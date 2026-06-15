@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 360" fill="none">
+  <!-- Decorative background glows -->
+  <circle cx="490" cy="45" r="95" fill="#818CF8" fill-opacity="0.05"/>
+  <circle cx="65" cy="330" r="72" fill="#34D399" fill-opacity="0.07"/>
+  <circle cx="280" cy="15" r="44" fill="#34D399" fill-opacity="0.04"/>
+
+  <!-- Grid — horizontal guides -->
+  <line x1="80" y1="95"  x2="500" y2="95"  stroke="#94A3B8" stroke-opacity="0.14" stroke-width="1"/>
+  <line x1="80" y1="140" x2="500" y2="140" stroke="#94A3B8" stroke-opacity="0.10" stroke-width="1"/>
+  <line x1="80" y1="185" x2="500" y2="185" stroke="#94A3B8" stroke-opacity="0.18" stroke-width="1"/>
+  <line x1="80" y1="230" x2="500" y2="230" stroke="#94A3B8" stroke-opacity="0.10" stroke-width="1"/>
+  <line x1="80" y1="275" x2="500" y2="275" stroke="#94A3B8" stroke-opacity="0.14" stroke-width="1"/>
+  <!-- Y-axis -->
+  <line x1="80" y1="75" x2="80" y2="290" stroke="#94A3B8" stroke-opacity="0.28" stroke-width="1"/>
+
+  <!-- ±2σ band lines (dashed, represent spread threshold) -->
+  <line x1="80" y1="99"  x2="500" y2="99"  stroke="#34D399" stroke-opacity="0.38" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="80" y1="271" x2="500" y2="271" stroke="#34D399" stroke-opacity="0.38" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="503" y="103" font-family="'Courier New',monospace" font-size="9" fill="#34D399" fill-opacity="0.72">+2σ</text>
+  <text x="503" y="275" font-family="'Courier New',monospace" font-size="9" fill="#34D399" fill-opacity="0.72">-2σ</text>
+
+  <!-- Spread fill area between Stock A and Stock B -->
+  <path d="
+    M 80,185
+    C 95,108 145,108 160,185
+    C 175,262 225,262 240,185
+    C 255,108 305,108 320,185
+    C 335,262 385,262 400,185
+    C 415,108 465,108 480,185
+    L 480,200
+    C 465,128 415,125 400,200
+    C 385,275 335,272 320,200
+    C 305,126 255,124 240,200
+    C 225,276 175,273 160,200
+    C 145,128 95,125 80,200
+    Z"
+    fill="#34D399" fill-opacity="0.08"/>
+
+  <!-- Signal zone marker (amber — where |Z| ≥ 2) -->
+  <rect x="385" y="85" width="2" height="200" fill="#F59E0B" fill-opacity="0.35"/>
+  <circle cx="386" cy="98"  r="5" fill="#F59E0B" fill-opacity="0.85"/>
+  <circle cx="386" cy="272" r="5" fill="#F59E0B" fill-opacity="0.85"/>
+
+  <!-- Stock B line (indigo) — drawn first so A sits on top -->
+  <path d="M 80,200 C 95,128 145,125 160,200 C 175,275 225,272 240,200 C 255,126 305,124 320,200 C 335,272 385,275 400,200 C 415,125 465,128 480,200"
+        stroke="#818CF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Stock A line (accent green) -->
+  <path d="M 80,185 C 95,108 145,108 160,185 C 175,262 225,262 240,185 C 255,108 305,108 320,185 C 335,262 385,262 400,185 C 415,108 465,108 480,185"
+        stroke="#34D399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Zero-crossing dots on Stock A -->
+  <circle cx="160" cy="185" r="4"   fill="#34D399"/>
+  <circle cx="240" cy="185" r="4"   fill="#34D399"/>
+  <circle cx="320" cy="185" r="4"   fill="#34D399"/>
+  <circle cx="400" cy="185" r="4"   fill="#34D399"/>
+  <circle cx="480" cy="185" r="3.5" fill="#34D399" fill-opacity="0.6"/>
+
+  <!-- Stock labels -->
+  <rect x="83" y="105" width="28" height="15" rx="4" fill="#34D399" fill-opacity="0.14"/>
+  <text x="97" y="116" font-family="'Courier New',monospace" font-size="8" fill="#34D399" text-anchor="middle" font-weight="bold">A</text>
+  <rect x="83" y="197" width="28" height="15" rx="4" fill="#818CF8" fill-opacity="0.14"/>
+  <text x="97" y="208" font-family="'Courier New',monospace" font-size="8" fill="#818CF8" text-anchor="middle" font-weight="bold">B</text>
+
+  <!-- Bottom stat pills -->
+  <rect x="118" y="306" width="92" height="23" rx="11.5" fill="#34D399" fill-opacity="0.10" stroke="#34D399" stroke-opacity="0.28" stroke-width="1"/>
+  <text x="164" y="321" font-family="'Courier New',monospace" font-size="9" fill="#34D399" text-anchor="middle">p = 0.023</text>
+
+  <rect x="226" y="306" width="92" height="23" rx="11.5" fill="#818CF8" fill-opacity="0.10" stroke="#818CF8" stroke-opacity="0.28" stroke-width="1"/>
+  <text x="272" y="321" font-family="'Courier New',monospace" font-size="9" fill="#818CF8" text-anchor="middle">HL = 14 d</text>
+
+  <rect x="334" y="306" width="92" height="23" rx="11.5" fill="#F59E0B" fill-opacity="0.10" stroke="#F59E0B" stroke-opacity="0.28" stroke-width="1"/>
+  <text x="380" y="321" font-family="'Courier New',monospace" font-size="9" fill="#F59E0B" text-anchor="middle">Z = &#x2212;2.4</text>
+</svg>

@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-data\\\\data_lake\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName | Select-Object -First 40)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-data\\\\ingestion\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-data\\\\warehouse\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName)",
+      "PowerShell(try { Invoke-RestMethod -Uri \"http://127.0.0.1:8000/api/stock/RELIANCE/summary\" -ErrorAction Stop } catch { \"BACKEND DOWN: $_\" })",
+      "PowerShell(Start-Sleep -Seconds 4; Invoke-RestMethod -Uri \"http://127.0.0.1:8000/health\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"-m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload\" -WorkingDirectory \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\" -NoNewWindow; Start-Sleep -Seconds 4; Invoke-WebRequest -Uri \"http://127.0.0.1:8000/health\" -UseBasicParsing -TimeoutSec 5 2>&1 | Select-Object StatusCode, Content)",
+      "Skill(claude-api)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\\\\app\" -Recurse -Filter \"*.py\")",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\" -MaxDepth 2 -Exclude \".venv\")",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(.venv\\\\Scripts\\\\uvicorn.exe app.main:app --port 8000 --log-level info)",
+      "Bash(npm run *)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\\\\.venv\\\\Scripts\\\\uvicorn.exe\" -ArgumentList \"app.main:app\", \"--port\", \"8000\", \"--log-level\", \"info\" -WorkingDirectory \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\" -PassThru | Select-Object Id)",
+      "PowerShell(Start-Job -ScriptBlock { cd C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend; python ingestion/nse_delivery_downloader.py --start 2024-01-01 2>&1 | Tee-Object -FilePath C:\\\\Users\\\\amitk\\\\EscVel\\\\delivery_download.log } | Select-Object Id, Name, State)",
+      "PowerShell(Start-Process -FilePath \"python\" -ArgumentList \"ingestion/nse_delivery_downloader.py --start 2024-01-01\" -WorkingDirectory \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\" -RedirectStandardOutput \"C:\\\\Users\\\\amitk\\\\EscVel\\\\delivery_download.log\" -RedirectStandardError \"C:\\\\Users\\\\amitk\\\\EscVel\\\\delivery_download_err.log\" -WindowStyle Hidden -PassThru | Select-Object Id, ProcessName)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Python311\\\\python.exe\" -ArgumentList \"-m uvicorn app.main:app --host 127.0.0.1 --port 8000\" -WorkingDirectory \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\" -RedirectStandardOutput \"C:\\\\Users\\\\amitk\\\\EscVel\\\\backend_out.log\" -RedirectStandardError \"C:\\\\Users\\\\amitk\\\\EscVel\\\\backend_err.log\" -WindowStyle Hidden -PassThru | Select-Object Id)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"-m uvicorn app.main:app --host 127.0.0.1 --port 8000\" -WorkingDirectory \"C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend\" -RedirectStandardOutput \"C:\\\\Users\\\\amitk\\\\EscVel\\\\backend_out.log\" -RedirectStandardError \"C:\\\\Users\\\\amitk\\\\EscVel\\\\backend_err.log\" -WindowStyle Hidden -PassThru | Select-Object Id)",
+      "PowerShell(Start-Sleep -Seconds 4; \\(Invoke-RestMethod http://localhost:8000/api/delivery/summary -ErrorAction SilentlyContinue\\).items[0] | Select-Object symbol, current_vol_ratio, delivery_ratio)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/docs)",
+      "Bash(curl -s http://localhost:8000/)",
+      "WebFetch(domain:themazine.com)",
+      "WebFetch(domain:undraw.co)",
+      "Skill(run)",
+      "PowerShell($p = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($p\\) { Stop-Process -Id $p[0].OwningProcess -Force; Write-Host \"killed\" } else { Write-Host \"none\" })"
+    ]
+  }
+}

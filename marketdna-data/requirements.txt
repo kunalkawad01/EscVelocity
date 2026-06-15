@@ -1,0 +1,8 @@
+kiteconnect
+polars
+duckdb
+pydantic
+python-dotenv
+pyarrow
+tzdata
+pytest
