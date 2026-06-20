@@ -1094,6 +1094,46 @@ function rankColor(rank: number | null, total: number): string {
   return pct <= 0.33 ? '#22c55e' : pct >= 0.67 ? '#ef4444' : '#f59e0b'
 }
 
+function TransparencyDrawer({ formula, interpret, conclusion }: {
+  formula: string
+  interpret: string
+  conclusion: string
+}) {
+  const [open, setOpen] = useState(false)
+  const { INK3, BORDER, CYAN } = usePalette()
+  return (
+    <Box sx={{ mt: 1.25, pt: 0.75, borderTop: `1px solid ${BORDER}` }}>
+      <Box
+        onClick={() => setOpen(v => !v)}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', '&:hover': { opacity: 0.75 } }}
+      >
+        <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.52rem', color: INK3, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+          How is this calculated?
+        </Typography>
+        <Typography sx={{ fontSize: '0.55rem', color: INK3 }}>{open ? '▲' : '▼'}</Typography>
+      </Box>
+      {open && (
+        <Box sx={{ mt: 0.75, display: 'flex', flexDirection: 'column', gap: 0.6 }}>
+          {([
+            { label: 'Formula',        text: formula,    color: CYAN      },
+            { label: 'Interpretation', text: interpret,  color: '#f59e0b' },
+            { label: 'Conclusion',     text: conclusion, color: '#22c55e' },
+          ] as { label: string; text: string; color: string }[]).map(({ label, text, color }) => (
+            <Box key={label} sx={{ px: 0.875, py: 0.6, borderRadius: 1, bgcolor: `${color}08`, borderLeft: `2px solid ${color}` }}>
+              <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.5rem', color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.3 }}>
+                {label}
+              </Typography>
+              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.6rem', color: INK3, lineHeight: 1.5 }}>
+                {text}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 function StockIntelligenceCard({
   data,
   onClose,
@@ -1470,6 +1510,11 @@ function StockIntelligenceCard({
                         </Box>
                       ))}
                     </Box>
+                    <TransparencyDrawer
+                      formula="Score = Trend (0–25) + Momentum (0–25) + RS (0–25) + Vol Quality (0–25). Trend: +10 if Price > VWAP, +5 if > SMA20, +6 if > SMA50, +4 if > SMA200. Momentum & RS: avg rank percentile across timeframes × 25. Vol: min(25, max(2, round(vol_ratio × direction_weight × 10)))."
+                      interpret="80–100 = Strong — all dimensions healthy. 60–79 = Moderate. 40–59 = Mixed — check sub-scores. Below 40 = Broad weakness. Sub-scores are independent and additive: a stock can score high on trend but low on RS, pinpointing the specific risk."
+                      conclusion={`${healthScore.total}/100. ${healthScore.total >= 65 ? 'Broad strength — signals have higher reliability.' : healthScore.total >= 40 ? `Mixed. Weakest sub-score: ${[['Trend', healthScore.trend], ['Momentum', healthScore.momentum], ['RS', healthScore.rs], ['Volume', healthScore.vol]].sort((a, b) => (a[1] as number) - (b[1] as number))[0][0]} (${[['Trend', healthScore.trend], ['Momentum', healthScore.momentum], ['RS', healthScore.rs], ['Volume', healthScore.vol]].sort((a, b) => (a[1] as number) - (b[1] as number))[0][1]}/25). Address this before entering.` : 'Broad weakness across all dimensions — elevated entry risk.'}`}
+                    />
                   </Box>
                 </Grid>
 
@@ -1504,6 +1549,11 @@ function StockIntelligenceCard({
                     <Box sx={{ mt: 0.75, px: 1, py: 0.4, borderRadius: 1, bgcolor: `${trendColor}14`, border: `1px solid ${trendColor}35`, textAlign: 'center' }}>
                       <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 700, color: trendColor }}>{trendLabel}</Typography>
                     </Box>
+                    <TransparencyDrawer
+                      formula="Score = count of true conditions: (1) Price > VWAP, (2) Price > SMA20, (3) Price > SMA50, (4) Price > SMA200. Each SMA represents a progressively longer trend horizon — 20d (short), 50d (medium), 200d (long-term institutional)."
+                      interpret="4/4 = Strong Uptrend. 3/4 = Uptrend. 2/4 = Mixed/Consolidating. 1/4 = Downtrend. 0/4 = Strong Downtrend. VWAP is intraday only; SMA alignment is the more durable signal. Stocks above all 4 levels historically show lower entry risk."
+                      conclusion={`${trendScore}/4 conditions pass — ${trendLabel}. ${trendScore === 4 ? 'Price is above VWAP and all three key moving averages. Structural trend is fully aligned.' : trendScore === 0 ? 'Price is below VWAP and all SMAs. Any rally into these levels is a resistance zone, not a breakout.' : `Passes ${trendScore} of 4. Failing conditions act as overhead resistance for long entries.`}`}
+                    />
                   </Box>
                 </Grid>
 
@@ -1549,6 +1599,11 @@ function StockIntelligenceCard({
                             </Typography>
                           </Box>
                         )}
+                        <TransparencyDrawer
+                          formula="Position% = (LTP − 52W Low) / (52W High − 52W Low) × 100. From High% = (LTP − High) / High × 100. From Low% = (LTP − Low) / Low × 100. All computed from the rolling 52-week window of daily closing prices."
+                          interpret="0–10% = Near yearly low (watch for reversal). 10–90% = Mid-range. 90–100% = Near yearly high (momentum zone, breakout potential). Stocks in the top decile of their yearly range in strong markets tend to continue higher; in weak markets this is an exit zone."
+                          conclusion={data.high_52w != null && data.low_52w != null ? `At ${pct52w.toFixed(0)}% of yearly range — ${near52wHigh ? `within striking distance of the 52W high (₹${data.high_52w.toLocaleString('en-IN')}). Breakout watch.` : near52wLow ? `hovering near the 52W low (₹${data.low_52w.toLocaleString('en-IN')}). Mean reversion risk is elevated.` : 'mid-range. No extreme reading on either end.'}` : 'Insufficient 52W data to draw conclusions.'}
+                        />
                       </>
                     ) : (
                       <Typography sx={{ ...SANS, fontSize: '0.68rem', color: INK3 }}>No 52W data</Typography>
@@ -1607,6 +1662,11 @@ function StockIntelligenceCard({
                     ) : (
                       <Typography sx={{ ...SANS, fontSize: '0.68rem', color: INK3 }}>No data</Typography>
                     )}
+                    <TransparencyDrawer
+                      formula="For each timeframe (1d, 1w, 1m, 3m, 6m, 1y): rank this stock's return vs all universe stocks (U bar) and all sector stocks (S bar). Bar fill = 1 − rank/total, so a full bar = rank #1. RS Health Score = avg sector rank percentile across timeframes × 25."
+                      interpret="U (Universe) = performance vs all NSE stocks. S (Sector) = performance vs same-sector peers. Top-third (green) = outperforming. Middle-third (amber) = in-line. Bottom-third (red) = underperforming. Consistent outperformance across multiple timeframes signals genuine institutional accumulation."
+                      conclusion={`Sector rank: #${secRank} of ${secTotal}${data.sector ? ` in ${data.sector}` : ''} — ${rsLabel}. ${secPct <= 0.25 ? 'Top-quartile performer — relative strength is a key tailwind.' : secPct <= 0.5 ? 'Second-quartile performer — moderate RS, acceptable for positional entries.' : 'Underperforming its sector peers. Prefer sector leaders unless catalyst-driven.'}`}
+                    />
                   </Box>
                 </Grid>
 
@@ -1641,6 +1701,11 @@ function StockIntelligenceCard({
                         )
                       })}
                     </Box>
+                    <TransparencyDrawer
+                      formula="Today's Return = (Close − Prev Close) / Prev Close × 100. Momentum Score = avg universe rank percentile across 1d/1w/1m/3m × 25. Multi-TF bars show absolute return_pct for each period, ranked against all stocks in the universe."
+                      interpret="> +2% = Strong Up. +0.5 to +2% = Moderate Up. −0.5 to +0.5% = Flat. −2 to −0.5% = Moderate Down. < −2% = Strong Down. Single-day momentum is noisy — alignment across 1d/1w/1m reduces false signals significantly."
+                      conclusion={`Today: ${data.return_pct > 0 ? '+' : ''}${data.return_pct.toFixed(2)}% — ${momLabel}. Score: ${healthScore.momentum}/25. ${healthScore.momentum >= 18 ? 'Strong multi-timeframe momentum alignment — trend has broad support.' : healthScore.momentum >= 10 ? 'Moderate momentum — directional but not accelerating.' : 'Weak or mixed momentum across timeframes — avoid chasing.'}`}
+                    />
                   </Box>
                 </Grid>
 
@@ -1676,6 +1741,11 @@ function StockIntelligenceCard({
                         </Box>
                       ))}
                     </Box>
+                    <TransparencyDrawer
+                      formula="Vol Ratio = Today's Volume / 20-Day Average Volume. Score = min(25, max(2, round(ratio × weight × 10))). Direction weight: 1.0 if return > 0, 0.7 if return 0 to −3%, 0.4 if return < −3%. Penalises high volume on strongly negative days."
+                      interpret="> 2x = Spike (institutional activity). 1.3–2x = High. 0.5–1.3x = Normal. < 0.5x = Low (disinterest). High volume on a positive day = buying conviction. High volume on a negative day = distribution or stop-loss cascade. Volume without price movement = accumulation or absorption."
+                      conclusion={`${volRatio.toFixed(1)}x average — ${volLabel}. ${volRatio > 1.5 ? ret1d > 0 ? 'High volume on an up day: buying conviction. Increases reliability of the bullish signal.' : 'High volume on a down day: selling pressure or distribution. Reduce position sizing.' : volRatio < 0.7 ? 'Below-average volume: lack of conviction. Avoid breakout trades — moves on low volume fade frequently.' : 'Volume is within normal range. No strong conviction signal either way.'}`}
+                    />
                   </Box>
                 </Grid>
               </Grid>
@@ -1704,6 +1774,11 @@ function StockIntelligenceCard({
                     {chartBars.length > 0 && (
                       <HighchartsReact highcharts={Highcharts} options={ddOptions} />
                     )}
+                    <TransparencyDrawer
+                      formula="Drawdown(t) = (Price(t) − RunningMax(Price[0..t])) / RunningMax(Price[0..t]) × 100. Always ≤ 0. RunningMax is the highest close within the window. 1W/1M/3M/1Y values show the maximum % decline from peak within each lookback window."
+                      interpret="0 to −5% = Minor dip. −5 to −10% = Pullback. −10 to −20% = Correction. −20 to −30% = Bear phase. > −30% = Deep bear. Shallow drawdown + rapid recovery = high-quality compounding stock. Deep drawdown + slow recovery = value trap risk."
+                      conclusion={`1M drawdown: ${data.drawdown_1m.toFixed(1)}%. 1Y drawdown: ${data.drawdown_1y.toFixed(1)}%. ${Math.abs(data.drawdown_1m) < 5 ? 'Shallow 1M drawdown — price is holding near recent highs. Positive for trend continuation.' : Math.abs(data.drawdown_1m) < 15 ? 'Moderate correction from 1M peak. Assess whether key support has held.' : 'Significant 1M drawdown. Risk/reward for fresh longs is impaired until drawdown narrows.'}`}
+                    />
                   </Box>
                 </Grid>
 
@@ -1768,6 +1843,11 @@ function StockIntelligenceCard({
                         </Box>
                       )
                     })}
+                    <TransparencyDrawer
+                      formula="Resistance = SMAs above LTP, sorted ascending (nearest first). Support = SMAs below LTP, sorted descending (nearest first). Fallback order: SMA20 → SMA50 → SMA200 → 52W High/Low → LTP ±5%/±10%. SMA values come from 20-day closing price averages."
+                      interpret="Each level is a zone where price previously found buyers/sellers. SMAs act as dynamic support/resistance because institutional algorithms place orders near them. A clean break above Resistance 1 on volume = bullish structural shift. A close below Support 1 = exit signal for longs."
+                      conclusion={`LTP ₹${data.ltp.toLocaleString('en-IN')}. Nearest resistance: ₹${res1.toLocaleString('en-IN', { maximumFractionDigits: 1 })} (${((res1 - data.ltp) / data.ltp * 100).toFixed(1)}% away). Nearest support: ₹${sup1.toLocaleString('en-IN', { maximumFractionDigits: 1 })} (${((data.ltp - sup1) / data.ltp * 100).toFixed(1)}% below). ${(res1 - data.ltp) / data.ltp < 0.03 ? 'Very close to resistance — reduce size or wait for confirmed breakout.' : (data.ltp - sup1) / data.ltp < 0.02 ? 'Sitting on support — strong risk/reward for longs with tight stop.' : 'Price in mid-zone between support and resistance.'}`}
+                    />
                   </Box>
                 </Grid>
 
@@ -1782,6 +1862,11 @@ function StockIntelligenceCard({
                         <Typography sx={{ ...SANS, fontSize: '0.64rem', color: INK2, lineHeight: 1.55 }}>{b.text}</Typography>
                       </Box>
                     ))}
+                    <TransparencyDrawer
+                      formula="Each bullet is derived from a specific computed value: (1) Trend bullet ← trendScore count. (2) RS bullet ← secRank/secTotal. (3) 52W position ← pct52w = (LTP − Low52W) / (High52W − Low52W) × 100. (4) Volume bullet ← volRatio vs 20D avg. (5) Pattern bullet ← most recent pattern from /api/patterns/{symbol}/history."
+                      interpret="▲ = bullish signal. ▼ = bearish signal. ◆ = neutral / mixed. These bullets are not a recommendation — they are a factual summary of the model's computed outputs. Read all bullets together; conflicting signals reduce conviction and suggest waiting for clarity."
+                      conclusion={`${bullets.filter(b => b.type === 'bull').length} bullish, ${bullets.filter(b => b.type === 'bear').length} bearish, ${bullets.filter(b => b.type === 'neutral').length} neutral signals. ${bullets.filter(b => b.type === 'bull').length > bullets.filter(b => b.type === 'bear').length ? 'Balance of signals favours the long side.' : bullets.filter(b => b.type === 'bear').length > bullets.filter(b => b.type === 'bull').length ? 'Balance of signals favours caution.' : 'Signals are evenly split — no strong directional edge. Wait for a clearer setup.'}`}
+                    />
                   </Box>
                 </Grid>
               </Grid>
@@ -1791,7 +1876,7 @@ function StockIntelligenceCard({
             <Grid item xs={12} lg={3}>
 
               {/* Action */}
-              <Box sx={{ ...iCard(biasColor), mb: 2 }}>
+              <Box sx={{ ...iCard(biasColor), mb: 2, height: 'auto' }}>
                 <SectionHead title="ACTION" accent={biasColor} />
                 <Box sx={{ textAlign: 'center', mb: 1.5 }}>
                   <Box sx={{ display: 'inline-block', px: 1.5, py: 0.6, borderRadius: 1.5, bgcolor: `${biasColor}18`, border: `1px solid ${biasColor}50` }}>
@@ -1836,10 +1921,10 @@ function StockIntelligenceCard({
 
               {/* Best Indicator */}
               {edgeData && (
-                <Box sx={{ ...iCard('#8b5cf6'), mb: 2 }}>
+                <Box sx={{ ...iCard('#8b5cf6'), mb: 2, height: 'auto' }}>
                   <SectionHead title="BEST INDICATOR" accent="#8b5cf6" />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.75 }}>
-                    <Typography sx={{ ...MONO, fontSize: '0.7rem', fontWeight: 700, color: INK, flex: 1, mr: 0.5 }}>{edgeData.best_indicator}</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75, minWidth: 0 }}>
+                    <Typography sx={{ ...MONO, fontSize: '0.7rem', fontWeight: 700, color: INK, flex: 1, mr: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{edgeData.best_indicator}</Typography>
                     {edgeData.grade && (
                       <Box sx={{ px: 0.75, py: 0.2, borderRadius: 0.75, bgcolor: '#22c55e14', border: '1px solid #22c55e30', flexShrink: 0 }}>
                         <Typography sx={{ ...MONO, fontSize: '0.58rem', color: '#22c55e', fontWeight: 700 }}>{edgeData.grade}</Typography>
@@ -1847,12 +1932,12 @@ function StockIntelligenceCard({
                     )}
                   </Box>
                   {edgeData.best_setup && (
-                    <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, mb: 0.75, lineHeight: 1.45 }}>{edgeData.best_setup}</Typography>
+                    <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, mb: 0.75, lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{edgeData.best_setup}</Typography>
                   )}
                   {Array.isArray(edgeData.current_signals) && edgeData.current_signals.length > 0 && (
                     <Box sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: `${CYAN}10`, border: `1px solid ${CYAN}25` }}>
-                      <Typography sx={{ ...MONO, fontSize: '0.62rem', color: CYAN }}>
-                        Active: {edgeData.current_signals[0].signal ?? edgeData.current_signals[0].name}
+                      <Typography sx={{ ...MONO, fontSize: '0.62rem', color: CYAN, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Active: {edgeData.current_signals[0].signal_label}
                       </Typography>
                     </Box>
                   )}
@@ -1860,7 +1945,7 @@ function StockIntelligenceCard({
               )}
 
               {/* Best Pattern Now */}
-              <Box sx={iCard('#22c55e')}>
+              <Box sx={{ ...iCard('#22c55e'), height: 'auto' }}>
                 <SectionHead title="BEST PATTERN NOW" accent="#22c55e" />
                 {patternData ? (
                   bestPattern ? (
