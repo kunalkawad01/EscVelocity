@@ -11,10 +11,13 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [indicators_page.md](indicators_page.md) | `/indicators` | **Reference UI.** Technical indicator scanner + edge lab |
 | [landing_page.md](landing_page.md) | `/` | Editorial home — module showcase + platform philosophy |
 | [markov_options_page.md](markov_options_page.md) | `/markov-options` | 6-regime Markov classifier + options strategy engine |
+| [options_page.md](options_page.md) | `/options` | F&O OI analysis — butterfly, max pain, CE/PE walls, 4-way buildup signal |
 | [pattern_dna_page.md](pattern_dna_page.md) | `/pattern-dna` | Pattern detection + validation + DNA scoring engine |
 | [pattern_dna_guide_page.md](pattern_dna_guide_page.md) | `/pattern-dna-guide` | Static user guide for the PatternDNA module |
 | [quant_strategies_page.md](quant_strategies_page.md) | `/quant-strategies` | Momentum · mean-reversion · vol rank · sector rotation |
+| [randomness_page.md](randomness_page.md) | `/randomness` | Luck vs Skill · Return Concentration · Fragility — Monte Carlo 10k shuffles |
 | [short_page.md](short_page.md) | `/short` | Short candidate screener + squeeze watch |
+| [stock_health_page.md](stock_health_page.md) | `/stock-health` | 20-metric behavioural profile + 7-archetype scanner for NSE 500 |
 | [stock_page.md](stock_page.md) | `/stock` | Comprehensive per-stock research profile (19 sections) |
 
 ---

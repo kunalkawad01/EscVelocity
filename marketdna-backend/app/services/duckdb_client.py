@@ -23,6 +23,27 @@ if _delivery_path.exists() and any(_delivery_path.rglob("*.parquet")):
         SELECT * FROM read_parquet('{_delivery_glob}', hive_partitioning = true)
     """)
 
+_options_glob = str(
+    settings.data_path / "data_lake/raw/options/date=*/data.parquet"
+).replace("\\", "/")
+
+_options_dir = settings.data_path / "data_lake" / "raw" / "options"
+if _options_dir.exists() and any(_options_dir.rglob("*.parquet")):
+    _base_con.execute(f"""
+        CREATE VIEW options_chain AS
+        SELECT * FROM read_parquet('{_options_glob}', hive_partitioning = true)
+    """)
+
+_futures_glob = str(
+    settings.data_path / "data_lake/raw/futures/date=*/data.parquet"
+).replace("\\", "/")
+_futures_dir = settings.data_path / "data_lake" / "raw" / "futures"
+if _futures_dir.exists() and any(_futures_dir.rglob("*.parquet")):
+    _base_con.execute(f"""
+        CREATE VIEW futures_chain AS
+        SELECT * FROM read_parquet('{_futures_glob}', hive_partitioning = true)
+    """)
+
 _returns_path = str(settings.data_path / "data_lake/features/returns.parquet").replace("\\", "/")
 _std_path = str(settings.data_path / "data_lake/features/std_deviation.parquet").replace("\\", "/")
 
@@ -32,6 +53,30 @@ if (settings.data_path / "data_lake/features/std_deviation.parquet").exists():
     _base_con.execute(f"CREATE VIEW std_deviation_features AS SELECT * FROM read_parquet('{_std_path}')")
 
 _local = threading.local()
+
+
+def ensure_fo_views() -> None:
+    """Re-register options_chain / futures_chain if parquet now exists.
+
+    Called by options_service so the views are available even when the backend
+    started before the data was ingested (CREATE OR REPLACE is idempotent).
+    """
+    if _options_dir.exists() and any(_options_dir.rglob("*.parquet")):
+        try:
+            _base_con.execute(
+                f"CREATE OR REPLACE VIEW options_chain AS "
+                f"SELECT * FROM read_parquet('{_options_glob}', hive_partitioning = true)"
+            )
+        except Exception:
+            pass
+    if _futures_dir.exists() and any(_futures_dir.rglob("*.parquet")):
+        try:
+            _base_con.execute(
+                f"CREATE OR REPLACE VIEW futures_chain AS "
+                f"SELECT * FROM read_parquet('{_futures_glob}', hive_partitioning = true)"
+            )
+        except Exception:
+            pass
 
 
 def get_connection() -> duckdb.DuckDBPyConnection:

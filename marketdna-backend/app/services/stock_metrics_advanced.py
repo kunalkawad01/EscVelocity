@@ -1120,3 +1120,10 @@ def get_dual_momentum(symbol: str) -> DualMomentumResponse:
         history=history[-252:],
         signal_performance=signal_performance,
     )
+
+
+def invalidate_cache() -> int:
+    """Clear all day-cached results. Returns number of entries cleared."""
+    count = len(_cache)
+    _cache.clear()
+    return count

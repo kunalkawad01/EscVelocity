@@ -1,11 +1,14 @@
 import { useState, useRef, useMemo } from 'react'
 import Navbar from '../components/Navbar'
+import { Footer } from '../components/Footer'
 import MarketRegimeDashboard from '../components/market/MarketRegimeDashboard'
 import IndicatorEdgeLab from '../components/stock/IndicatorEdgeLab'
 import EdgeSummaryTable from '../components/stock/EdgeSummaryTable'
 import MaterialTable from '../components/MaterialTable'
 import type { ColDef } from '../components/MaterialTable'
 import SymbolAutocomplete from '../components/shared/SymbolAutocomplete'
+import SearchBox from '../components/shared/SearchBox'
+import SectionHead from '../components/shared/SectionHead'
 import {
   Box, Typography, LinearProgress,
   Select, MenuItem, OutlinedInput, Tooltip, Grid,
@@ -63,19 +66,6 @@ function RunBtn({ onClick, loading, label }: { onClick: () => void; loading: boo
   )
 }
 
-function SectionHead({ title, accent, meta }: { title: string; accent: string; meta?: string }) {
-  const { INK, INK3 } = usePalette()
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-      <Box sx={{
-        width: 3, height: 20, borderRadius: '2px', bgcolor: accent, flexShrink: 0,
-        boxShadow: `0 0 8px ${accent}80`,
-      }} />
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: INK, letterSpacing: '0.02em', ...JAKARTA }}>{title}</Typography>
-      {meta && <Typography sx={{ fontSize: '0.62rem', color: INK3, ml: 'auto', ...JAKARTA }}>{meta}</Typography>}
-    </Box>
-  )
-}
 
 function StatRow({ label, value, valueColor }: { label: string; value: React.ReactNode; valueColor?: string }) {
   const { INK3, INK, BORDER } = usePalette()
@@ -346,11 +336,7 @@ function ScanSection({ onSymbolSelect }: { onSymbolSelect: (s: string) => void }
 
           {/* Filters */}
           <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            <OutlinedInput
-              size="small" placeholder="Search symbol…" value={searchStock}
-              onChange={e => setSearchStock(e.target.value)}
-              sx={{ ...INPUT_SX, width: 130, bgcolor: PAPER2 }}
-            />
+            <SearchBox value={searchStock} onChange={setSearchStock} placeholder="Symbol…" width={130} />
             <Select value={filterSignal} onChange={e => setFilterSignal(e.target.value as string)}
               input={<OutlinedInput sx={{ ...INPUT_SX, bgcolor: PAPER2 }} />}
               sx={{ minWidth: 120, ...INPUT_SX, bgcolor: PAPER2 }}
@@ -894,76 +880,6 @@ function TabBar({ active, onChange }: { active: number; onChange: (i: number) =>
   )
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function Footer() {
-  const { PAPER, BORDER, CYAN, INK, INK3, INK2 } = usePalette()
-  const NAV = [
-    { label: 'Platform',   links: ['Stock DNA', 'Pattern DNA', 'Markov Options', 'Quant Strategies', 'Indicators']           },
-    { label: 'Intelligence', links: ['Market Regime', 'Breadth Score', 'Edge Lab', 'Cointegration', 'Delivery Intel']        },
-    { label: 'Research',   links: ['Validation Framework', 'MCP Architecture', 'AI Agents', 'Feature Store', 'Backtests']   },
-  ]
-  return (
-    <Box component="footer" sx={{ bgcolor: PAPER, borderTop: `1px solid ${BORDER}`, mt: 8 }}>
-      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 3, md: 8, lg: 12 }, pt: 6, pb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 6, flexWrap: 'wrap', mb: 5 }}>
-          {/* Brand block */}
-          <Box sx={{ flex: '0 0 auto', maxWidth: 260 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{ width: 7, height: 7, bgcolor: CYAN, animation: 'blink 1.4s step-end infinite',
-                '@keyframes blink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } } }} />
-              <Typography sx={{ ...JAKARTA, fontWeight: 800, fontSize: '1rem', color: INK, letterSpacing: '0.08em' }}>
-                MARKET<Box component="span" sx={{ color: CYAN }}>DNA</Box>
-              </Typography>
-            </Box>
-            <Typography sx={{ ...JAKARTA, fontSize: '0.8rem', color: INK3, lineHeight: 1.7, mb: 2 }}>
-              Quantitative market intelligence for Indian equities and options. Research precedes product. Validation is mandatory.
-            </Typography>
-            <Box
-              component="img"
-              src="https://cdn.undraw.co/illustration/data-at-work_3tbf.svg"
-              alt=""
-              sx={{ width: 140, opacity: 0.6 }}
-            />
-          </Box>
-          {/* Nav columns */}
-          {NAV.map(col => (
-            <Box key={col.label} sx={{ flex: '1 1 140px' }}>
-              <Typography sx={{ ...JAKARTA, fontSize: '0.7rem', fontWeight: 700, color: CYAN, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1.75 }}>
-                {col.label}
-              </Typography>
-              {col.links.map(link => (
-                <Typography key={link} sx={{ ...JAKARTA, fontSize: '0.8rem', color: INK3, mb: 0.875, cursor: 'default',
-                  '&:hover': { color: INK2 }, transition: 'color 0.12s' }}>
-                  {link}
-                </Typography>
-              ))}
-            </Box>
-          ))}
-          {/* Illustration */}
-          <Box sx={{ flex: '0 0 auto', display: { xs: 'none', lg: 'flex' }, alignItems: 'center' }}>
-            <Box
-              component="img"
-              src="https://cdn.undraw.co/illustration/real-time-analytics_50za.svg"
-              alt=""
-              sx={{ width: 180, opacity: 0.55 }}
-            />
-          </Box>
-        </Box>
-
-        {/* Bottom bar */}
-        <Box sx={{ borderTop: `1px solid ${BORDER}`, pt: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
-          <Typography sx={{ ...JAKARTA, fontSize: '0.7rem', color: INK3 }}>
-            © 2024 MarketDNA · Data sourced from NSE via Kite Connect · For research purposes only
-          </Typography>
-          <Typography sx={{ ...JAKARTA, fontSize: '0.7rem', color: INK3 }}>
-            Not investment advice · Past performance is not indicative of future results
-          </Typography>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 

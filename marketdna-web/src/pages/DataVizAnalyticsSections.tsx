@@ -12,6 +12,7 @@ import {
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import SymbolAutocomplete from '../components/shared/SymbolAutocomplete'
+import SectionHead from '../components/shared/SectionHead'
 import { datavizApi } from '../api/datavizApi'
 import type {
   HistogramResponse,
@@ -29,19 +30,6 @@ const JAKARTA = { fontFamily: "'IBM Plex Sans', sans-serif" } as const
 const MONO    = { fontFamily: "'IBM Plex Mono', monospace" } as const
 const WIN     = '#22c55e'
 const LOSS    = '#ef4444'
-
-// ─── Shared primitives (re-declared here to avoid cross-file import of private components) ─
-
-function SectionHead({ title, accent, meta }: { title: string; accent: string; meta?: string }) {
-  const { INK, INK3 } = usePalette()
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-      <Box sx={{ width: 3, height: 20, borderRadius: '2px', bgcolor: accent, flexShrink: 0, boxShadow: `0 0 8px ${accent}80` }} />
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: INK, letterSpacing: '0.02em', ...JAKARTA }}>{title}</Typography>
-      {meta && <Typography sx={{ fontSize: '0.62rem', color: INK3, ml: 'auto', ...JAKARTA }}>{meta}</Typography>}
-    </Box>
-  )
-}
 
 function ChartInfo({ what, rationale, use: howToUse }: { what: string; rationale: string; use: string }) {
   const { INK3, PAPER2, BORDER } = usePalette()

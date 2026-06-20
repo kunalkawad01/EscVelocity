@@ -7,6 +7,7 @@ import {
 } from '@mui/material'
 import Navbar from '../components/Navbar'
 import { Footer } from '../components/Footer'
+import SectionHead from '../components/shared/SectionHead'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import SymbolAutocomplete from '../components/shared/SymbolAutocomplete'
 import { useThemeMode } from '../contexts/ThemeModeContext'
@@ -54,17 +55,6 @@ function horizonLabel(h: string): string {
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
-function SectionHead({ title, accent, meta }: { title: string; accent: string; meta?: string }) {
-  const { INK, INK3 } = usePalette()
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-      <Box sx={{ width: 3, height: 20, borderRadius: '2px', bgcolor: accent, flexShrink: 0, boxShadow: `0 0 8px ${accent}80` }} />
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: INK, letterSpacing: '0.02em', ...JAKARTA }}>{title}</Typography>
-      {meta && <Typography sx={{ fontSize: '0.62rem', color: INK3, ml: 'auto', ...JAKARTA }}>{meta}</Typography>}
-    </Box>
-  )
-}
-
 function RunBtn({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
   const { CYAN } = usePalette()
   return (
@@ -95,13 +85,12 @@ function StatChip({ label, value, color }: { label: string; value: string; color
 // ─── Snapshot bar chart ───────────────────────────────────────────────────────
 
 function SnapshotChart({ data, horizon }: { data: ReturnSnapshotResponse; horizon: string }) {
-  const { mode } = useThemeMode()
+  const { PAPER, INK, INK3, BORDER, INK2 } = usePalette()
 
-  const isDark       = mode === 'dark'
-  const gridColor    = isDark ? '#1E3055' : '#D1DCEA'
-  const labelColor   = isDark ? '#7A90B4' : '#8696AC'
-  const surfaceColor = isDark ? '#0B1429' : '#FFFFFF'
-  const textColor    = isDark ? '#E4EDFF' : '#0B1829'
+  const gridColor    = BORDER
+  const labelColor   = INK2
+  const surfaceColor = PAPER
+  const textColor    = INK
 
   // losers: most negative first → winners: most positive last
   const combined = useMemo(() => {
@@ -140,14 +129,14 @@ function SnapshotChart({ data, horizon }: { data: ReturnSnapshotResponse; horizo
       },
       plotLines: [{
         value: 0,
-        color: isDark ? '#4B607A' : '#8696AC',
+        color: INK3,
         width: 1,
         zIndex: 5,
       }],
     },
     tooltip: {
       backgroundColor: surfaceColor,
-      borderColor: isDark ? '#1E3055' : '#D1DCEA',
+      borderColor: BORDER,
       borderWidth: 1,
       shadow: false,
       style: { color: textColor, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '12px' },
@@ -175,7 +164,7 @@ function SnapshotChart({ data, horizon }: { data: ReturnSnapshotResponse; horizo
         color: b.value >= 0 ? WIN : LOSS,
       })),
     }],
-  }), [combined, horizon, isDark, gridColor, labelColor, surfaceColor, textColor])
+  }), [combined, horizon, gridColor, labelColor, surfaceColor, textColor])
 
   return (
     <Box sx={{ mt: 1, '.highcharts-container': { width: '100% !important' } }}>
@@ -187,13 +176,12 @@ function SnapshotChart({ data, horizon }: { data: ReturnSnapshotResponse; horizo
 // ─── History bar chart ────────────────────────────────────────────────────────
 
 function HistoryChart({ data, metric }: { data: ReturnHistoryResponse; metric: string }) {
-  const { mode } = useThemeMode()
+  const { PAPER, INK, INK3, BORDER, INK2 } = usePalette()
 
-  const isDark = mode === 'dark'
-  const gridColor  = isDark ? '#1E3055' : '#D1DCEA'
-  const labelColor = isDark ? '#7A90B4' : '#8696AC'
-  const surfaceColor = isDark ? '#0B1429' : '#FFFFFF'
-  const textColor    = isDark ? '#E4EDFF' : '#0B1829'
+  const gridColor    = BORDER
+  const labelColor   = INK2
+  const surfaceColor = PAPER
+  const textColor    = INK
 
   const options = useMemo((): Highcharts.Options => ({
     chart: {
@@ -223,14 +211,14 @@ function HistoryChart({ data, metric }: { data: ReturnHistoryResponse; metric: s
       },
       plotLines: [{
         value: 0,
-        color: isDark ? '#4B607A' : '#8696AC',
+        color: INK3,
         width: 1,
         zIndex: 5,
       }],
     },
     tooltip: {
       backgroundColor: surfaceColor,
-      borderColor: isDark ? '#1E3055' : '#D1DCEA',
+      borderColor: BORDER,
       borderWidth: 1,
       shadow: false,
       style: { color: textColor, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '12px' },
@@ -262,7 +250,7 @@ function HistoryChart({ data, metric }: { data: ReturnHistoryResponse; metric: s
         color: d.value >= 0 ? WIN : LOSS,
       })),
     }],
-  }), [data, metric, isDark, gridColor, labelColor, surfaceColor, textColor])
+  }), [data, metric, gridColor, labelColor, surfaceColor, textColor])
 
   return (
     <Box sx={{ mt: 1, '.highcharts-container': { width: '100% !important' } }}>
@@ -497,13 +485,12 @@ const SCATTER_HORIZONS = [
 ]
 
 function ScatterChart({ data }: { data: ScatterResponse }) {
-  const { mode } = useThemeMode()
+  const { PAPER, INK, INK3, BORDER, INK2 } = usePalette()
 
-  const isDark       = mode === 'dark'
-  const gridColor    = isDark ? '#1E3055' : '#D1DCEA'
-  const labelColor   = isDark ? '#7A90B4' : '#8696AC'
-  const surfaceColor = isDark ? '#0B1429' : '#FFFFFF'
-  const textColor    = isDark ? '#E4EDFF' : '#0B1829'
+  const gridColor    = BORDER
+  const labelColor   = INK2
+  const surfaceColor = PAPER
+  const textColor    = INK
 
   const options = useMemo((): Highcharts.Options => ({
     chart: {
@@ -528,7 +515,7 @@ function ScatterChart({ data }: { data: ScatterResponse }) {
       },
       plotLines: [{
         value: data.stats.median_ret,
-        color: isDark ? '#6366f180' : '#6366f160',
+        color: '#6366f170',
         width: 1.5,
         dashStyle: 'Dash',
         zIndex: 5,
@@ -549,7 +536,7 @@ function ScatterChart({ data }: { data: ScatterResponse }) {
       },
       plotLines: [{
         value: data.stats.median_std,
-        color: isDark ? '#f59e0b80' : '#f59e0b60',
+        color: '#f59e0b70',
         width: 1.5,
         dashStyle: 'Dash',
         zIndex: 5,
@@ -562,7 +549,7 @@ function ScatterChart({ data }: { data: ScatterResponse }) {
     },
     tooltip: {
       backgroundColor: surfaceColor,
-      borderColor: isDark ? '#1E3055' : '#D1DCEA',
+      borderColor: BORDER,
       borderWidth: 1,
       shadow: false,
       style: { color: textColor, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '12px' },
@@ -579,7 +566,7 @@ function ScatterChart({ data }: { data: ScatterResponse }) {
     legend: { enabled: false },
     plotOptions: {
       scatter: {
-        marker: { radius: 5, symbol: 'circle', states: { hover: { enabled: true, lineColor: isDark ? '#fff' : '#000', lineWidth: 1 } } },
+        marker: { radius: 5, symbol: 'circle', states: { hover: { enabled: true, lineColor: INK, lineWidth: 1 } } },
       },
     },
     series: [{
@@ -592,7 +579,7 @@ function ScatterChart({ data }: { data: ScatterResponse }) {
         color: p.ret >= 0 ? `${WIN}CC` : `${LOSS}CC`,
       })),
     }],
-  }), [data, isDark, gridColor, labelColor, surfaceColor, textColor])
+  }), [data, INK, INK3, BORDER, gridColor, labelColor, surfaceColor, textColor])
 
   return (
     <Box sx={{ mt: 1, '.highcharts-container': { width: '100% !important' } }}>
@@ -604,14 +591,12 @@ function ScatterChart({ data }: { data: ScatterResponse }) {
 // ─── Above-200 area chart ─────────────────────────────────────────────────────
 
 function Above200Chart({ data, mode: viewMode }: { data: Above200WeeklyResponse; mode: 'pct' | 'count' }) {
-  const { mode } = useThemeMode()
-  const { CYAN } = usePalette()
+  const { PAPER, INK, INK3, BORDER, INK2, CYAN } = usePalette()
 
-  const isDark       = mode === 'dark'
-  const gridColor    = isDark ? '#1E3055' : '#D1DCEA'
-  const labelColor   = isDark ? '#7A90B4' : '#8696AC'
-  const surfaceColor = isDark ? '#0B1429' : '#FFFFFF'
-  const textColor    = isDark ? '#E4EDFF' : '#0B1829'
+  const gridColor    = BORDER
+  const labelColor   = INK2
+  const surfaceColor = PAPER
+  const textColor    = INK
 
   const isPct = viewMode === 'pct'
 
@@ -645,13 +630,13 @@ function Above200Chart({ data, mode: viewMode }: { data: Above200WeeklyResponse;
       },
       plotLines: isPct ? [
         { value: 80, color: '#22c55e60', width: 1, dashStyle: 'Dash' as const, label: { text: '80%', style: { color: labelColor, fontSize: '10px' } } },
-        { value: 50, color: isDark ? '#4B607A' : '#8696AC', width: 1, dashStyle: 'Dash' as const, label: { text: '50%', style: { color: labelColor, fontSize: '10px' } } },
+        { value: 50, color: INK3, width: 1, dashStyle: 'Dash' as const, label: { text: '50%', style: { color: labelColor, fontSize: '10px' } } },
         { value: 20, color: '#ef444460', width: 1, dashStyle: 'Dash' as const, label: { text: '20%', style: { color: labelColor, fontSize: '10px' } } },
       ] : [],
     },
     tooltip: {
       backgroundColor: surfaceColor,
-      borderColor: isDark ? '#1E3055' : '#D1DCEA',
+      borderColor: BORDER,
       borderWidth: 1,
       shadow: false,
       style: { color: textColor, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '12px' },
@@ -685,7 +670,7 @@ function Above200Chart({ data, mode: viewMode }: { data: Above200WeeklyResponse;
         y: isPct ? d.pct_above_200 : d.n_above_200,
       })),
     }],
-  }), [data, isPct, isDark, CYAN, gridColor, labelColor, surfaceColor, textColor])
+  }), [data, isPct, CYAN, INK3, gridColor, labelColor, surfaceColor, textColor])
 
   return (
     <Box sx={{ mt: 1, '.highcharts-container': { width: '100% !important' } }}>

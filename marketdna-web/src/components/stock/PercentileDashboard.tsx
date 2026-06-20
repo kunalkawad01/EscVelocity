@@ -1,14 +1,14 @@
-﻿import { Box, Typography, Grid, CircularProgress, LinearProgress } from '@mui/material'
+import { Box, Typography, Grid, CircularProgress, LinearProgress } from '@mui/material'
 import type { PercentilesResponse } from '../../types/stock'
+import { usePalette } from '../../hooks/usePalette'
 
-const INK    = '#F2EDE4'
-const INK2   = '#8B95AC'
-const INK3   = '#5B6880'
-const BORDER = '#0F1526'
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: PercentilesResponse | null; loading: boolean }
 
 export default function PercentileDashboard({ data, loading }: Props) {
+  const { INK, INK2, INK3 } = usePalette()
   if (loading) {
     return (
       <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -20,7 +20,7 @@ export default function PercentileDashboard({ data, loading }: Props) {
 
   return (
     <Box>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
         Historical Context
       </Typography>
       <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', color: INK, mb: 0.5, display: 'block' }}>
@@ -41,6 +41,7 @@ export default function PercentileDashboard({ data, loading }: Props) {
 }
 
 function PercentileCard({ metric }: { metric: { metric: string; current_value: number; unit: string; percentile: number; label: string } }) {
+  const { PAPER, BORDER, INK, INK3 } = usePalette()
   const pct = metric.percentile
   const barColor = pct >= 75 ? '#ef4444' : pct >= 50 ? '#f59e0b' : pct >= 25 ? '#4f9cf9' : '#22c55e'
 
@@ -50,22 +51,22 @@ function PercentileCard({ metric }: { metric: { metric: string; current_value: n
         p: 2.5,
         borderRadius: '14px',
         border: `1px solid ${BORDER}`,
-        background: '#07090F',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-        '&:hover': { borderColor: `${barColor}50`, boxShadow: `0 0 18px ${barColor}12` },
+        bgcolor: PAPER,
+        transition: 'border-color 0.2s',
+        '&:hover': { borderColor: `${barColor}50` },
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
         <Box>
-          <Typography variant="caption" sx={{ color: INK3, textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.75rem', display: 'block' }}>
+          <Typography sx={{ ...COND, fontSize: '0.7rem', fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block' }}>
             {metric.label}
           </Typography>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: INK }}>
+          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.875rem', fontWeight: 700, color: INK }}>
             {metric.metric}
           </Typography>
         </Box>
         <Box sx={{ textAlign: 'right' }}>
-          <Typography variant="body2" sx={{ fontWeight: 700, color: INK }}>
+          <Typography sx={{ ...MONO, fontSize: '0.9rem', fontWeight: 700, color: INK }}>
             {metric.current_value}{metric.unit}
           </Typography>
         </Box>

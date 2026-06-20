@@ -301,6 +301,42 @@ export interface MarketDynamicsResponse {
   strongest_lagger: string | null
 }
 
+// ── Options & Futures ─────────────────────────────────────────────────────────
+
+export interface StrikeData {
+  strike: number
+  ce_oi: number
+  pe_oi: number
+  ce_oi_change: number | null
+  pe_oi_change: number | null
+  ce_volume: number
+  pe_volume: number
+  ce_iv: number | null
+  pe_iv: number | null
+  ce_ltp: number
+  pe_ltp: number
+  pcr: number | null
+}
+
+export interface OIAnalysis {
+  symbol: string
+  date: string
+  expiry: string
+  spot: number
+  atm_strike: number
+  ce_wall: number
+  pe_wall: number
+  max_pain: number
+  pcr: number
+  total_ce_oi: number
+  total_pe_oi: number
+  atm_iv: number | null
+  strikes: StrikeData[]
+  max_pain_curve: { strike: number; total_pain: number }[]
+  futures_ltp: number | null
+  basis_pct: number | null
+}
+
 // ── Sprint 3 types ─────────────────────────────────────────────────────────────
 
 export interface AnalogSnapshot {

@@ -26,7 +26,7 @@ export default function SymbolAutocomplete({
 
   return (
     <Autocomplete
-      value={value || null}
+      value={value || undefined}
       onChange={(_, v) => v && onChange(v)}
       options={options}
       filterOptions={(opts, { inputValue }) => {

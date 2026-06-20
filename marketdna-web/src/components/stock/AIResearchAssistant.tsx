@@ -1,4 +1,5 @@
 ﻿import { useState, useRef, useEffect } from 'react'
+import { usePalette } from '../../hooks/usePalette'
 import {
   Box, Typography, TextField, IconButton, Chip, Paper,
   Collapse, Divider, Stack, Tooltip,
@@ -29,6 +30,7 @@ const SUGGESTIONS = [
 let msgId = 0
 
 export default function AIResearchAssistant({ symbol }: { symbol: string }) {
+  const { BORDER, PAPER2, INK2, INK3 } = usePalette()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -94,7 +96,7 @@ export default function AIResearchAssistant({ symbol }: { symbol: string }) {
             <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#A78BFA' }}>llama3.2</Typography>
           </Box>
         </Box>
-        <Typography sx={{ fontSize: '0.73rem', color: '#4B5563', lineHeight: 1.5 }}>
+        <Typography sx={{ fontSize: '0.73rem', color: INK3, lineHeight: 1.5 }}>
           Ask any question about this stock — answers backed by live DuckDB queries on historical price data
         </Typography>
       </Box>
@@ -140,7 +142,7 @@ export default function AIResearchAssistant({ symbol }: { symbol: string }) {
             mb: 2,
             pr: 0.5,
             '&::-webkit-scrollbar': { width: 4 },
-            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 2 },
+            '&::-webkit-scrollbar-thumb': { bgcolor: INK3, borderRadius: 2 },
           }}
         >
           {messages.map(msg => (
@@ -171,8 +173,8 @@ export default function AIResearchAssistant({ symbol }: { symbol: string }) {
                     sx={{
                       px: 2,
                       py: 1.5,
-                      bgcolor: 'rgba(255,255,255,0.025)',
-                      border: '1px solid rgba(255,255,255,0.07)',
+                      bgcolor: PAPER2,
+                      border: `1px solid ${BORDER}`,
                       borderLeft: '3px solid rgba(167,139,250,0.4)',
                       borderRadius: '4px 16px 16px 16px',
                     }}
@@ -238,7 +240,7 @@ export default function AIResearchAssistant({ symbol }: { symbol: string }) {
                                     borderRadius: 1,
                                     fontSize: '0.7rem',
                                     fontFamily: "'IBM Plex Mono', 'Fira Code', monospace",
-                                    color: 'rgba(255,255,255,0.6)',
+                                    color: INK2,
                                     overflowX: 'auto',
                                     whiteSpace: 'pre-wrap',
                                     wordBreak: 'break-all',
@@ -297,9 +299,9 @@ export default function AIResearchAssistant({ symbol }: { symbol: string }) {
           disabled={loading}
           sx={{
             '& .MuiOutlinedInput-root': {
-              bgcolor: 'rgba(255,255,255,0.07)',
-              '& fieldset': { borderColor: 'rgba(255,255,255,0.10)' },
-              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.20)' },
+              bgcolor: PAPER2,
+              '& fieldset': { borderColor: BORDER },
+              '&:hover fieldset': { borderColor: INK3 },
               '&.Mui-focused fieldset': { borderColor: 'rgba(167,139,250,0.5) !important' },
             },
           }}
@@ -312,7 +314,7 @@ export default function AIResearchAssistant({ symbol }: { symbol: string }) {
             bgcolor: 'primary.main',
             color: '#fff',
             '&:hover': { bgcolor: 'primary.dark' },
-            '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)' },
+            '&.Mui-disabled': { bgcolor: BORDER, color: INK3 },
             flexShrink: 0,
           }}
         >

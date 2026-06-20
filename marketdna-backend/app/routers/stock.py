@@ -21,6 +21,13 @@ def _check_symbol(symbol: str, symbols: list[str]) -> None:
         raise HTTPException(status_code=404, detail=f"Symbol '{symbol}' not found")
 
 
+@router.post("/invalidate")
+def invalidate_stock_cache():
+    n1 = stock_metrics.invalidate_cache()
+    n2 = stock_metrics_advanced.invalidate_cache()
+    return {"status": "invalidated", "cleared": n1 + n2}
+
+
 @router.get("/symbols", response_model=SymbolListResponse)
 def list_symbols():
     return SymbolListResponse(symbols=stock_metrics.get_symbols())

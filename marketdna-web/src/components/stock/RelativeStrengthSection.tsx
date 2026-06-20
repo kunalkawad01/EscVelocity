@@ -5,14 +5,14 @@ import Highcharts from 'highcharts'
 import type { RelativeStrengthResponse } from '../../types/stock'
 import { hcTheme } from '../../theme'
 import StatCard from './StatCard'
+import { usePalette } from '../../hooks/usePalette'
+
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: RelativeStrengthResponse | null; loading: boolean }
 
-const INK    = '#F2EDE4'
-const INK2   = '#8B95AC'
-const INK3   = '#5B6880'
-
 export default function RelativeStrengthSection({ data, loading }: Props) {
+  const { INK, INK2, INK3 } = usePalette()
   const options = useMemo((): Highcharts.Options => {
     if (!data?.ranks.length) return {}
     const series = data.ranks.map(r => [new Date(r.date).getTime(), r.rank])
@@ -76,7 +76,7 @@ export default function RelativeStrengthSection({ data, loading }: Props) {
   const { stats } = data
   return (
     <Box>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
         Peer Comparison
       </Typography>
       <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', color: INK, mb: 0.5, display: 'block' }}>

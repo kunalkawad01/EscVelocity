@@ -4,6 +4,8 @@ import { useParams } from 'react-router-dom'
 import {
   Box, Typography, Select, MenuItem, Grid, CircularProgress, Alert, Tooltip,
 } from '@mui/material'
+import SearchBox from '../components/shared/SearchBox'
+import SectionHead from '../components/shared/SectionHead'
 import type { ArchetypeSummary, ArchetypeScanResponse } from '../types/stock_health'
 import HighchartsReact from 'highcharts-react-official'
 import Highcharts from 'highcharts'
@@ -95,18 +97,6 @@ const ARCHETYPES = [
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SectionHead({ title, accent }: { title: string; accent: string }) {
-  const { INK } = usePalette()
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-      <Box sx={{ width: 3, height: 18, borderRadius: 2, bgcolor: accent, flexShrink: 0 }} />
-      <Typography sx={{ ...SANS, fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.04em', color: INK }}>
-        {title}
-      </Typography>
-    </Box>
-  )
-}
 
 function Card({ children, sx = {} }: { children: React.ReactNode; sx?: object }) {
   const { PAPER, BORDER } = usePalette()
@@ -592,6 +582,7 @@ function ArchetypeScanner({ onSelect }: { onSelect: (symbol: string) => void }) 
   const [started, setStarted]    = useState(false)
   const [error, setError]        = useState<string | null>(null)
   const [active, setActive]      = useState<string>(ARCHETYPES[0].name)
+  const [symSearch, setSymSearch] = useState('')
 
   const poll = () => {
     stockHealthApi.getScan()
@@ -620,7 +611,12 @@ function ArchetypeScanner({ onSelect }: { onSelect: (symbol: string) => void }) 
   , [items])
 
   const activeMeta = ARCHETYPES.find(a => a.name === active) ?? ARCHETYPES[0]
-  const activeStocks = grouped[active] ?? []
+  const allActiveStocks = grouped[active] ?? []
+  const activeStocks = symSearch
+    ? allActiveStocks.filter(s => s.symbol.toLowerCase().includes(symSearch.toLowerCase()))
+    : allActiveStocks
+
+  const handleArchetypeChange = (name: string) => { setActive(name); setSymSearch('') }
 
   if (!started) {
     return (
@@ -687,7 +683,7 @@ function ArchetypeScanner({ onSelect }: { onSelect: (symbol: string) => void }) 
           return (
             <Box
               key={a.name}
-              onClick={() => setActive(a.name)}
+              onClick={() => handleArchetypeChange(a.name)}
               sx={{
                 display: 'flex', alignItems: 'center', gap: 1.25,
                 px: 2, py: 1.5,
@@ -729,14 +725,17 @@ function ArchetypeScanner({ onSelect }: { onSelect: (symbol: string) => void }) 
       <Box sx={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
         {/* Archetype header */}
         <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${BORDER}`, bgcolor: `${activeMeta.color}08` }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
             <Typography sx={{ fontSize: '1.1rem', color: activeMeta.color }}>{activeMeta.icon}</Typography>
             <Typography sx={{ ...SANS, fontSize: '0.9rem', fontWeight: 800, letterSpacing: '0.08em', color: activeMeta.color }}>
               {activeMeta.name}
             </Typography>
             <Typography sx={{ ...SANS, fontSize: '0.72rem', color: INK3 }}>
-              — {activeStocks.length} stock{activeStocks.length !== 1 ? 's' : ''}
+              — {activeStocks.length}{symSearch ? ` of ${allActiveStocks.length}` : ''} stock{activeStocks.length !== 1 ? 's' : ''}
             </Typography>
+            <Box sx={{ ml: 'auto' }}>
+              <SearchBox value={symSearch} onChange={setSymSearch} placeholder="Filter…" width={110} />
+            </Box>
           </Box>
           <Typography sx={{ ...SANS, fontSize: '0.72rem', color: INK2, lineHeight: 1.5 }}>
             {activeMeta.investor}

@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Box, Typography, CircularProgress, Collapse } from '@mui/material'
 import Navbar from '../components/Navbar'
+import { Footer } from '../components/Footer'
 import { SquiggleUnderline, ResearchNote } from '../components/DoodleDecor'
 import { shortApi } from '../api/shortApi'
 import type { ShortCandidate, SqueezeWatch, MarketContext } from '../types/short'
 import { GRADE_COLOR, SQUEEZE_RISK_COLOR } from '../types/short'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
+import SearchBox from '../components/shared/SearchBox'
 
 // ─── Semantic colors (not palette) ────────────────────────────────────────────
 
@@ -36,7 +39,8 @@ function ActiveDot() {
 }
 
 function GradeBadge({ grade }: { grade: string }) {
-  const c = GRADE_COLOR[grade] ?? '#94a3b8'
+  const { INK3 } = usePalette()
+  const c = GRADE_COLOR[grade] ?? INK3
   return (
     <Box component="span" sx={{
       px: 0.875, py: 0.25, fontSize: '0.6875rem', fontWeight: 700, lineHeight: 1.5,
@@ -417,6 +421,7 @@ function AlgoGuide() {
 
 function ShortCard({ c, expanded, onToggle }: { c: ShortCandidate; expanded: boolean; onToggle: () => void }) {
   const { PAPER, BORDER, INK, INK2, INK3, PAPER2, CYAN } = usePalette()
+  const navigate = useNavigate()
   const evColor  = c.expected_value > 0 ? '#22C55E' : RED
   const wrColor  = c.win_rate >= 60 ? '#22C55E' : c.win_rate >= 50 ? '#FBBF24' : RED
   const weakBoost = c.mkt_low_win_rate != null && c.mkt_low_win_rate > c.win_rate + 5
@@ -431,7 +436,11 @@ function ShortCard({ c, expanded, onToggle }: { c: ShortCandidate; expanded: boo
       {/* Top row */}
       <Box sx={{ px: 2, pt: 1.75, pb: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography sx={{ ...MONO, fontSize: '1.05rem', fontWeight: 800, color: INK, letterSpacing: '-0.01em' }}>
+          <Typography
+            onClick={e => { e.stopPropagation(); navigate(`/stock/${c.symbol}`) }}
+            sx={{ ...MONO, fontSize: '1.05rem', fontWeight: 800, color: INK, letterSpacing: '-0.01em',
+              cursor: 'pointer', '&:hover': { color: CYAN }, transition: 'color 0.12s' }}
+          >
             {c.symbol}
           </Typography>
           <GradeBadge grade={c.grade} />
@@ -540,7 +549,8 @@ function ShortCard({ c, expanded, onToggle }: { c: ShortCandidate; expanded: boo
 // ─── Squeeze Card ─────────────────────────────────────────────────────────────
 
 function SqueezeCard({ s, expanded, onToggle }: { s: SqueezeWatch; expanded: boolean; onToggle: () => void }) {
-  const { PAPER, BORDER, INK, INK2, INK3, PAPER2 } = usePalette()
+  const { PAPER, BORDER, INK, INK2, INK3, PAPER2, CYAN } = usePalette()
+  const navigate = useNavigate()
   const riskColor = SQUEEZE_RISK_COLOR[s.squeeze_risk]
   const wrColor   = s.win_rate >= 60 ? '#22C55E' : s.win_rate >= 50 ? '#FBBF24' : RED
   const weakMktDanger = s.mkt_low_win_rate != null && s.mkt_low_win_rate > s.win_rate + 5
@@ -555,7 +565,11 @@ function SqueezeCard({ s, expanded, onToggle }: { s: SqueezeWatch; expanded: boo
       {/* Header */}
       <Box sx={{ px: 2, pt: 1.75, pb: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography sx={{ ...MONO, fontSize: '1.05rem', fontWeight: 800, color: INK, letterSpacing: '-0.01em' }}>
+          <Typography
+            onClick={e => { e.stopPropagation(); navigate(`/stock/${s.symbol}`) }}
+            sx={{ ...MONO, fontSize: '1.05rem', fontWeight: 800, color: INK, letterSpacing: '-0.01em',
+              cursor: 'pointer', '&:hover': { color: CYAN }, transition: 'color 0.12s' }}
+          >
             {s.symbol}
           </Typography>
           {s.is_active && <ActiveDot />}
@@ -812,47 +826,6 @@ function SqueezeLegend() {
   )
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function Footer() {
-  const { PAPER, BORDER, CYAN, INK, INK2, INK3 } = usePalette()
-  const NAV = [
-    { label: 'Platform',     links: ['Stock DNA', 'Pattern DNA', 'Markov Options', 'Quant Strategies', 'Indicators'] },
-    { label: 'Intelligence', links: ['Market Regime', 'Breadth Score', 'Edge Lab', 'Cointegration', 'Delivery Intel'] },
-    { label: 'Research',     links: ['Validation Framework', 'MCP Architecture', 'AI Agents', 'Feature Store', 'Backtests'] },
-  ]
-  return (
-    <Box component="footer" sx={{ bgcolor: PAPER, borderTop: `1px solid ${BORDER}`, mt: 8 }}>
-      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 3, md: 8, lg: 12 }, pt: 6, pb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 6, flexWrap: 'wrap', mb: 5 }}>
-          <Box sx={{ flex: '0 0 auto', maxWidth: 260 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{ width: 7, height: 7, bgcolor: CYAN, animation: 'blink 1.4s step-end infinite', '@keyframes blink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } } }} />
-              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: 800, fontSize: '1rem', color: INK, letterSpacing: '0.08em' }}>
-                MARKET<Box component="span" sx={{ color: CYAN }}>DNA</Box>
-              </Typography>
-            </Box>
-            <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem', color: INK3, lineHeight: 1.7 }}>
-              Quantitative market intelligence for Indian equities and options. Research precedes product. Validation is mandatory.
-            </Typography>
-          </Box>
-          {NAV.map(col => (
-            <Box key={col.label} sx={{ flex: '1 1 140px' }}>
-              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, color: CYAN, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1.75 }}>{col.label}</Typography>
-              {col.links.map(link => (
-                <Typography key={link} sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem', color: INK3, mb: 0.875, cursor: 'default', transition: 'color 0.12s', '&:hover': { color: INK2 } }}>{link}</Typography>
-              ))}
-            </Box>
-          ))}
-        </Box>
-        <Box sx={{ borderTop: `1px solid ${BORDER}`, pt: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
-          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK3 }}>© 2024 MarketDNA · For research purposes only</Typography>
-          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK3 }}>Not investment advice</Typography>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -867,6 +840,7 @@ export default function ShortPage() {
   const [sqFilter, setSqFilter]         = useState<'all' | 'high' | 'active'>('all')
   const [expandedShort, setExpandedShort]     = useState<string | null>(null)
   const [expandedSqueeze, setExpandedSqueeze] = useState<string | null>(null)
+  const [symSearch, setSymSearch] = useState('')
 
   useEffect(() => {
     shortApi.getIntelligence()
@@ -875,14 +849,18 @@ export default function ShortPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const shorts = (data?.short_candidates ?? []).filter(c =>
-    shortFilter === 'active' ? c.is_active : true
-  )
-  const squeezes = (data?.squeeze_watch ?? []).filter(s => {
-    if (sqFilter === 'high')   return s.squeeze_risk === 'High'
-    if (sqFilter === 'active') return s.is_active
+  const shorts = useMemo(() => (data?.short_candidates ?? []).filter(c => {
+    if (shortFilter === 'active' && !c.is_active) return false
+    if (symSearch && !c.symbol.toUpperCase().includes(symSearch.toUpperCase())) return false
     return true
-  })
+  }), [data, shortFilter, symSearch])
+
+  const squeezes = useMemo(() => (data?.squeeze_watch ?? []).filter(s => {
+    if (sqFilter === 'high'   && s.squeeze_risk !== 'High')  return false
+    if (sqFilter === 'active' && !s.is_active)               return false
+    if (symSearch && !s.symbol.toUpperCase().includes(symSearch.toUpperCase())) return false
+    return true
+  }), [data, sqFilter, symSearch])
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: BG, color: INK }}>
@@ -945,6 +923,16 @@ export default function ShortPage() {
             )}
 
             <AlgoGuide />
+
+            {/* Search */}
+            <Box sx={{ mb: 2.5 }}>
+              <SearchBox
+                value={symSearch}
+                onChange={setSymSearch}
+                placeholder="Filter by symbol…"
+                width={240}
+              />
+            </Box>
 
             {/* Two-column grid */}
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' }, gap: 4, alignItems: 'start' }}>

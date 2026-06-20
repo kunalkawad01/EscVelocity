@@ -1,19 +1,19 @@
-﻿import { useMemo } from 'react'
+import { useMemo } from 'react'
 import { Box, Typography, Stack, CircularProgress, Chip } from '@mui/material'
 import HighchartsReact from 'highcharts-react-official'
 import Highcharts from 'highcharts'
 import type { RiskResponse } from '../../types/stock'
 import { hcTheme } from '../../theme'
 import StatCard from './StatCard'
+import { usePalette } from '../../hooks/usePalette'
+
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: RiskResponse | null; loading: boolean }
 
-const INK    = '#F2EDE4'
-const INK2   = '#8B95AC'
-const INK3   = '#5B6880'
-const BORDER = '#0F1526'
-
 export default function RiskIntelligence({ data, loading }: Props) {
+  const { INK, INK2, INK3, BORDER } = usePalette()
+
   const options = useMemo((): Highcharts.Options => {
     if (!data?.atr_series.length) return {}
     const series = data.atr_series.map(p => [new Date(p.date).getTime(), p.atr14])
@@ -46,7 +46,7 @@ export default function RiskIntelligence({ data, loading }: Props) {
         },
       },
     }
-  }, [data])
+  }, [data, INK3])
 
   if (loading) {
     return (
@@ -64,7 +64,7 @@ export default function RiskIntelligence({ data, loading }: Props) {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+          <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
             Volatility Exposure
           </Typography>
           <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', color: INK, display: 'block' }}>
@@ -86,7 +86,6 @@ export default function RiskIntelligence({ data, loading }: Props) {
         <StatCard label="ATR % of Price" value={`${stats.atr_pct_of_price}%`} sub="daily range estimate" accent="default" />
       </Stack>
 
-      {/* Percentile bar */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>Low Volatility</Typography>
