@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import {
-  Box, Typography, Collapse, Tooltip, LinearProgress,
+  Box, Typography, Tooltip,
 } from '@mui/material'
 import type { PairResult, SpreadSignalStats } from '../../types/cointegration'
 import { GRADE_COLOR, GRADE_BG } from '../../types/cointegration'
+import { usePalette } from '../../hooks/usePalette'
+import FilterChip from '../shared/FilterChip'
+
+const SANS = { fontFamily: "'IBM Plex Sans', sans-serif" } as const
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
 
 // ─── Z-score sparkline ────────────────────────────────────────────────────────
 
 function ZSparkline({ data }: { data: number[] }) {
+  const { BORDER } = usePalette()
   if (data.length < 10) return null
   const W = 220, H = 56
   const PAD = { t: 6, r: 4, b: 6, l: 4 }
@@ -26,14 +32,10 @@ function ZSparkline({ data }: { data: number[] }) {
 
   return (
     <svg width={W} height={H} style={{ display: 'block' }}>
-      {/* Zero line */}
-      <line x1={PAD.l} y1={y0} x2={W - PAD.r} y2={y0} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
-      {/* ±2 dashed bands */}
+      <line x1={PAD.l} y1={y0} x2={W - PAD.r} y2={y0} stroke={BORDER} strokeWidth={1} />
       <line x1={PAD.l} y1={y2p} x2={W - PAD.r} y2={y2p} stroke="rgba(239,68,68,0.3)"  strokeWidth={1} strokeDasharray="3,3" />
       <line x1={PAD.l} y1={y2n} x2={W - PAD.r} y2={y2n} stroke="rgba(34,197,94,0.3)"  strokeWidth={1} strokeDasharray="3,3" />
-      {/* Z-score line */}
       <polyline points={pts} fill="none" stroke="#60a5fa" strokeWidth={1.5} strokeLinejoin="round" />
-      {/* Current dot */}
       <circle cx={toX(data.length - 1)} cy={toY(last)} r={3} fill={dotColor} />
     </svg>
   )
@@ -47,9 +49,10 @@ function SignalCard({
   label: string; color: string; bg: string
   stats: SpreadSignalStats | null
 }) {
+  const { INK, INK3 } = usePalette()
   return (
     <Box sx={{ flex: 1, p: 1.5, borderRadius: '8px', bgcolor: bg, border: `1px solid ${color}30` }}>
-      <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color, textTransform: 'uppercase',
+      <Typography sx={{ ...SANS, fontSize: '0.6rem', fontWeight: 700, color, textTransform: 'uppercase',
         letterSpacing: '0.08em', mb: 1 }}>
         {label}
       </Typography>
@@ -57,43 +60,42 @@ function SignalCard({
         <>
           <Box sx={{ display: 'flex', gap: 2.5, mb: 1 }}>
             <Box>
-              <Typography sx={{ fontSize: '0.57rem', color: '#64748B' }}>Win Rate</Typography>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 900,
+              <Typography sx={{ ...SANS, fontSize: '0.57rem', color: INK3 }}>Win Rate</Typography>
+              <Typography sx={{ ...MONO, fontSize: '1rem', fontWeight: 900,
                 color: stats.win_rate >= 60 ? '#22c55e' : stats.win_rate >= 50 ? '#fbbf24' : '#ef4444' }}>
                 {stats.win_rate.toFixed(1)}%
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '0.57rem', color: '#64748B' }}>EV</Typography>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 900,
+              <Typography sx={{ ...SANS, fontSize: '0.57rem', color: INK3 }}>EV</Typography>
+              <Typography sx={{ ...MONO, fontSize: '1rem', fontWeight: 900,
                 color: stats.expected_value > 0 ? '#22c55e' : '#ef4444' }}>
                 {stats.expected_value > 0 ? '+' : ''}{stats.expected_value.toFixed(2)}%
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '0.57rem', color: '#64748B' }}>Avg 1M</Typography>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 900,
+              <Typography sx={{ ...SANS, fontSize: '0.57rem', color: INK3 }}>Avg 1M</Typography>
+              <Typography sx={{ ...MONO, fontSize: '1rem', fontWeight: 900,
                 color: stats.avg_1m > 0 ? '#22c55e' : '#ef4444' }}>
                 {stats.avg_1m > 0 ? '+' : ''}{stats.avg_1m.toFixed(2)}%
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '0.57rem', color: '#64748B' }}>N</Typography>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#94A3B8' }}>
+              <Typography sx={{ ...SANS, fontSize: '0.57rem', color: INK3 }}>N</Typography>
+              <Typography sx={{ ...MONO, fontSize: '1rem', fontWeight: 900, color: INK3 }}>
                 {stats.occurrences}
               </Typography>
             </Box>
           </Box>
-          {/* Market regime conditional */}
           {(stats.mkt_regime_high_win_rate !== null || stats.mkt_regime_low_win_rate !== null) && (
             <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
               {stats.mkt_regime_high_win_rate !== null && (
                 <Box sx={{ flex: 1, p: 0.75, borderRadius: '6px',
                   bgcolor: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                  <Typography sx={{ fontSize: '0.55rem', color: '#22c55e', fontWeight: 700 }}>
+                  <Typography sx={{ ...SANS, fontSize: '0.55rem', color: '#22c55e', fontWeight: 700 }}>
                     Mkt ≥60 · {stats.mkt_regime_high_occurrences}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 800,
+                  <Typography sx={{ ...MONO, fontSize: '0.78rem', fontWeight: 800,
                     color: stats.mkt_regime_high_win_rate >= 60 ? '#22c55e' : '#fbbf24' }}>
                     {stats.mkt_regime_high_win_rate.toFixed(1)}%
                   </Typography>
@@ -102,10 +104,10 @@ function SignalCard({
               {stats.mkt_regime_low_win_rate !== null && (
                 <Box sx={{ flex: 1, p: 0.75, borderRadius: '6px',
                   bgcolor: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                  <Typography sx={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: 700 }}>
+                  <Typography sx={{ ...SANS, fontSize: '0.55rem', color: '#ef4444', fontWeight: 700 }}>
                     Mkt &lt;60 · {stats.mkt_regime_low_occurrences}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 800,
+                  <Typography sx={{ ...MONO, fontSize: '0.78rem', fontWeight: 800,
                     color: stats.mkt_regime_low_win_rate >= 60 ? '#22c55e' : '#fbbf24' }}>
                     {stats.mkt_regime_low_win_rate.toFixed(1)}%
                   </Typography>
@@ -113,7 +115,6 @@ function SignalCard({
               )}
             </Box>
           )}
-          {/* Distribution bar */}
           <Box sx={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', mt: 1 }}>
             {Object.entries(stats.distribution).map(([bucket, count]) => {
               const total = Object.values(stats.distribution).reduce((a, b) => a + b, 0)
@@ -129,7 +130,7 @@ function SignalCard({
           </Box>
         </>
       ) : (
-        <Typography sx={{ fontSize: '0.65rem', color: '#4B5563' }}>Insufficient signal history</Typography>
+        <Typography sx={{ ...SANS, fontSize: '0.65rem', color: INK3 }}>Insufficient signal history</Typography>
       )}
     </Box>
   )
@@ -181,26 +182,27 @@ function buildPairInsight(pair: PairResult): string {
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
 function PairDetail({ pair }: { pair: PairResult }) {
+  const { INK, INK2, INK3, BORDER, PAPER2 } = usePalette()
   const insight = buildPairInsight(pair)
   const isActive = Math.abs(pair.current_zscore) >= 2
 
   return (
     <Box sx={{
       mx: 1, mb: 1, p: 2, borderRadius: '10px',
-      bgcolor: 'rgba(255,255,255,0.015)',
-      border: '1px solid rgba(255,255,255,0.06)',
+      bgcolor: PAPER2,
+      border: `1px solid ${BORDER}`,
     }}>
       {/* Z-score sparkline */}
       <Box sx={{ mb: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: '#4B5563',
+          <Typography sx={{ ...SANS, fontSize: '0.6rem', fontWeight: 700, color: INK3,
             textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Z-score History (252 days)
           </Typography>
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '0.6rem', color: '#64748B' }}>— spread line</Typography>
-            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(239,68,68,0.7)' }}>--- +2</Typography>
-            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(34,197,94,0.7)' }}>--- -2</Typography>
+            <Typography sx={{ ...SANS, fontSize: '0.6rem', color: INK3 }}>— spread line</Typography>
+            <Typography sx={{ ...SANS, fontSize: '0.6rem', color: 'rgba(239,68,68,0.7)' }}>--- +2</Typography>
+            <Typography sx={{ ...SANS, fontSize: '0.6rem', color: 'rgba(34,197,94,0.7)' }}>--- -2</Typography>
           </Box>
         </Box>
         <ZSparkline data={pair.zscore_history} />
@@ -223,20 +225,20 @@ function PairDetail({ pair }: { pair: PairResult }) {
       {/* Key insight */}
       <Box sx={{
         p: 1.5, borderRadius: '8px',
-        bgcolor: isActive ? 'rgba(251,191,36,0.08)' : 'rgba(96,165,250,0.05)',
-        border: `1px solid ${isActive ? 'rgba(251,191,36,0.25)' : 'rgba(96,165,250,0.15)'}`,
+        bgcolor: isActive ? 'rgba(251,191,36,0.08)' : `${BORDER}50`,
+        border: `1px solid ${isActive ? 'rgba(251,191,36,0.25)' : BORDER}`,
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
           <Typography sx={{ fontSize: '0.75rem', lineHeight: 1 }}>
             {isActive ? '🚨' : '💡'}
           </Typography>
-          <Typography sx={{ fontSize: '0.62rem', fontWeight: 700,
+          <Typography sx={{ ...SANS, fontSize: '0.62rem', fontWeight: 700,
             color: isActive ? '#fbbf24' : '#60a5fa',
             textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {isActive ? 'Active Signal' : 'Key Insight'}
           </Typography>
         </Box>
-        <Typography sx={{ fontSize: '0.72rem', color: '#CBD5E1', lineHeight: 1.7 }}>
+        <Typography sx={{ ...SANS, fontSize: '0.72rem', color: INK2, lineHeight: 1.7 }}>
           {insight}
         </Typography>
       </Box>
@@ -251,8 +253,8 @@ function PairDetail({ pair }: { pair: PairResult }) {
           ['p-value', pair.p_value.toFixed(4)],
         ].map(([label, val]) => (
           <Box key={label}>
-            <Typography sx={{ fontSize: '0.57rem', color: '#374151' }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8' }}>{val}</Typography>
+            <Typography sx={{ ...SANS, fontSize: '0.57rem', color: INK3 }}>{label}</Typography>
+            <Typography sx={{ ...MONO, fontSize: '0.75rem', fontWeight: 700, color: INK2 }}>{val}</Typography>
           </Box>
         ))}
       </Box>
@@ -271,17 +273,19 @@ function Th({
   active: boolean; asc: boolean
   onClick: (k: SortKey) => void
 }) {
+  const { INK3, BORDER, CYAN } = usePalette()
   return (
     <Box
       component="th"
       onClick={() => onClick(sortKey)}
       sx={{
         px: 1.5, py: 1, textAlign: 'left', cursor: 'pointer', userSelect: 'none',
-        fontSize: '0.6rem', fontWeight: 700, color: active ? '#60a5fa' : '#4B5563',
+        ...SANS, fontSize: '0.6rem', fontWeight: 700,
+        color: active ? CYAN : INK3,
         textTransform: 'uppercase', letterSpacing: '0.07em',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: `1px solid ${BORDER}`,
         whiteSpace: 'nowrap',
-        '&:hover': { color: '#94A3B8' },
+        '&:hover': { color: CYAN },
       }}
     >
       {label} {active ? (asc ? '↑' : '↓') : ''}
@@ -292,6 +296,8 @@ function Th({
 // ─── Main table ───────────────────────────────────────────────────────────────
 
 export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
+  const { INK, INK2, INK3, BORDER, PAPER2, CYAN } = usePalette()
+
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
   const [sortKey, setSortKey]   = useState<SortKey>('grade')
   const [sortAsc, setSortAsc]   = useState(true)
@@ -328,23 +334,9 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
     <Box>
       {/* Filter bar */}
       <Box sx={{ display: 'flex', gap: 1, mb: 1.5, alignItems: 'center' }}>
-        {(['all', 'active'] as const).map(f => (
-          <Box
-            key={f}
-            onClick={() => setFilter(f)}
-            sx={{
-              px: 1.5, py: 0.5, borderRadius: '6px', cursor: 'pointer',
-              fontSize: '0.65rem', fontWeight: 700,
-              bgcolor: filter === f ? 'rgba(96,165,250,0.15)' : 'transparent',
-              color: filter === f ? '#60a5fa' : '#4B5563',
-              border: `1px solid ${filter === f ? 'rgba(96,165,250,0.3)' : 'rgba(255,255,255,0.05)'}`,
-              textTransform: 'capitalize',
-            }}
-          >
-            {f === 'active' ? '🔴 Active Signals Only' : 'All Pairs'}
-          </Box>
-        ))}
-        <Typography sx={{ fontSize: '0.62rem', color: '#374151', ml: 'auto' }}>
+        <FilterChip label="All Pairs" value="all" current={filter} onChange={v => setFilter(v as 'all' | 'active')} count={pairs.length} />
+        <FilterChip label="Active Signals" value="active" current={filter} onChange={v => setFilter(v as 'all' | 'active')} dot="#ef4444" accent="#ef4444" />
+        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, ml: 'auto' }}>
           {sorted.length} pair{sorted.length !== 1 ? 's' : ''}
         </Typography>
       </Box>
@@ -362,8 +354,8 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
               <Th label="Long WR"             sortKey="long_wr"       {...thProps} active={sortKey === 'long_wr'} />
               <Th label="Short WR"            sortKey="short_wr"      {...thProps} active={sortKey === 'short_wr'} />
               <Th label="Correlation"         sortKey="p_value"       {...thProps} active={false} />
-              <Box component="th" sx={{ px: 1.5, py: 1, borderBottom: '1px solid rgba(255,255,255,0.06)',
-                fontSize: '0.6rem', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              <Box component="th" sx={{ px: 1.5, py: 1, borderBottom: `1px solid ${BORDER}`,
+                ...SANS, fontSize: '0.6rem', color: INK3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 Z History
               </Box>
             </Box>
@@ -374,6 +366,8 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
               const isActive = Math.abs(pair.current_zscore) >= 2
               const signalDir = pair.current_zscore > 2 ? 'short' : pair.current_zscore < -2 ? 'long' : null
 
+              const cellSx = { px: 1.5, py: 1.25, borderBottom: `1px solid ${BORDER}` }
+
               return (
                 <>
                   <Box
@@ -382,19 +376,19 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
                     onClick={() => handleRow(idx)}
                     sx={{
                       cursor: 'pointer',
-                      bgcolor: isExpanded ? 'rgba(96,165,250,0.04)' : 'transparent',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                      bgcolor: isExpanded ? `${CYAN}08` : 'transparent',
+                      '&:hover': { bgcolor: `${PAPER2}80` },
                       transition: 'background 0.15s',
                     }}
                   >
                     {/* Pair */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={cellSx}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box>
-                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#E2E8F0', lineHeight: 1.2 }}>
+                          <Typography sx={{ ...MONO, fontSize: '0.75rem', fontWeight: 800, color: INK, lineHeight: 1.2 }}>
                             {pair.symbol_y}
                           </Typography>
-                          <Typography sx={{ fontSize: '0.62rem', color: '#4B5563' }}>
+                          <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3 }}>
                             / {pair.symbol_x}
                           </Typography>
                         </Box>
@@ -402,7 +396,7 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
                           <Tooltip title={`Active ${signalDir} spread signal`} arrow>
                             <Box sx={{
                               px: 0.75, py: 0.25, borderRadius: '4px', fontSize: '0.55rem',
-                              fontWeight: 700, textTransform: 'uppercase',
+                              fontWeight: 700, textTransform: 'uppercase', ...SANS,
                               bgcolor: signalDir === 'long' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
                               color: signalDir === 'long' ? '#22c55e' : '#ef4444',
                               border: `1px solid ${signalDir === 'long' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
@@ -415,20 +409,20 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
                     </Box>
 
                     {/* Grade */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={cellSx}>
                       <Box sx={{
                         display: 'inline-flex', px: 1, py: 0.25, borderRadius: '5px',
                         bgcolor: GRADE_BG[pair.grade], color: GRADE_COLOR[pair.grade],
-                        fontSize: '0.7rem', fontWeight: 900,
+                        fontSize: '0.7rem', fontWeight: 900, ...MONO,
                       }}>
                         {pair.grade}
                       </Box>
                     </Box>
 
                     {/* p-value */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={cellSx}>
                       <Typography sx={{
-                        fontSize: '0.72rem', fontWeight: 700,
+                        ...MONO, fontSize: '0.72rem', fontWeight: 700,
                         color: pair.p_value < 0.01 ? '#22c55e' : pair.p_value < 0.02 ? '#86efac' : '#fbbf24',
                       }}>
                         {pair.p_value.toFixed(4)}
@@ -436,71 +430,69 @@ export default function PairScannerTable({ pairs }: { pairs: PairResult[] }) {
                     </Box>
 
                     {/* Half-life */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <Box>
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#E2E8F0' }}>
-                          {pair.half_life < 999 ? `${pair.half_life}d` : '—'}
-                        </Typography>
-                        {pair.half_life < 999 && (
-                          <Box sx={{ mt: 0.25, width: 60, height: 3, borderRadius: 1,
-                            bgcolor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                            <Box sx={{
-                              height: '100%', borderRadius: 1,
-                              width: `${Math.max(5, Math.min(100, (1 - pair.half_life / 60) * 100))}%`,
-                              bgcolor: pair.half_life <= 15 ? '#22c55e' : pair.half_life <= 30 ? '#fbbf24' : '#94a3b8',
-                            }} />
-                          </Box>
-                        )}
-                      </Box>
+                    <Box component="td" sx={cellSx}>
+                      <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: INK }}>
+                        {pair.half_life < 999 ? `${pair.half_life}d` : '—'}
+                      </Typography>
+                      {pair.half_life < 999 && (
+                        <Box sx={{ mt: 0.25, width: 60, height: 3, borderRadius: 1,
+                          bgcolor: BORDER, overflow: 'hidden' }}>
+                          <Box sx={{
+                            height: '100%', borderRadius: 1,
+                            width: `${Math.max(5, Math.min(100, (1 - pair.half_life / 60) * 100))}%`,
+                            bgcolor: pair.half_life <= 15 ? '#22c55e' : pair.half_life <= 30 ? '#fbbf24' : INK3,
+                          }} />
+                        </Box>
+                      )}
                     </Box>
 
                     {/* Current Z */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={cellSx}>
                       <Typography sx={{
-                        fontSize: '0.82rem', fontWeight: 900,
+                        ...MONO, fontSize: '0.82rem', fontWeight: 900,
                         color: Math.abs(pair.current_zscore) >= 2
                           ? (pair.current_zscore > 0 ? '#ef4444' : '#22c55e')
-                          : '#94A3B8',
+                          : INK3,
                       }}>
                         {pair.current_zscore > 0 ? '+' : ''}{pair.current_zscore.toFixed(2)}
                       </Typography>
                     </Box>
 
                     {/* Long WR */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={cellSx}>
                       {pair.long_stats ? (
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700,
+                        <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700,
                           color: pair.long_stats.win_rate >= 60 ? '#22c55e' : pair.long_stats.win_rate >= 50 ? '#fbbf24' : '#ef4444' }}>
                           {pair.long_stats.win_rate.toFixed(1)}%
-                          <Typography component="span" sx={{ fontSize: '0.57rem', color: '#374151', ml: 0.5 }}>
+                          <Typography component="span" sx={{ ...SANS, fontSize: '0.57rem', color: INK3, ml: 0.5 }}>
                             ({pair.long_stats.occurrences})
                           </Typography>
                         </Typography>
-                      ) : <Typography sx={{ color: '#374151', fontSize: '0.65rem' }}>—</Typography>}
+                      ) : <Typography sx={{ ...SANS, color: INK3, fontSize: '0.65rem' }}>—</Typography>}
                     </Box>
 
                     {/* Short WR */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={cellSx}>
                       {pair.short_stats ? (
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700,
+                        <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700,
                           color: pair.short_stats.win_rate >= 60 ? '#22c55e' : pair.short_stats.win_rate >= 50 ? '#fbbf24' : '#ef4444' }}>
                           {pair.short_stats.win_rate.toFixed(1)}%
-                          <Typography component="span" sx={{ fontSize: '0.57rem', color: '#374151', ml: 0.5 }}>
+                          <Typography component="span" sx={{ ...SANS, fontSize: '0.57rem', color: INK3, ml: 0.5 }}>
                             ({pair.short_stats.occurrences})
                           </Typography>
                         </Typography>
-                      ) : <Typography sx={{ color: '#374151', fontSize: '0.65rem' }}>—</Typography>}
+                      ) : <Typography sx={{ ...SANS, color: INK3, fontSize: '0.65rem' }}>—</Typography>}
                     </Box>
 
                     {/* Correlation */}
-                    <Box component="td" sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#94A3B8' }}>
+                    <Box component="td" sx={cellSx}>
+                      <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 600, color: INK2 }}>
                         {pair.correlation.toFixed(3)}
                       </Typography>
                     </Box>
 
                     {/* Z sparkline mini */}
-                    <Box component="td" sx={{ px: 1, py: 0.5, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <Box component="td" sx={{ px: 1, py: 0.5, borderBottom: `1px solid ${BORDER}` }}>
                       <ZSparkline data={pair.zscore_history.slice(-60)} />
                     </Box>
                   </Box>

@@ -1,14 +1,15 @@
-﻿import { Box, Typography, Stack, CircularProgress } from '@mui/material'
+import { Box, Typography, Stack, CircularProgress } from '@mui/material'
 import type { TrendPersistenceResponse } from '../../types/stock'
+import { usePalette } from '../../hooks/usePalette'
+
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: TrendPersistenceResponse | null; loading: boolean }
 
-const INK    = '#F2EDE4'
-const INK2   = '#8B95AC'
-const INK3   = '#5B6880'
-const BORDER = '#0F1526'
-
 export default function TrendPersistence({ data, loading }: Props) {
+  const { INK, INK2, INK3, BORDER } = usePalette()
+
   if (loading) {
     return (
       <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -20,7 +21,7 @@ export default function TrendPersistence({ data, loading }: Props) {
 
   return (
     <Box>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
         Streak Analysis
       </Typography>
       <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', color: INK, mb: 0.5, display: 'block' }}>
@@ -44,7 +45,7 @@ export default function TrendPersistence({ data, loading }: Props) {
                     {s.label}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color, lineHeight: 1 }}>
+                    <Typography sx={{ ...MONO, fontSize: '1.25rem', fontWeight: 800, color, lineHeight: 1 }}>
                       {s.current_streak}d
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -56,13 +57,12 @@ export default function TrendPersistence({ data, loading }: Props) {
                   <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
                     Historical percentile
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color }}>
+                  <Typography sx={{ ...MONO, fontSize: '0.875rem', fontWeight: 700, color }}>
                     {pct.toFixed(0)}th
                   </Typography>
                 </Box>
               </Box>
 
-              {/* Progress bar */}
               <Box sx={{ height: 5, borderRadius: 3, bgcolor: BORDER }}>
                 <Box
                   sx={{

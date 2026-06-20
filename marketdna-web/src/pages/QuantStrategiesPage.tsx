@@ -1,5 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import { Footer } from '../components/Footer'
+import SearchBox from '../components/shared/SearchBox'
+import SectionHead from '../components/shared/SectionHead'
 import {
   Box, Typography, CircularProgress, LinearProgress,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -54,17 +58,6 @@ function Pill({ label, color }: { label: string; color: string }) {
       color, bgcolor: `${color}18`, border: `1px solid ${color}28`,
     }}>
       {label}
-    </Box>
-  )
-}
-
-function SectionHead({ title, accent, meta }: { title: string; accent: string; meta?: string }) {
-  const { INK, INK3 } = usePalette()
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-      <Box sx={{ width: 3, height: 20, borderRadius: 2, bgcolor: accent, flexShrink: 0 }} />
-      <Typography sx={{ ...JAKARTA, fontSize: '0.82rem', fontWeight: 800, color: INK }}>{title}</Typography>
-      {meta && <Typography sx={{ ...JAKARTA, fontSize: '0.72rem', color: INK3, ml: 'auto' }}>{meta}</Typography>}
     </Box>
   )
 }
@@ -151,7 +144,7 @@ function SummaryStrip({ items }: {
 
 // ─── 1. Momentum Scanner ─────────────────────────────────────────────────────
 
-function MomentumSection({ data }: { data: QuantScanResult['momentum'] }) {
+function MomentumSection({ data, onSymbol }: { data: QuantScanResult['momentum']; onSymbol: (s: string) => void }) {
   const { CARD, TH, TD, t1, t2, t3, INPUT_SX, BORDER, CYAN, PAPER, INK, INK2, INK3 } = useTokens()
   const [filterStock,  setFilterStock]  = useState('')
   const [filterQ,      setFilterQ]      = useState(0)
@@ -176,9 +169,7 @@ function MomentumSection({ data }: { data: QuantScanResult['momentum'] }) {
         ]} />
 
         <FilterBar>
-          <OutlinedInput placeholder="Stock…" value={filterStock}
-            onChange={e => setFilterStock(e.target.value)}
-            sx={{ ...INPUT_SX, width: 90 }} />
+          <SearchBox value={filterStock} onChange={setFilterStock} placeholder="Symbol…" width={120} />
           <Select value={filterQ} onChange={e => setFilterQ(Number(e.target.value))}
             input={<OutlinedInput sx={INPUT_SX} />}
             sx={{ minWidth: 130, ...INPUT_SX }}
@@ -216,7 +207,8 @@ function MomentumSection({ data }: { data: QuantScanResult['momentum'] }) {
             <TableBody>
               {rows.map(item => (
                 <TableRow key={item.symbol}
-                  sx={{ bgcolor: PAPER, '&:hover td': { bgcolor: `${CYAN}08` } }}>
+                  onClick={() => onSymbol(item.symbol)}
+                  sx={{ bgcolor: PAPER, cursor: 'pointer', '&:hover td': { bgcolor: `${CYAN}08` } }}>
                   {/* t3: rank is ordinal meta */}
                   <TableCell sx={{ ...TD, ...t3 }}>{item.rank}</TableCell>
                   {/* t1+CYAN: symbol is the primary identity */}
@@ -242,7 +234,7 @@ function MomentumSection({ data }: { data: QuantScanResult['momentum'] }) {
 
 // ─── 2. Mean Reversion Scanner ────────────────────────────────────────────────
 
-function MeanReversionSection({ data }: { data: QuantScanResult['mean_reversion'] }) {
+function MeanReversionSection({ data, onSymbol }: { data: QuantScanResult['mean_reversion']; onSymbol: (s: string) => void }) {
   const { CARD, TH, TD, t1, t2, t3, INPUT_SX, BORDER, CYAN, PAPER, INK, INK2, INK3 } = useTokens()
   const [filterStock,  setFilterStock]  = useState('')
   const [filterSignal, setFilterSignal] = useState('All')
@@ -287,9 +279,7 @@ function MeanReversionSection({ data }: { data: QuantScanResult['mean_reversion'
         ]} />
 
         <FilterBar>
-          <OutlinedInput placeholder="Stock…" value={filterStock}
-            onChange={e => setFilterStock(e.target.value)}
-            sx={{ ...INPUT_SX, width: 90 }} />
+          <SearchBox value={filterStock} onChange={setFilterStock} placeholder="Symbol…" width={120} />
           <Select value={filterSignal} onChange={e => setFilterSignal(e.target.value)}
             input={<OutlinedInput sx={INPUT_SX} />}
             sx={{ minWidth: 130, ...INPUT_SX }}
@@ -317,7 +307,8 @@ function MeanReversionSection({ data }: { data: QuantScanResult['mean_reversion'
             <TableBody>
               {rows.map(item => (
                 <TableRow key={item.symbol}
-                  sx={{ bgcolor: PAPER, '&:hover td': { bgcolor: `${CYAN}08` } }}>
+                  onClick={() => onSymbol(item.symbol)}
+                  sx={{ bgcolor: PAPER, cursor: 'pointer', '&:hover td': { bgcolor: `${CYAN}08` } }}>
                   <TableCell sx={{ ...TD, ...t1, color: CYAN }}>{item.symbol}</TableCell>
                   <TableCell sx={{ ...TD, ...t3 }}>{item.sector}</TableCell>
                   <TableCell sx={{ ...TD, minWidth: 140 }}>{scoreBar(item.reversion_score)}</TableCell>
@@ -366,7 +357,7 @@ function MeanReversionSection({ data }: { data: QuantScanResult['mean_reversion'
 
 // ─── 3. Volatility Rank ───────────────────────────────────────────────────────
 
-function VolRankSection({ data }: { data: QuantScanResult['vol_rank'] }) {
+function VolRankSection({ data, onSymbol }: { data: QuantScanResult['vol_rank']; onSymbol: (s: string) => void }) {
   const { CARD, TH, TD, t1, t2, t3, INPUT_SX, BORDER, CYAN, PAPER, INK, INK2, INK3 } = useTokens()
   const [filterStock,  setFilterStock]  = useState('')
   const [filterAction, setFilterAction] = useState('All')
@@ -391,9 +382,7 @@ function VolRankSection({ data }: { data: QuantScanResult['vol_rank'] }) {
         ]} />
 
         <FilterBar>
-          <OutlinedInput placeholder="Stock…" value={filterStock}
-            onChange={e => setFilterStock(e.target.value)}
-            sx={{ ...INPUT_SX, width: 90 }} />
+          <SearchBox value={filterStock} onChange={setFilterStock} placeholder="Symbol…" width={120} />
           <Select value={filterAction} onChange={e => setFilterAction(e.target.value)}
             input={<OutlinedInput sx={INPUT_SX} />}
             sx={{ minWidth: 110, ...INPUT_SX }}
@@ -431,7 +420,8 @@ function VolRankSection({ data }: { data: QuantScanResult['vol_rank'] }) {
             <TableBody>
               {rows.map(item => (
                 <TableRow key={item.symbol}
-                  sx={{ bgcolor: PAPER, '&:hover td': { bgcolor: `${CYAN}08` } }}>
+                  onClick={() => onSymbol(item.symbol)}
+                  sx={{ bgcolor: PAPER, cursor: 'pointer', '&:hover td': { bgcolor: `${CYAN}08` } }}>
                   <TableCell sx={{ ...TD, ...t1, color: CYAN }}>{item.symbol}</TableCell>
                   <TableCell sx={{ ...TD, ...t3 }}>{item.sector}</TableCell>
                   <TableCell sx={TD}>
@@ -584,96 +574,13 @@ function SectorRotationSection({ data }: { data: QuantScanResult['sector_rotatio
   )
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function Footer() {
-  const { PAPER, BORDER, CYAN, INK, INK2, INK3 } = usePalette()
-  const NAV = [
-    { label: 'Platform',     links: ['Stock DNA', 'Pattern DNA', 'Markov Options', 'Quant Strategies', 'Indicators']         },
-    { label: 'Intelligence', links: ['Market Regime', 'Breadth Score', 'Edge Lab', 'Cointegration', 'Delivery Intel']        },
-    { label: 'Research',     links: ['Validation Framework', 'MCP Architecture', 'AI Agents', 'Feature Store', 'Backtests'] },
-  ]
-  return (
-    <Box component="footer" sx={{ bgcolor: PAPER, borderTop: `1px solid ${BORDER}`, mt: 8 }}>
-      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 3, md: 8, lg: 12 }, pt: 6, pb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 6, flexWrap: 'wrap', mb: 5 }}>
-
-          {/* Brand block */}
-          <Box sx={{ flex: '0 0 auto', maxWidth: 260 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{
-                width: 7, height: 7, bgcolor: CYAN,
-                animation: 'blink 1.4s step-end infinite',
-                '@keyframes blink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } },
-              }} />
-              <Typography sx={{ ...JAKARTA, fontWeight: 800, fontSize: '1rem', color: INK, letterSpacing: '0.08em' }}>
-                MARKET<Box component="span" sx={{ color: CYAN }}>DNA</Box>
-              </Typography>
-            </Box>
-            <Typography sx={{ ...JAKARTA, fontSize: '0.8rem', color: INK3, lineHeight: 1.7, mb: 2 }}>
-              Quantitative market intelligence for Indian equities and options. Research precedes product. Validation is mandatory.
-            </Typography>
-            <Box
-              component="img"
-              src="https://cdn.undraw.co/illustration/data-at-work_3tbf.svg"
-              alt=""
-              sx={{ width: 140, opacity: 0.6 }}
-            />
-          </Box>
-
-          {/* Nav columns */}
-          {NAV.map(col => (
-            <Box key={col.label} sx={{ flex: '1 1 140px' }}>
-              <Typography sx={{
-                ...JAKARTA, fontSize: '0.7rem', fontWeight: 700, color: CYAN,
-                letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1.75,
-              }}>
-                {col.label}
-              </Typography>
-              {col.links.map(link => (
-                <Typography key={link} sx={{
-                  ...JAKARTA, fontSize: '0.8rem', color: INK3, mb: 0.875, cursor: 'default',
-                  transition: 'color 0.12s', '&:hover': { color: INK2 },
-                }}>
-                  {link}
-                </Typography>
-              ))}
-            </Box>
-          ))}
-
-          {/* Illustration */}
-          <Box sx={{ flex: '0 0 auto', display: { xs: 'none', lg: 'flex' }, alignItems: 'center' }}>
-            <Box
-              component="img"
-              src="https://cdn.undraw.co/illustration/real-time-analytics_50za.svg"
-              alt=""
-              sx={{ width: 180, opacity: 0.55 }}
-            />
-          </Box>
-        </Box>
-
-        {/* Bottom bar */}
-        <Box sx={{
-          borderTop: `1px solid ${BORDER}`, pt: 3,
-          display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5,
-        }}>
-          <Typography sx={{ ...JAKARTA, fontSize: '0.7rem', color: INK3 }}>
-            © 2024 MarketDNA · Data sourced from NSE via Kite Connect · For research purposes only
-          </Typography>
-          <Typography sx={{ ...JAKARTA, fontSize: '0.7rem', color: INK3 }}>
-            Not investment advice · Past performance is not indicative of future results
-          </Typography>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function QuantStrategiesPage() {
   const { BG, PAPER, PAPER2, BORDER, CYAN, INK, INK2, INK3, CARD } = useTokens()
   const { mode } = useThemeMode()
+  const navigate = useNavigate()
   const [result,  setResult]  = useState<QuantScanResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -866,9 +773,9 @@ export default function QuantStrategiesPage() {
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <MomentumSection      data={result.momentum} />
-              <MeanReversionSection data={result.mean_reversion} />
-              <VolRankSection       data={result.vol_rank} />
+              <MomentumSection      data={result.momentum}       onSymbol={sym => navigate(`/stock/${sym}`)} />
+              <MeanReversionSection data={result.mean_reversion} onSymbol={sym => navigate(`/stock/${sym}`)} />
+              <VolRankSection       data={result.vol_rank}       onSymbol={sym => navigate(`/stock/${sym}`)} />
               <SectorRotationSection data={result.sector_rotation} />
             </Box>
           </>

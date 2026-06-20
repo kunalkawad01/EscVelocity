@@ -4,6 +4,7 @@ import HighchartsReact from 'highcharts-react-official'
 import Highcharts from 'highcharts/highstock'
 import type { OHLCVResponse } from '../../types/stock'
 import { hcTheme } from '../../theme'
+import { usePalette } from '../../hooks/usePalette'
 
 const TIMEFRAMES = [
   { label: '1M', days: 21 },
@@ -20,6 +21,7 @@ const TIMEFRAMES = [
 interface Props { data: OHLCVResponse | null; loading: boolean }
 
 export default function PriceChart({ data, loading }: Props) {
+  const { BORDER } = usePalette()
   const [tf, setTf] = useState('1Y')
 
   const sliced = useMemo(() => {
@@ -107,7 +109,7 @@ export default function PriceChart({ data, loading }: Props) {
               onClick={() => setTf(t.label)}
               sx={{
                 px: 1.5,
-                borderColor: 'rgba(255,255,255,0.1)',
+                borderColor: BORDER,
                 color: tf === t.label ? '#3b82f6' : 'text.secondary',
                 bgcolor: tf === t.label ? 'rgba(59,130,246,0.1)' : 'transparent',
                 fontWeight: tf === t.label ? 700 : 400,

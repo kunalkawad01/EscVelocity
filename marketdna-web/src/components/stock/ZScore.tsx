@@ -2,27 +2,32 @@
 import { Box, Typography, Chip, CircularProgress, Grid } from '@mui/material'
 import Highcharts from 'highcharts'
 import type { ZScoreResponse, ZScoreZoneStats } from '../../types/stock'
+import { usePalette } from '../../hooks/usePalette'
+
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: ZScoreResponse | null; loading: boolean }
 
-function zColor(z: number): string {
+function zColor(z: number, ink3: string): string {
   if (z > 2.5) return '#ef4444'
   if (z > 1.5) return '#f97316'
   if (z < -2.5) return '#22c55e'
   if (z < -1.5) return '#4ade80'
-  return '#94a3b8'
+  return ink3
 }
 
-function zoneColor(zone: string): string {
+function zoneColor(zone: string, ink3: string): string {
   if (zone.includes('Below')) return '#22c55e'
   if (zone.includes('-2σ to')) return '#4ade80'
-  if (zone === 'Neutral') return '#94a3b8'
+  if (zone === 'Neutral') return ink3
   if (zone.includes('+1σ to')) return '#f97316'
   return '#ef4444'
 }
 
 function ZoneRow({ stat }: { stat: ZScoreZoneStats }) {
-  const barColor = zoneColor(stat.zone)
+  const { BORDER, INK3 } = usePalette()
+  const barColor = zoneColor(stat.zone, INK3)
   const retColor = stat.avg_fwd_21d > 0 ? '#22c55e' : '#ef4444'
   const barW = Math.min(100, Math.abs(stat.avg_fwd_21d) * 4)
 
@@ -34,7 +39,7 @@ function ZoneRow({ stat }: { stat: ZScoreZoneStats }) {
         </Typography>
       </Box>
       <Box sx={{ flex: 1 }}>
-        <Box sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
+        <Box sx={{ height: 6, borderRadius: 3, bgcolor: BORDER, overflow: 'hidden' }}>
           <Box sx={{ height: '100%', width: `${barW}%`, borderRadius: 3, bgcolor: retColor }} />
         </Box>
       </Box>
@@ -58,6 +63,7 @@ function ZoneRow({ stat }: { stat: ZScoreZoneStats }) {
 }
 
 function ZScoreChart({ series }: { series: ZScoreResponse['series'] }) {
+  const { BORDER, INK3 } = usePalette()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -78,18 +84,18 @@ function ZScoreChart({ series }: { series: ZScoreResponse['series'] }) {
       legend: { enabled: false },
       xAxis: {
         type: 'datetime',
-        labels: { style: { color: '#64748b', fontSize: '9px' } },
-        lineColor: 'rgba(255,255,255,0.08)',
-        tickColor: 'rgba(255,255,255,0.08)',
+        labels: { style: { color: INK3, fontSize: '9px' } },
+        lineColor: BORDER,
+        tickColor: BORDER,
       },
       yAxis: {
         title: { text: undefined },
-        labels: { style: { color: '#64748b', fontSize: '9px' }, format: '{value}σ' },
-        gridLineColor: 'rgba(255,255,255,0.05)',
+        labels: { style: { color: INK3, fontSize: '9px' }, format: '{value}σ' },
+        gridLineColor: BORDER,
         plotLines: [
           { value: 2.5,  color: '#ef444460', width: 1, dashStyle: 'Dash' },
           { value: 1.5,  color: '#f9731660', width: 1, dashStyle: 'Dash' },
-          { value: 0,    color: 'rgba(255,255,255,0.15)', width: 1 },
+          { value: 0,    color: INK3,        width: 1 },
           { value: -1.5, color: '#4ade8060', width: 1, dashStyle: 'Dash' },
           { value: -2.5, color: '#22c55e60', width: 1, dashStyle: 'Dash' },
         ],
@@ -102,7 +108,7 @@ function ZScoreChart({ series }: { series: ZScoreResponse['series'] }) {
       },
       tooltip: {
         backgroundColor: '#1e293b',
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: BORDER,
         style: { color: '#f1f5f9', fontSize: '11px' },
         xDateFormat: '%d %b %Y',
         pointFormat: '<b>{point.y:.2f}σ</b>',
@@ -117,12 +123,13 @@ function ZScoreChart({ series }: { series: ZScoreResponse['series'] }) {
     } as Highcharts.Options)
 
     return () => chart.destroy()
-  }, [series])
+  }, [series, INK3, BORDER])
 
   return <div ref={ref} />
 }
 
 export default function ZScore({ data, loading }: Props) {
+  const { BORDER, PAPER2, INK3 } = usePalette()
   if (loading) {
     return (
       <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexDirection: 'column' }}>
@@ -133,17 +140,17 @@ export default function ZScore({ data, loading }: Props) {
   }
   if (!data) return null
 
-  const c = zColor(data.current_zscore)
+  const c = zColor(data.current_zscore, INK3)
 
   return (
     <Box>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#60A5FA', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#60A5FA', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
         Mean Reversion · 252-day Rolling
       </Typography>
-      <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: 'linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: `linear-gradient(135deg, #FFFFFF 30%, ${INK3} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', mb: 0.5, display: 'block' }}>
         Z-Score Mean Reversion
       </Typography>
-      <Typography sx={{ fontSize: '0.73rem', color: '#4B5563', mb: 2.5, display: 'block', lineHeight: 1.5 }}>
+      <Typography sx={{ fontSize: '0.73rem', color: INK3, mb: 2.5, display: 'block', lineHeight: 1.5 }}>
         How many standard deviations is the current price from its 1-year mean — and what historically followed each extreme?
       </Typography>
 
@@ -153,9 +160,9 @@ export default function ZScore({ data, loading }: Props) {
           {/* Current reading */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <Box>
-              <Typography sx={{ fontSize: '3rem', fontWeight: 900, color: c, lineHeight: 1 }}>
+              <Typography sx={{ ...MONO, fontSize: '3rem', fontWeight: 900, color: c, lineHeight: 1 }}>
                 {data.current_zscore > 0 ? '+' : ''}{data.current_zscore.toFixed(2)}
-                <Typography component="span" sx={{ fontSize: '1.2rem', fontWeight: 700, color: c }}>σ</Typography>
+                <Typography component="span" sx={{ ...MONO, fontSize: '1.2rem', fontWeight: 700, color: c }}>σ</Typography>
               </Typography>
             </Box>
             <Box>
@@ -171,7 +178,7 @@ export default function ZScore({ data, loading }: Props) {
           </Box>
 
           {/* Z-Score chart */}
-          <Box sx={{ borderRadius: 2, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden', bgcolor: 'rgba(255,255,255,0.02)' }}>
+          <Box sx={{ borderRadius: 2, border: `1px solid ${BORDER}`, overflow: 'hidden', bgcolor: PAPER2 }}>
             <ZScoreChart series={data.series} />
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, px: 1 }}>
@@ -186,7 +193,7 @@ export default function ZScore({ data, loading }: Props) {
           <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: '0.6875rem', display: 'block', mb: 1.5 }}>
             Historical avg 21d return by Z-Score zone
           </Typography>
-          <Box sx={{ p: 1.5, borderRadius: 2, border: '1px solid rgba(255,255,255,0.07)', bgcolor: 'rgba(255,255,255,0.02)' }}>
+          <Box sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: PAPER2 }}>
             {data.zone_stats.map(s => <ZoneRow key={s.zone} stat={s} />)}
           </Box>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', display: 'block', mt: 1.5, lineHeight: 1.6 }}>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta-X Options Analytics Studio</title>
+    <style>
+        :root {
+            --bg-workspace: #080c14;
+            --bg-panel: #0f1624;
+            --bg-row-alt: #141d2f;
+            --border-glow: #1d2b44;
+            --text-lead: #ffffff;
+            --text-body: #94a3b8;
+            --text-dim: #475569;
+            
+            --neon-cyan: #00f0ff;
+            --neon-magenta: #f43f5e;
+            --neon-emerald: #10b981;
+            --neon-amethyst: #a855f7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-workspace);
+            color: var(--text-body);
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        .workspace-frame {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        /* Left Side: Tree / Index Controller */
+        .index-panel {
+            background: #0b101b;
+            border-right: 1px solid var(--border-glow);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .panel-brand {
+            font-weight: 800;
+            font-size: 18px;
+            color: var(--text-lead);
+            letter-spacing: -0.5px;
+            margin-bottom: 20px;
+        }
+        .panel-brand span { color: var(--neon-cyan); }
+
+        .search-engine {
+            background: var(--bg-workspace);
+            border: 1px solid var(--border-glow);
+            padding: 10px 14px;
+            border-radius: 8px;
+            color: #fff;
+            outline: none;
+            margin-bottom: 24px;
+        }
+
+        .tree-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .tree-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .tree-node {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .tree-node:hover, .tree-node.active {
+            background: var(--bg-row-alt);
+            color: var(--neon-cyan);
+        }
+
+        /* Right Side: Analytical Mainframe Dashboard */
+        .mainframe-panel {
+            padding: 24px;
+            overflow-x: auto;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-glow);
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+        }
+
+        .header-meta h2 { font-size: 20px; font-weight: 700; color: #fff; }
+        .header-meta p { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+        .quick-ribbon {
+            display: flex;
+            gap: 30px;
+        }
+        .ribbon-metric { text-align: right; }
+        .ribbon-lbl { font-size: 10px; text-transform: uppercase; color: var(--text-dim); font-weight: 700; }
+        .ribbon-val { font-size: 15px; font-weight: 700; color: var(--text-lead); margin-top: 2px;}
+
+        /* Unified Density Stream Layout */
+        .stream-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stream-row {
+            background: rgba(20, 29, 47, 0.4);
+            border: 1px solid var(--border-glow);
+            border-radius: 8px;
+            display: grid;
+            grid-template-columns: 160px 140px 180px 240px 140px 100px;
+            align-items: center;
+            padding: 16px;
+            transition: background 0.2s;
+        }
+        .stream-row:hover {
+            background: var(--bg-row-alt);
+            border-color: var(--neon-cyan);
+        }
+
+        /* Columns internal components layout */
+        .col-identity h4 { font-size: 16px; font-weight: 800; color: #fff; }
+        .col-identity p { font-size: 11px; color: var(--text-dim); }
+
+        .col-price .spot { font-size: 15px; font-weight: 700; color: var(--text-lead); }
+        .col-price .fut { font-size: 11px; margin-top: 2px; }
+
+        .col-straddle .premium { font-weight: 700; color: var(--neon-amethyst); }
+        .col-straddle .breakdown { font-size: 11px; color: var(--text-body); margin-top: 2px; }
+
+        /* Custom Inline Timeline Tracker */
+        .col-tracker {
+            padding-right: 20px;
+        }
+        .track-labels { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 6px; font-weight: 600;}
+        .track-line { height: 4px; background: #080c14; border-radius: 2px; position: relative;}
+        .track-fill { position: absolute; left: 25%; right: 25%; height: 100%; background: var(--neon-cyan); border-radius: 2px; }
+        .track-pin { position: absolute; left: 50%; top: -3px; width: 10px; height: 10px; background: #fff; border-radius: 50%; }
+
+        .col-walls div { font-size: 11px; margin-bottom: 2px; font-weight: 600; }
+
+        /* Mini Momentum Track Bar indicators */
+        .col-momentum {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .m-bar { flex: 1; height: 14px; background: #080c14; border-radius: 3px; position: relative; overflow: hidden;}
+        .m-fill { height: 100%; position: absolute; top: 0;}
+        .m-fill.up { background: var(--neon-emerald); width: 70%; }
+        .m-fill.down { background: var(--neon-magenta); width: 40%; }
+        .m-lbl { font-size: 10px; font-weight: 700; min-width: 15px;}
+
+        /* Utilities */
+        .c-cyan { color: var(--neon-cyan); }
+        .c-magenta { color: var(--neon-magenta); }
+        .c-emerald { color: var(--neon-emerald); }
+        .c-purple { color: var(--neon-amethyst); }
+    </style>
+</head>
+<body>
+
+<div class="workspace-frame">
+    <div class="index-panel">
+        <div class="panel-brand">DELTA-X<span> // FO</span></div>
+        <input type="text" class="search-engine" placeholder="Filter active assets...">
+        
+        <div class="tree-header">Volatility Scanners</div>
+        <ul class="tree-list">
+            <li class="tree-node active"><span>All Parameters</span> <span>211</span></li>
+            <li class="tree-node"><span>Aggressive Long</span> <span>24</span></li>
+            <li class="tree-node"><span>Aggressive Short</span> <span>12</span></li>
+            <li class="tree-node"><span>Bearish Build-up</span> <span>41</span></li>
+            <li class="tree-node"><span>Bullish Build-up</span> <span>56</span></li>
+            <li class="tree-node"><span>Short Covering</span> <span>33</span></li>
+        </ul>
+    </div>
+
+    <div class="mainframe-panel">
+        <div class="dashboard-header">
+            <div class="header-meta">
+                <h2>Expected Move // Matrix Engine</h2>
+                <p>Real-time ATM straddle pricing mapped against core open interest resistance anchors.</p>
+            </div>
+            <div class="quick-ribbon">
+                <div class="ribbon-metric">
+                    <div class="ribbon-lbl">System Snapshot</div>
+                    <div class="ribbon-val">2026-06-16</div>
+                </div>
+                <div class="ribbon-metric">
+                    <div class="ribbon-lbl">Global Implied Move</div>
+                    <div class="ribbon-val c-purple">±4.33%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stream-container">
+            
+            <div class="stream-row">
+                <div class="col-identity">
+                    <h4>IDEA</h4>
+                    <p>ATM 15 &bull; 2026-06-30</p>
+                </div>
+                <div class="col-price">
+                    <div class="spot">₹15.00</div>
+                    <div class="fut c-magenta">-1.94%</div>
+                </div>
+                <div class="col-straddle">
+                    <div class="premium">₹1.20 Straddle</div>
+                    <div class="breakdown">CE ₹0.5 / PE ₹0.8</div>
+                </div>
+                <div class="col-tracker">
+                    <div class="track-labels">
+                        <span class="c-magenta">₹13 (-8.3%)</span>
+                        <span class="c-emerald">₹16 (+8.3%)</span>
+                    </div>
+                    <div class="track-line">
+                        <div class="track-fill"></div>
+                        <div class="track-pin" style="left: 40%"></div>
+                    </div>
+                </div>
+                <div class="col-walls">
+                    <div>CE Wall: <span class="c-magenta">₹15</span></div>
+                    <div>PE Wall: <span class="c-emerald">₹14</span></div>
+                </div>
+                <div class="col-momentum">
+                    <span class="m-lbl c-emerald">C</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 75%"></div></div>
+                    <span class="m-lbl c-magenta">P</span>
+                    <div class="m-bar"><div class="m-fill down" style="width: 30%"></div></div>
+                </div>
+            </div>
+
+            <div class="stream-row">
+                <div class="col-identity">
+                    <h4>ADANIPOWER</h4>
+                    <p>ATM 223 &bull; 2026-06-30</p>
+                </div>
+                <div class="col-price">
+                    <div class="spot">₹223.00</div>
+                    <div class="fut c-emerald">+0.97%</div>
+                </div>
+                <div class="col-straddle">
+                    <div class="premium">₹16.30 Straddle</div>
+                    <div class="breakdown">CE ₹8.6 / PE ₹7.8</div>
+                </div>
+                <div class="col-tracker">
+                    <div class="track-labels">
+                        <span class="c-magenta">₹206 (-7.3%)</span>
+                        <span class="c-emerald">₹239 (+7.3%)</span>
+                    </div>
+                    <div class="track-line">
+                        <div class="track-fill" style="left: 20%; right: 30%"></div>
+                        <div class="track-pin" style="left: 55%"></div>
+                    </div>
+                </div>
+                <div class="col-walls">
+                    <div>CE Wall: <span class="c-magenta">₹250</span></div>
+                    <div>PE Wall: <span class="c-emerald">₹220</span></div>
+                </div>
+                <div class="col-momentum">
+                    <span class="m-lbl c-emerald">C</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 85%"></div></div>
+                    <span class="m-lbl c-magenta">P</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 65%"></div></div>
+                </div>
+            </div>
+
+            <div class="stream-row">
+                <div class="col-identity">
+                    <h4>FORCEMOT</h4>
+                    <p>ATM 18.5k &bull; 2026-06-30</p>
+                </div>
+                <div class="col-price">
+                    <div class="spot">₹18,427</div>
+                    <div class="fut c-magenta">-0.28%</div>
+                </div>
+                <div class="col-straddle">
+                    <div class="premium">₹1,307.7 Straddle</div>
+                    <div class="breakdown">CE ₹628 / PE ₹679</div>
+                </div>
+                <div class="col-tracker">
+                    <div class="track-labels">
+                        <span class="c-magenta">17,119 (-7.1%)</span>
+                        <span class="c-emerald">19,735 (+7.1%)</span>
+                    </div>
+                    <div class="track-line">
+                        <div class="track-fill"></div>
+                        <div class="track-pin" style="left: 48%"></div>
+                    </div>
+                </div>
+                <div class="col-walls">
+                    <div>CE Wall: <span class="c-magenta">19.0k</span></div>
+                    <div>PE Wall: <span class="c-emerald">18.0k</span></div>
+                </div>
+                <div class="col-momentum">
+                    <span class="m-lbl c-emerald">C</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 50%"></div></div>
+                    <span class="m-lbl c-magenta">P</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 55%"></div></div>
+                </div>
+            </div>
+
+            <div class="stream-row">
+                <div class="col-identity">
+                    <h4>VEDL</h4>
+                    <p>ATM 300 &bull; 2026-06-30</p>
+                </div>
+                <div class="col-price">
+                    <div class="spot">₹300.00</div>
+                    <div class="fut" style="color:var(--text-dim)">0.00%</div>
+                </div>
+                <div class="col-straddle">
+                    <div class="premium">₹20.40 Straddle</div>
+                    <div class="breakdown">CE ₹10.8 / PE ₹9.6</div>
+                </div>
+                <div class="col-tracker">
+                    <div class="track-labels">
+                        <span class="c-magenta">₹280 (-6.8%)</span>
+                        <span class="c-emerald">₹320 (+6.8%)</span>
+                    </div>
+                    <div class="track-line">
+                        <div class="track-fill" style="left: 30%; right: 30%"></div>
+                        <div class="track-pin" style="left: 35%"></div>
+                    </div>
+                </div>
+                <div class="col-walls">
+                    <div>CE Wall: <span class="c-magenta">₹350</span></div>
+                    <div>PE Wall: <span class="c-emerald">₹300</span></div>
+                </div>
+                <div class="col-momentum">
+                    <span class="m-lbl c-emerald">C</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 40%"></div></div>
+                    <span class="m-lbl c-magenta">P</span>
+                    <div class="m-bar"><div class="m-fill up" style="width: 40%"></div></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -536,7 +536,10 @@ def get_delivery_summary() -> DeliverySummaryResult:
 
 
 def invalidate_cache() -> None:
-    global _summary_cache
+    global _summary_cache, _delivery_data, _delivery_symbols, _view_ready
     _report_cache.clear()
     _summary_cache = None
+    _delivery_data = None
+    _delivery_symbols = None
+    _view_ready = False
     log.info("delivery_service: cache cleared")

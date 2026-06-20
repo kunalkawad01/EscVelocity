@@ -556,6 +556,96 @@ npm run dev -- --host 127.0.0.1
 
 ---
 
+# Post-Market Close Workflow
+
+Run this every day after NSE market close (~15:35 IST). Order matters.
+
+## Step 1 — Ingest fresh data (from `marketdna-data/` with venv active)
+
+```powershell
+# a. OHLCV — incremental, adds today's candle for all 500 NSE symbols (~3 min)
+.\.venv\Scripts\python.exe -m ingestion.download_nse500
+
+# b. Delivery — incremental, downloads NSE bhavcopy for NIFTY 50 delivery data (~1 min)
+.\.venv\Scripts\python.exe -m ingestion.ingest_delivery
+
+# c. Options chain — ATM ±20 strikes, CE+PE, IV computed, all F&O symbols (~2.5 min)
+.\.venv\Scripts\python.exe -m ingestion.ingest_option_chain
+
+# d. Futures — current monthly expiry, basis computed, all F&O symbols (~5 sec)
+.\.venv\Scripts\python.exe -m ingestion.ingest_futures
+```
+
+Options and futures can run in parallel (separate terminals) while OHLCV is running.
+Each script automatically refreshes its DuckDB view on completion.
+
+## Step 2 — Invalidate backend caches (backend must be running on port 8000)
+
+The backend pre-warms all service caches at startup. After ingestion adds new data,
+the in-process Python caches are stale and must be flushed so pages pick up today's prices.
+
+```powershell
+$endpoints = @(
+    "http://localhost:8000/api/stock/invalidate",
+    "http://localhost:8000/api/regime/invalidate",
+    "http://localhost:8000/api/indicators/invalidate",
+    "http://localhost:8000/api/delivery/invalidate",
+    "http://localhost:8000/api/short/invalidate",
+    "http://localhost:8000/api/cointegration/invalidate",
+    "http://localhost:8000/api/markov-options/market/invalidate",
+    "http://localhost:8000/api/stock-health/scan/invalidate",
+    "http://localhost:8000/api/quant/invalidate",
+    "http://localhost:8000/api/options/em-scan/invalidate",
+    "http://localhost:8000/api/options/scan/invalidate"
+)
+foreach ($url in $endpoints) {
+    try {
+        $r = Invoke-WebRequest -Uri $url -Method POST -UseBasicParsing -ErrorAction Stop
+        Write-Output "$($r.StatusCode) $url"
+    } catch {
+        Write-Output "ERROR $url — $($_.Exception.Message)"
+    }
+}
+```
+
+After invalidation each page re-queries DuckDB (which reads directly from the fresh parquet
+files) on its next request — no backend restart needed.
+
+## Alternative: restart both servers
+
+If you prefer a clean slate (e.g. after a code change), restart instead of invalidating:
+
+```powershell
+# Kill servers
+(Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }
+(Get-NetTCPConnection -LocalPort 5173 -State Listen).OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }
+
+# Restart (backend ~30s prewarm before first request)
+Start-Process powershell -ArgumentList "-NoExit -Command cd 'C:\Users\amitk\EscVel\marketdna-backend'; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
+Start-Process powershell -ArgumentList "-NoExit -Command cd 'C:\Users\amitk\EscVel\marketdna-web'; npm run dev -- --host 127.0.0.1"
+```
+
+## What each invalidation clears
+
+| Endpoint | Pages affected |
+|----------|---------------|
+| `/api/stock/invalidate` | All `/stock/:symbol` sub-pages (clears `stock_metrics` + `stock_metrics_advanced` day-caches) |
+| `/api/regime/invalidate` | All stock pages, Indicators, regime scores |
+| `/api/indicators/invalidate` | Indicators scan, edge summary |
+| `/api/delivery/invalidate` | Delivery page, Short page (derived from delivery) |
+| `/api/short/invalidate` | Short page candidates + squeeze watch |
+| `/api/cointegration/invalidate` | Cointegration page pair scan |
+| `/api/markov-options/market/invalidate` | Markov Options market scan |
+| `/api/stock-health/scan/invalidate` | Stock Health archetype scanner (recomputes in background) |
+| `/api/quant/invalidate` | Quant Strategies scan |
+| `/api/options/em-scan/invalidate` | Expected Move page (all symbols scan) |
+| `/api/options/scan/invalidate` | OI Buildup scanner |
+
+Per-symbol options caches (`/api/options/{symbol}`) are populated on demand — they pick up
+fresh parquet automatically on first request after ingestion, no explicit invalidation needed.
+
+---
+
 # Development Priority Order
 
 Phase 1  — Data Ingestion (done)

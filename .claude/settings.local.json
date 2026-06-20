@@ -25,7 +25,15 @@
       "WebFetch(domain:themazine.com)",
       "WebFetch(domain:undraw.co)",
       "Skill(run)",
-      "PowerShell($p = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($p\\) { Stop-Process -Id $p[0].OwningProcess -Force; Write-Host \"killed\" } else { Write-Host \"none\" })"
+      "PowerShell($p = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($p\\) { Stop-Process -Id $p[0].OwningProcess -Force; Write-Host \"killed\" } else { Write-Host \"none\" })",
+      "PowerShell(Start-Process powershell -ArgumentList \"-NoExit -Command `\"cd 'C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-web'; npm run dev -- --host 127.0.0.1`\"\")",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8000/api/options/em-scan/invalidate\" -Method POST -UseBasicParsing | Select-Object StatusCode, Content)",
+      "PowerShell(Start-Process powershell -ArgumentList \"-NoExit -Command cd 'C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend'; .\\\\.venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000\")",
+      "Bash(curl -s http://localhost:8000/api/options/em-scan)",
+      "Bash(python3 -c ' *)",
+      "PowerShell(\\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }; Write-Output \"Backend stopped\")",
+      "PowerShell(Start-Process powershell -ArgumentList \"-NoExit -Command cd 'C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend'; .\\\\.venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000\"; Write-Output \"Backend starting...\")",
+      "PowerShell($procs = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($procs\\) { $procs.OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Killed existing process on port 8000\" } else { Write-Output \"No process on port 8000\" })"
     ]
   }
 }

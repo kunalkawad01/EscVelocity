@@ -28,8 +28,11 @@ import duckdb
 from functools import lru_cache
 from pathlib import Path
 
-DB_PATH     = Path("warehouse/marketdna.duckdb")
-EQUITIES_GLOB = "data_lake/raw/equities/**/*.parquet"
+DB_PATH        = Path("warehouse/marketdna.duckdb")
+EQUITIES_GLOB  = "data_lake/raw/equities/**/*.parquet"
+DELIVERY_GLOB  = "data_lake/raw/delivery/**/*.parquet"
+OPTIONS_GLOB   = "data_lake/raw/options/date=*/data.parquet"
+FUTURES_GLOB   = "data_lake/raw/futures/date=*/data.parquet"
 
 # (view_name, parquet_file_stem)
 FEATURE_VIEWS: list[tuple[str, str]] = [
@@ -71,6 +74,27 @@ def _register_views(con: duckdb.DuckDBPyConnection) -> None:
             hive_partitioning = true
         )
     """)
+    options_dir = Path("data_lake/raw/options")
+    if options_dir.exists() and any(options_dir.rglob("*.parquet")):
+        con.execute(f"""
+            CREATE OR REPLACE VIEW options_chain AS
+            SELECT *
+            FROM read_parquet('{OPTIONS_GLOB}', hive_partitioning = true)
+        """)
+    futures_dir = Path("data_lake/raw/futures")
+    if futures_dir.exists() and any(futures_dir.rglob("*.parquet")):
+        con.execute(f"""
+            CREATE OR REPLACE VIEW futures_chain AS
+            SELECT *
+            FROM read_parquet('{FUTURES_GLOB}', hive_partitioning = true)
+        """)
+    delivery_dir = Path("data_lake/raw/delivery")
+    if delivery_dir.exists() and any(delivery_dir.rglob("*.parquet")):
+        con.execute(f"""
+            CREATE OR REPLACE VIEW delivery_data AS
+            SELECT *
+            FROM read_parquet('{DELIVERY_GLOB}', hive_partitioning = true)
+        """)
 
 
 def register_feature_views(con: duckdb.DuckDBPyConnection) -> None:

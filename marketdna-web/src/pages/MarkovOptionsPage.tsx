@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from '../components/Navbar'
+import { Footer } from '../components/Footer'
 import {
   Box, Typography, CircularProgress,
   Tooltip, Chip, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, LinearProgress,
+  Select, MenuItem, OutlinedInput,
 } from '@mui/material'
+import type { SelectChangeEvent } from '@mui/material'
 import SymbolAutocomplete from '../components/shared/SymbolAutocomplete'
 import { useSymbols } from '../hooks/useSymbols'
 import { markovOptionsApi } from '../api/markovOptionsApi'
@@ -32,7 +35,7 @@ const SECTION_ACCENT: Record<string, string> = {
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
 function RegimePill({ regime, small }: { regime: Regime; small?: boolean }) {
-  const { INK2 } = usePalette()
+  const { INK2, PAPER2 } = usePalette()
   return (
     <Box component="span" sx={{
       display: 'inline-block',
@@ -40,7 +43,7 @@ function RegimePill({ regime, small }: { regime: Regime; small?: boolean }) {
       py: small ? 0.25 : 0.375,
       fontSize: small ? '0.6875rem' : '0.75rem',
       fontWeight: 700,
-      background: REGIME_BG[regime] ?? 'rgba(255,255,255,0.07)',
+      background: REGIME_BG[regime] ?? PAPER2,
       color: REGIME_COLOR[regime] ?? INK2,
       border: `1px solid ${REGIME_COLOR[regime] ?? INK2}30`,
       whiteSpace: 'nowrap',
@@ -157,7 +160,7 @@ function TransitionMatrixView({ matrix, counts }: { matrix: number[][]; counts: 
   return (
     <Box sx={CARD}>
       <SectionHeader title="Markov Transition Matrix" accent={SECTION_ACCENT.matrix} meta="α=0.20 prior blend" />
-      <Box sx={{ overflowX: 'auto' }}>
+      <Box className="mdna-table-scroll">
         <Box component="table" sx={{ borderCollapse: 'collapse', fontSize: '0.62rem', width: '100%' }}>
           <Box component="thead">
             <Box component="tr">
@@ -389,7 +392,7 @@ function MarketOverview({ data, onSelectSymbol }: { data: MarketMarkovResult; on
         />
         <Select
           value={filterRegime}
-          onChange={e => setFilterRegime(e.target.value)}
+          onChange={(e: SelectChangeEvent) => setFilterRegime(e.target.value)}
           sx={{ ...INPUT_SX, minWidth: 140 }}
           displayEmpty
           MenuProps={{ PaperProps: { sx: { bgcolor: PAPER, border: `1px solid ${BORDER}`, color: INK } } }}
@@ -401,7 +404,7 @@ function MarketOverview({ data, onSelectSymbol }: { data: MarketMarkovResult; on
         </Select>
         <Select
           value={filterIV}
-          onChange={e => setFilterIV(e.target.value)}
+          onChange={(e: SelectChangeEvent) => setFilterIV(e.target.value)}
           sx={{ ...INPUT_SX, minWidth: 90 }}
           displayEmpty
           MenuProps={{ PaperProps: { sx: { bgcolor: PAPER, border: `1px solid ${BORDER}`, color: INK } } }}
@@ -597,47 +600,6 @@ function StockDetail({
   )
 }
 
-// ─── Footer ──────────────────────────────────────────────────────────────────
-
-function Footer() {
-  const { PAPER, BORDER, CYAN, INK, INK2, INK3 } = usePalette()
-  const NAV = [
-    { label: 'Platform',     links: ['Stock DNA', 'Pattern DNA', 'Markov Options', 'Quant Strategies', 'Indicators'] },
-    { label: 'Intelligence', links: ['Market Regime', 'Breadth Score', 'Edge Lab', 'Cointegration', 'Delivery Intel'] },
-    { label: 'Research',     links: ['Validation Framework', 'MCP Architecture', 'AI Agents', 'Feature Store', 'Backtests'] },
-  ]
-  return (
-    <Box component="footer" sx={{ bgcolor: PAPER, borderTop: `1px solid ${BORDER}`, mt: 8 }}>
-      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 3, md: 8, lg: 12 }, pt: 6, pb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 6, flexWrap: 'wrap', mb: 5 }}>
-          <Box sx={{ flex: '0 0 auto', maxWidth: 260 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{ width: 7, height: 7, bgcolor: CYAN, animation: 'blink 1.4s step-end infinite', '@keyframes blink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } } }} />
-              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: 800, fontSize: '1rem', color: INK, letterSpacing: '0.08em' }}>
-                MARKET<Box component="span" sx={{ color: CYAN }}>DNA</Box>
-              </Typography>
-            </Box>
-            <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem', color: INK3, lineHeight: 1.7 }}>
-              Quantitative market intelligence for Indian equities and options. Research precedes product. Validation is mandatory.
-            </Typography>
-          </Box>
-          {NAV.map(col => (
-            <Box key={col.label} sx={{ flex: '1 1 140px' }}>
-              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, color: CYAN, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1.75 }}>{col.label}</Typography>
-              {col.links.map(link => (
-                <Typography key={link} sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem', color: INK3, mb: 0.875, cursor: 'default', transition: 'color 0.12s', '&:hover': { color: INK2 } }}>{link}</Typography>
-              ))}
-            </Box>
-          ))}
-        </Box>
-        <Box sx={{ borderTop: `1px solid ${BORDER}`, pt: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
-          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK3 }}>© 2024 MarketDNA · For research purposes only</Typography>
-          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK3 }}>Not investment advice</Typography>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 

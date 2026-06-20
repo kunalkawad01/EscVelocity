@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
-  Box, Select, MenuItem, Typography, Alert, Grid,
+  Box, Select, MenuItem, Typography, Alert, Grid, Stack,
 } from '@mui/material'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
 import type {
   StockSummary, OHLCVResponse, RelativeStrengthResponse, ReturnsResponse,
   RiskResponse, DrawdownResponse, PercentilesResponse,
@@ -11,9 +13,10 @@ import type {
   ZScoreResponse, DualMomentumResponse,
   StatisticalSignalsResponse, VolatilityLabResponse,
   RegimeClustersResponse, PatternMatchResponse, MarketDynamicsResponse,
+  OIAnalysis,
 } from '../types/stock'
 import { stockApi } from '../api/stockApi'
-import HeroSection from '../components/stock/HeroSection'
+import Navbar from '../components/Navbar'
 import PriceChart from '../components/stock/PriceChart'
 import RelativeStrengthSection from '../components/stock/RelativeStrengthSection'
 import ReturnIntelligence from '../components/stock/ReturnIntelligence'
@@ -34,17 +37,23 @@ import VolatilityLab from '../components/stock/VolatilityLab'
 import RegimeClusters from '../components/stock/RegimeClusters'
 import PatternMatch from '../components/stock/PatternMatch'
 import MarketDynamics from '../components/stock/MarketDynamics'
-import { usePalette } from '../hooks/usePalette'
+import OptionsIntelligence from '../components/stock/OptionsIntelligence'
+import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import { Footer } from '../components/Footer'
 
 const MONO    = { fontFamily: "'IBM Plex Mono', monospace" } as const
 const COND    = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
-const DISPLAY = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 const JAKARTA = { fontFamily: "'IBM Plex Sans', sans-serif" } as const
 
-// Height of the sticky nav (both rows)
+// Navbar (48px) + jump strip (38px)
 const NAV_H = 86
+
+function formatVolume(v: number): string {
+  if (v >= 1e7) return `${(v / 1e7).toFixed(1)}Cr`
+  if (v >= 1e5) return `${(v / 1e5).toFixed(1)}L`
+  return v.toLocaleString('en-IN')
+}
 
 // ─── Section index ────────────────────────────────────────────────────────────
 
@@ -67,6 +76,7 @@ const SECTION_INDEX = [
   { id: 's-clusters',    label: 'Clusters',      accent: '#14B8A6' },
   { id: 's-patterns',    label: 'Patterns',      accent: '#F59E0B' },
   { id: 's-dynamics',    label: 'Dynamics',      accent: '#22C55E' },
+  { id: 's-options',     label: 'Options / F&O', accent: '#A855F7' },
   { id: 's-ai',          label: 'AI Copilot',    accent: '#8B5CF6' },
 ]
 
@@ -91,6 +101,7 @@ interface StockData {
   regimeClusters: RegimeClustersResponse | null
   patternMatch: PatternMatchResponse | null
   marketDynamics: MarketDynamicsResponse | null
+  oiAnalysis: OIAnalysis | null
 }
 
 const INITIAL: StockData = {
@@ -99,6 +110,7 @@ const INITIAL: StockData = {
   regime: null, persistence: null, insights: null, analogs: null,
   zscore: null, dualMomentum: null,
   statSignals: null, volLab: null, regimeClusters: null, patternMatch: null, marketDynamics: null,
+  oiAnalysis: null,
 }
 
 type LoadState = { [K in keyof StockData]: boolean }
@@ -108,20 +120,19 @@ const INIT_LOAD: LoadState = {
   regime: false, persistence: false, insights: false, analogs: false,
   zscore: false, dualMomentum: false,
   statSignals: false, volLab: false, regimeClusters: false, patternMatch: false, marketDynamics: false,
+  oiAnalysis: false,
 }
 
-// ─── Section component (light editorial) ─────────────────────────────────────
+// ─── Section card ─────────────────────────────────────────────────────────────
 
 function Section({ id, title, accent, num, children }: {
   id: string; title: string; accent?: string; num: number; children: React.ReactNode
 }) {
-  const { PAPER, PAPER2, BORDER, INK2, INK3, CYAN } = usePalette()
+  const { PAPER2, BORDER, INK2, INK3, CYAN } = usePalette()
+  const { CARD } = useTokens()
   const sectionAccent = accent ?? CYAN
   return (
-    <Box id={id} sx={{
-      mb: 1.5, bgcolor: PAPER, border: `1px solid ${BORDER}`,
-      overflow: 'hidden', scrollMarginTop: NAV_H + 10,
-    }}>
+    <Box id={id} sx={{ ...CARD, mb: 3, overflow: 'hidden', scrollMarginTop: NAV_H + 10 }}>
       <Box sx={{
         height: '2px',
         background: `linear-gradient(90deg, ${sectionAccent} 0%, ${sectionAccent}60 40%, transparent 100%)`,
@@ -161,9 +172,30 @@ export default function StockPage() {
   const [data, setData]         = useState<StockData>(INITIAL)
   const [loading, setLoading]   = useState<LoadState>(INIT_LOAD)
   const [error, setError]       = useState<string | null>(null)
+  const [activeSection, setActiveSection] = useState<string>('')
 
   useEffect(() => {
     stockApi.getSymbols().then(r => setSymbols(r.symbols)).catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        const visible = entries.filter(e => e.isIntersecting)
+        if (visible.length > 0) {
+          const topmost = visible.reduce((a, b) =>
+            a.boundingClientRect.top < b.boundingClientRect.top ? a : b
+          )
+          setActiveSection(topmost.target.id)
+        }
+      },
+      { rootMargin: `-${NAV_H + 8}px 0px -60% 0px`, threshold: 0 }
+    )
+    SECTION_INDEX.forEach(s => {
+      const el = document.getElementById(s.id)
+      if (el) observer.observe(el)
+    })
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -186,185 +218,431 @@ export default function StockPage() {
       }
     }
 
-    load('summary',       () => stockApi.getSummary(symbol))
-    load('ohlcv',         () => stockApi.getOHLCV(symbol))
-    load('percentiles',   () => stockApi.getPercentiles(symbol))
-    load('drawdown',      () => stockApi.getDrawdown(symbol))
-    load('risk',          () => stockApi.getRisk(symbol))
-    load('regime',        () => stockApi.getRegime(symbol))
-    load('persistence',   () => stockApi.getTrendPersistence(symbol))
-    load('returns',       () => stockApi.getReturns(symbol))
-    load('rs',            () => stockApi.getRelativeStrength(symbol))
-    load('insights',      () => stockApi.getInsights(symbol))
-    load('analogs',       () => stockApi.getAnalogs(symbol))
-    load('zscore',        () => stockApi.getZScore(symbol))
-    load('dualMomentum',  () => stockApi.getDualMomentum(symbol))
-    load('statSignals',   () => stockApi.getStatisticalSignals(symbol))
-    load('volLab',        () => stockApi.getVolatilityLab(symbol))
-    load('regimeClusters',() => stockApi.getRegimeClusters(symbol))
-    load('patternMatch',  () => stockApi.getPatternMatch(symbol))
-    load('marketDynamics',() => stockApi.getMarketDynamics(symbol))
+    load('summary',        () => stockApi.getSummary(symbol))
+    load('ohlcv',          () => stockApi.getOHLCV(symbol))
+    load('percentiles',    () => stockApi.getPercentiles(symbol))
+    load('drawdown',       () => stockApi.getDrawdown(symbol))
+    load('risk',           () => stockApi.getRisk(symbol))
+    load('regime',         () => stockApi.getRegime(symbol))
+    load('persistence',    () => stockApi.getTrendPersistence(symbol))
+    load('returns',        () => stockApi.getReturns(symbol))
+    load('rs',             () => stockApi.getRelativeStrength(symbol))
+    load('insights',       () => stockApi.getInsights(symbol))
+    load('analogs',        () => stockApi.getAnalogs(symbol))
+    load('zscore',         () => stockApi.getZScore(symbol))
+    load('dualMomentum',   () => stockApi.getDualMomentum(symbol))
+    load('statSignals',    () => stockApi.getStatisticalSignals(symbol))
+    load('volLab',         () => stockApi.getVolatilityLab(symbol))
+    load('regimeClusters', () => stockApi.getRegimeClusters(symbol))
+    load('patternMatch',   () => stockApi.getPatternMatch(symbol))
+    load('marketDynamics', () => stockApi.getMarketDynamics(symbol))
+    setLoad('oiAnalysis', true)
+    stockApi.getOIAnalysis(symbol)
+      .then(r => setData(prev => ({ ...prev, oiAnalysis: r })))
+      .catch(() => {/* non-F&O — leave oiAnalysis null */})
+      .finally(() => setLoad('oiAnalysis', false))
   }, [symbol])
 
   const summary = data.summary
+  const isUp        = summary ? summary.change_pct >= 0 : true
+  const changeColor = isUp ? '#22c55e' : '#ef4444'
+  const regimeColor = summary?.regime === 'Bullish' ? '#22c55e'
+    : summary?.regime === 'Bearish' ? '#ef4444' : '#f59e0b'
+  const rangePct = summary
+    ? Math.max(2, Math.min(98,
+        ((summary.close - summary.low_52w) / (summary.high_52w - summary.low_52w)) * 100
+      ))
+    : 50
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: BG, color: INK }}>
 
-      {/* ── Sticky two-row nav ─────────────────────────────────────────────── */}
-      <Box sx={{
-        position: 'sticky', top: 0, zIndex: 200,
-        bgcolor: mode === 'dark' ? 'rgba(6,12,26,0.96)' : 'rgba(247,249,252,0.96)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${BORDER}`,
-      }}>
+      {/* ── Standard navbar ─────────────────────────────────────────────────── */}
+      <Navbar />
 
-        {/* Row 1 — identity + selector */}
-        <Box sx={{
-          px: { xs: 2.5, md: 4 }, height: 54,
-          display: 'flex', alignItems: 'center', gap: 2.5,
-          borderBottom: `1px solid ${BORDER}`,
-        }}>
-          {/* Logo */}
-          <Link to="/" style={{ textDecoration: 'none' }}>
-            <Typography sx={{
-              ...DISPLAY, fontSize: '1.1875rem', letterSpacing: '0.04em',
-              color: INK, lineHeight: 1,
-              '& span': { color: CYAN },
-            }}>
-              Market<span>DNA</span>
-            </Typography>
-          </Link>
-
-          <Box sx={{ width: 1, height: 22, bgcolor: BORDER, flexShrink: 0 }} />
-
-          {/* Symbol + price */}
-          {summary ? (
-            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
-              <Typography sx={{ ...MONO, fontSize: '1.0625rem', fontWeight: 700, color: INK, letterSpacing: '-0.01em' }}>
-                {symbol}
-              </Typography>
-              <Typography sx={{ ...MONO, fontSize: '0.9375rem', color: CYAN, fontWeight: 600 }}>
-                ₹{summary.close.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-              </Typography>
-              <Typography sx={{
-                ...MONO, fontSize: '0.875rem', fontWeight: 700,
-                color: summary.change_pct >= 0 ? '#16A34A' : '#DC2626',
-              }}>
-                {summary.change_pct >= 0 ? '+' : ''}{summary.change_pct.toFixed(2)}%
-              </Typography>
-            </Box>
-          ) : (
-            <Typography sx={{ ...MONO, fontSize: '1.0625rem', fontWeight: 700, color: INK }}>{symbol}</Typography>
-          )}
-
-          {/* Regime chip */}
-          {summary && (
+      {/* ── Sticky section nav bar ───────────────────────────────────────────── */}
+      {(() => {
+        const active = SECTION_INDEX.find(s => s.id === activeSection)
+        return (
+          <Box sx={{
+            position: 'sticky', top: 48, zIndex: 100,
+            width: '100%',
+            bgcolor: PAPER2,
+            borderBottom: `1px solid ${BORDER}`,
+          }}>
             <Box sx={{
-              px: 1, py: 0.35, flexShrink: 0,
-              border: `1px solid ${summary.regime === 'Bullish' ? 'rgba(22,163,74,0.3)' : summary.regime === 'Bearish' ? 'rgba(220,38,38,0.3)' : 'rgba(245,158,11,0.3)'}`,
-              bgcolor: summary.regime === 'Bullish' ? 'rgba(22,163,74,0.07)' : summary.regime === 'Bearish' ? 'rgba(220,38,38,0.07)' : 'rgba(245,158,11,0.07)',
+              maxWidth: 1280, mx: 'auto',
+              px: { xs: 2, md: 4, lg: 8 },
+              height: 40, display: 'flex', alignItems: 'center', gap: 2,
             }}>
-              <Typography sx={{
-                ...COND, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
-                color: summary.regime === 'Bullish' ? '#16A34A' : summary.regime === 'Bearish' ? '#DC2626' : '#D97706',
+              {/* Active section label */}
+              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                {active ? (
+                  <>
+                    <Box sx={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      bgcolor: active.accent, flexShrink: 0,
+                      boxShadow: `0 0 6px ${active.accent}80`,
+                    }} />
+                    <Typography sx={{
+                      ...MONO, fontSize: '0.7rem', fontWeight: 700,
+                      color: INK2, letterSpacing: '0.06em', textTransform: 'uppercase',
+                    }} noWrap>
+                      {active.label}
+                    </Typography>
+                    <Typography sx={{ ...MONO, fontSize: '0.65rem', color: INK3 }}>
+                      {(SECTION_INDEX.findIndex(s => s.id === activeSection) + 1)
+                        .toString().padStart(2, '0')} / {SECTION_INDEX.length}
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography sx={{ ...COND, fontSize: '0.7rem', color: INK3, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    Stock DNA
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Section dots — compact clickable progress row */}
+              <Box sx={{
+                display: { xs: 'none', md: 'flex' },
+                alignItems: 'center', gap: 0.5,
               }}>
-                {summary.regime}
-              </Typography>
-            </Box>
-          )}
+                {SECTION_INDEX.map(s => {
+                  const isActive = activeSection === s.id
+                  return (
+                    <Box
+                      key={s.id}
+                      component="a"
+                      href={`#${s.id}`}
+                      title={s.label}
+                      sx={{
+                        width: isActive ? 18 : 6,
+                        height: 6, borderRadius: 3,
+                        bgcolor: isActive ? s.accent : BORDER,
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer',
+                        textDecoration: 'none',
+                        '&:hover': { bgcolor: s.accent, opacity: 0.85 },
+                      }}
+                    />
+                  )
+                })}
+              </Box>
 
-          <Box sx={{ flex: 1 }} />
-
-          {/* Pattern DNA link */}
-          <Link to="/pattern-dna" style={{ textDecoration: 'none' }}>
-            <Typography sx={{
-              ...COND, fontSize: '0.8125rem', fontWeight: 700, letterSpacing: '0.09em',
-              textTransform: 'uppercase', color: '#8B5CF6',
-              '&:hover': { color: '#6D28D9' }, transition: 'color 0.15s',
-            }}>
-              Pattern DNA ↗
-            </Typography>
-          </Link>
-
-          {/* Symbol selector */}
-          <Select
-            value={symbol}
-            onChange={e => setSymbol(e.target.value)}
-            size="small"
-            sx={{
-              ...MONO, fontSize: '0.875rem', fontWeight: 600,
-              color: INK, height: 34, minWidth: 150,
-              borderRadius: 0,
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: BORDER },
-              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: CYAN },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: CYAN },
-              '& .MuiSvgIcon-root': { color: INK3 },
-              '& .MuiSelect-select': { py: '6px !important' },
-            }}
-            MenuProps={{
-              PaperProps: {
-                sx: {
-                  bgcolor: PAPER2, border: `1px solid ${BORDER}`, borderRadius: 0,
-                  '& .MuiMenuItem-root': {
-                    ...MONO, fontSize: '0.875rem', color: INK2, py: 1,
-                    '&:hover': { bgcolor: BORDER, color: INK },
-                    '&.Mui-selected': { bgcolor: BORDER, color: CYAN },
+              {/* Jump-to dropdown */}
+              <Select
+                value={activeSection || ''}
+                displayEmpty
+                size="small"
+                renderValue={() => (
+                  <Typography sx={{ ...COND, fontSize: '0.72rem', fontWeight: 700, color: INK2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    Jump to ▾
+                  </Typography>
+                )}
+                onChange={e => {
+                  const el = document.getElementById(e.target.value as string)
+                  if (el) el.scrollIntoView({ behavior: 'smooth' })
+                }}
+                sx={{
+                  height: 28, minWidth: 100, flexShrink: 0,
+                  bgcolor: PAPER, borderRadius: 1.5,
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: BORDER },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: CYAN },
+                  '& .MuiSelect-select': { py: '4px !important', pr: '28px !important' },
+                  '& .MuiSvgIcon-root': { display: 'none' },
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: PAPER2, border: `1px solid ${BORDER}`,
+                      borderRadius: 2, mt: 0.5, maxHeight: 360,
+                      '& .MuiMenuItem-root': {
+                        ...COND, fontSize: '0.78rem', color: INK2, py: 0.75,
+                        '&:hover': { bgcolor: BORDER, color: INK },
+                        '&.Mui-selected': { bgcolor: `${CYAN}14`, color: CYAN },
+                      },
+                    },
                   },
-                },
-              },
-            }}
-          >
-            {symbols.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-          </Select>
-        </Box>
-
-        {/* Row 2 — section jump strip */}
-        <Box sx={{
-          display: 'flex', alignItems: 'center',
-          px: { xs: 1.5, md: 2.5 }, height: 38,
-          overflowX: 'auto', scrollbarWidth: 'none',
-          '&::-webkit-scrollbar': { display: 'none' },
-        }}>
-          {SECTION_INDEX.map((s, i) => (
-            <Box
-              key={s.id}
-              component="a"
-              href={`#${s.id}`}
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 0.75,
-                px: 1.5, py: 0.5, textDecoration: 'none', flexShrink: 0, cursor: 'pointer',
-                borderRight: i < SECTION_INDEX.length - 1 ? `1px solid ${BORDER}` : 'none',
-                '&:hover .dot': { bgcolor: s.accent },
-                '&:hover .lbl': { color: INK },
-              }}
-            >
-              <Box className="dot" sx={{
-                width: 5, height: 5, borderRadius: '50%',
-                bgcolor: BORDER, transition: 'background 0.15s',
-              }} />
-              <Typography className="lbl" sx={{
-                ...COND, fontSize: '0.75rem', fontWeight: 700,
-                letterSpacing: '0.07em', textTransform: 'uppercase',
-                color: INK3, transition: 'color 0.15s', whiteSpace: 'nowrap',
-              }}>
-                {s.label}
-              </Typography>
+                }}
+              >
+                {SECTION_INDEX.map((s, i) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                      <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: s.accent, flexShrink: 0 }} />
+                      <Typography sx={{ ...MONO, fontSize: '0.65rem', color: INK3, minWidth: 20 }}>
+                        {(i + 1).toString().padStart(2, '0')}
+                      </Typography>
+                      {s.label}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
             </Box>
-          ))}
+          </Box>
+        )
+      })()}
+
+      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
+      <Box sx={{
+        borderBottom: `1px solid ${BORDER}`,
+        background: mode === 'dark'
+          ? `linear-gradient(160deg, #0A1628 0%, #060C1A 60%, ${BG} 100%)`
+          : `linear-gradient(160deg, #EBF3FC 0%, #F2F7FD 50%, ${BG} 100%)`,
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Ambient glows */}
+        <Box sx={{
+          position: 'absolute', top: -100, right: '10%', width: 500, height: 400,
+          borderRadius: '50%',
+          background: `radial-gradient(ellipse, ${CYAN}12 0%, transparent 65%)`,
+          pointerEvents: 'none',
+        }} />
+        <Box sx={{
+          position: 'absolute', bottom: -60, left: '5%', width: 300, height: 300,
+          borderRadius: '50%',
+          background: 'radial-gradient(ellipse, #6366f118 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        <Box sx={{
+          maxWidth: 1280, mx: 'auto',
+          px: { xs: 3, md: 8, lg: 12 },
+          py: { xs: 5, md: 8 },
+          position: 'relative',
+        }}>
+          {/* Pulsing eyebrow badge */}
+          <Box sx={{
+            display: 'inline-flex', alignItems: 'center', gap: 1.25, mb: 3,
+            px: 1.5, py: 0.5, borderRadius: '20px',
+            border: `1px solid ${CYAN}40`, bgcolor: `${CYAN}0D`,
+          }}>
+            <Box sx={{
+              width: 6, height: 6, borderRadius: '50%', bgcolor: CYAN,
+              animation: 'hpulse 2s ease-in-out infinite',
+              '@keyframes hpulse': {
+                '0%,100%': { boxShadow: `0 0 4px ${CYAN}` },
+                '50%':     { boxShadow: `0 0 14px ${CYAN}` },
+              },
+            }} />
+            <Typography sx={{
+              ...COND, fontSize: '0.68rem', fontWeight: 700, color: CYAN,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+            }}>
+              Stock DNA · Quantitative Research
+            </Typography>
+          </Box>
+
+          <Stack
+            direction={{ xs: 'column', lg: 'row' }}
+            spacing={5}
+            alignItems={{ lg: 'flex-start' }}
+            justifyContent="space-between"
+          >
+            {/* Left — symbol identity */}
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{
+                ...MONO, fontWeight: 700, color: INK,
+                fontSize: { xs: '2.75rem', sm: '3.5rem', md: '4.5rem' },
+                lineHeight: 1, letterSpacing: '-0.02em', mb: 0.75,
+              }}>
+                {symbol}
+                <Box component="span" sx={{ color: CYAN, textShadow: `0 0 32px ${CYAN}70` }}> ·</Box>
+              </Typography>
+
+              <Typography sx={{
+                ...JAKARTA, fontSize: '0.9375rem', color: INK2,
+                lineHeight: 1.75, mb: 3, maxWidth: 440,
+              }}>
+                20-section deep dive — regime, returns, volatility, patterns, AI copilot
+              </Typography>
+
+              {/* Badges row */}
+              {summary && (
+                <Box sx={{ display: 'flex', gap: 1, mb: 2.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <Box sx={{
+                    px: 1, py: 0.35, borderRadius: 1,
+                    border: '1px solid rgba(59,130,246,0.25)', bgcolor: 'rgba(59,130,246,0.06)',
+                  }}>
+                    <Typography sx={{ ...COND, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', color: '#3B82F6', textTransform: 'uppercase' }}>
+                      NSE · EQUITY
+                    </Typography>
+                  </Box>
+                  <Box sx={{
+                    px: 1, py: 0.35, borderRadius: 1,
+                    border: `1px solid ${regimeColor}30`, bgcolor: `${regimeColor}07`,
+                  }}>
+                    <Typography sx={{ ...COND, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', color: regimeColor, textTransform: 'uppercase' }}>
+                      {summary.regime}
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ ...MONO, fontSize: '0.72rem', color: INK3 }}>
+                    {summary.date}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* SMA position chips */}
+              {summary && (
+                <Box sx={{ display: 'flex', gap: 0.75, mb: 3.5, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'SMA 20',  active: summary.above_sma20 },
+                    { label: 'SMA 50',  active: summary.above_sma50 },
+                    { label: 'SMA 200', active: summary.above_sma200 },
+                  ].map(s => {
+                    const c = s.active ? '#22c55e' : '#ef4444'
+                    return (
+                      <Box key={s.label} sx={{
+                        display: 'flex', alignItems: 'center', gap: 0.6,
+                        px: 1, py: 0.35, borderRadius: 1,
+                        border: `1px solid ${c}28`, bgcolor: `${c}07`,
+                      }}>
+                        <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: c }} />
+                        <Typography sx={{ ...COND, fontSize: '0.72rem', fontWeight: 700, color: c, letterSpacing: '0.05em' }}>
+                          {s.active ? '▲' : '▼'} {s.label}
+                        </Typography>
+                      </Box>
+                    )
+                  })}
+                </Box>
+              )}
+
+              {/* Symbol selector */}
+              <Select
+                value={symbol}
+                onChange={e => setSymbol(e.target.value)}
+                size="small"
+                sx={{
+                  ...MONO, fontSize: '0.875rem', fontWeight: 600,
+                  color: INK, height: 36, minWidth: 180,
+                  borderRadius: 1.5,
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: BORDER },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: CYAN },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: CYAN },
+                  '& .MuiSvgIcon-root': { color: INK3 },
+                  '& .MuiSelect-select': { py: '7px !important' },
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: PAPER2, border: `1px solid ${BORDER}`, borderRadius: 2,
+                      '& .MuiMenuItem-root': {
+                        ...MONO, fontSize: '0.875rem', color: INK2, py: 1,
+                        '&:hover': { bgcolor: BORDER, color: INK },
+                        '&.Mui-selected': { bgcolor: BORDER, color: CYAN },
+                      },
+                    },
+                  },
+                }}
+              >
+                {symbols.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              </Select>
+            </Box>
+
+            {/* Right — price panel */}
+            {summary ? (
+              <Box sx={{ minWidth: { lg: 320 }, flexShrink: 0 }}>
+                <Typography sx={{
+                  ...COND, fontSize: '0.72rem', fontWeight: 700,
+                  letterSpacing: '0.18em', color: INK3, textTransform: 'uppercase', mb: 0.5,
+                }}>
+                  Last Price
+                </Typography>
+                <Typography sx={{
+                  ...MONO, fontWeight: 700, color: CYAN, lineHeight: 1,
+                  fontSize: { xs: '2.5rem', md: '3.25rem' },
+                  letterSpacing: '-0.02em',
+                }}>
+                  ₹{summary.close.toLocaleString('en-IN')}
+                </Typography>
+
+                <Box sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 0.75,
+                  mt: 1.25, mb: 2.5, px: 1.5, py: 0.6, borderRadius: 1,
+                  border: `1px solid ${changeColor}28`, bgcolor: `${changeColor}07`,
+                }}>
+                  {isUp
+                    ? <TrendingUpIcon sx={{ color: changeColor, fontSize: 16 }} />
+                    : <TrendingDownIcon sx={{ color: changeColor, fontSize: 16 }} />
+                  }
+                  <Typography sx={{ ...MONO, color: changeColor, fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.02em' }}>
+                    {isUp ? '+' : ''}{summary.change_pct.toFixed(2)}%
+                  </Typography>
+                </Box>
+
+                {/* 52W metrics */}
+                <Box sx={{
+                  display: 'flex', mb: 2, borderRadius: 2, overflow: 'hidden',
+                  border: `1px solid ${BORDER}`,
+                  '& > *:not(:last-child)': { borderRight: `1px solid ${BORDER}` },
+                }}>
+                  {[
+                    { label: '52W High', value: `₹${summary.high_52w.toLocaleString('en-IN')}`, color: CYAN },
+                    { label: '52W Low',  value: `₹${summary.low_52w.toLocaleString('en-IN')}`,  color: INK2 },
+                    { label: 'Vol 20D',  value: formatVolume(summary.avg_volume_20d),             color: '#3B82F6' },
+                  ].map(m => (
+                    <Box key={m.label} sx={{ px: 2, py: 1.5, flex: 1, textAlign: 'center', bgcolor: PAPER }}>
+                      <Typography sx={{ ...COND, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: INK3, mb: 0.4 }}>
+                        {m.label}
+                      </Typography>
+                      <Typography sx={{ ...MONO, fontSize: '0.875rem', fontWeight: 700, color: m.color, lineHeight: 1 }}>
+                        {m.value}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                {/* 52W range bar */}
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography sx={{ ...MONO, fontSize: '0.7rem', color: INK3 }}>
+                      ₹{summary.low_52w.toLocaleString('en-IN')}
+                    </Typography>
+                    <Typography sx={{ ...COND, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', color: INK3, textTransform: 'uppercase' }}>
+                      52-week range
+                    </Typography>
+                    <Typography sx={{ ...MONO, fontSize: '0.7rem', color: INK3 }}>
+                      ₹{summary.high_52w.toLocaleString('en-IN')}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ height: 4, bgcolor: BORDER, borderRadius: 2, position: 'relative', overflow: 'visible' }}>
+                    <Box sx={{
+                      position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2,
+                      width: `${rangePct}%`,
+                      background: `linear-gradient(90deg, ${BORDER}, ${CYAN})`,
+                    }} />
+                    <Box sx={{
+                      position: 'absolute', top: '50%', transform: 'translate(-50%, -50%)',
+                      left: `${rangePct}%`,
+                      width: 10, height: 10, borderRadius: '50%',
+                      bgcolor: CYAN, border: `2px solid ${BG}`,
+                      boxShadow: `0 0 6px ${CYAN}80`,
+                    }} />
+                  </Box>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ minWidth: { lg: 320 }, flexShrink: 0 }}>
+                <Box sx={{
+                  height: 140, bgcolor: PAPER, borderRadius: 2,
+                  border: `1px solid ${BORDER}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Typography sx={{ ...COND, color: INK3, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    Loading…
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </Stack>
         </Box>
       </Box>
 
-      {/* ── Hero ──────────────────────────────────────────────────────────────── */}
-      {summary && <HeroSection summary={summary} />}
-
       {/* ── Content ───────────────────────────────────────────────────────────── */}
-      <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 2, md: 4, lg: 6 }, py: 2 }}>
+      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 2, md: 4, lg: 8 }, py: 3 }}>
 
         {error && (
           <Alert severity="error" onClose={() => setError(null)}
-            sx={{ mb: 2, borderRadius: 0, border: '1px solid rgba(239,68,68,0.3)' }}>
+            sx={{ mb: 3, borderRadius: 2, border: '1px solid rgba(239,68,68,0.3)' }}>
             {error}
           </Alert>
         )}
@@ -452,7 +730,11 @@ export default function StockPage() {
           <MarketDynamics data={data.marketDynamics} loading={loading.marketDynamics} />
         </Section>
 
-        <Section id="s-ai" title="AI Research Assistant" accent="#8B5CF6" num={19}>
+        <Section id="s-options" title="Options & Futures Intelligence" accent="#A855F7" num={19}>
+          <OptionsIntelligence data={data.oiAnalysis} loading={loading.oiAnalysis} />
+        </Section>
+
+        <Section id="s-ai" title="AI Research Assistant" accent="#8B5CF6" num={20}>
           <AIResearchAssistant symbol={symbol} />
         </Section>
 

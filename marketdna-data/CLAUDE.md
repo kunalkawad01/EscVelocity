@@ -28,6 +28,16 @@ All commands run from the project root with the venv active. On Windows use `.\.
 # Download NSE instruments list
 .\.venv\Scripts\python.exe -c "from ingestion.kite.instruments import download_instruments; download_instruments()"
 
+# Ingest F&O option chain (current monthly expiry, ATM ± 20 strikes, all FO.csv symbols)
+# Output: data_lake/raw/options/date=YYYY-MM-DD/data.parquet + refreshes options_chain DuckDB view
+# Fields: ltp, bid, ask, oi, oi_change, volume, iv (%)
+.\.venv\Scripts\python.exe -m ingestion.ingest_option_chain
+
+# Ingest F&O futures (current monthly expiry, all FO.csv symbols)
+# Output: data_lake/raw/futures/date=YYYY-MM-DD/data.parquet + refreshes futures_chain DuckDB view
+# Fields: ltp, bid, ask, oi, oi_change, volume, basis, basis_pct
+.\.venv\Scripts\python.exe -m ingestion.ingest_futures
+
 # Feature engine — cold build (all 11 features, full history, ~2 min)
 .\.venv\Scripts\python.exe -m feature_engine.compute_all
 

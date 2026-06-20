@@ -26,6 +26,7 @@ import { hcTheme } from '../theme'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import { Footer } from '../components/Footer'
+import SearchBox from '../components/shared/SearchBox'
 
 const CATEGORY_COLOR: Record<string, string> = {
   'Bullish Reversal':    '#22c55e',
@@ -242,12 +243,7 @@ function PatternScanner({ data, loading, onSymbolClick }: {
       }}>
         {/* Row 1: text + dropdown + confidence */}
         <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap', alignItems: 'center' }}>
-          <OutlinedInput
-            placeholder="Stock…"
-            value={filterStock}
-            onChange={e => setFilterStock(e.target.value)}
-            sx={{ ...INPUT_SX, width: 110 }}
-          />
+          <SearchBox value={filterStock} onChange={setFilterStock} placeholder="Symbol…" width={120} />
           <FormControl size="small" sx={{ minWidth: 168 }}>
             <Select
               value={filterPattern}

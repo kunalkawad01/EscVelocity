@@ -1,11 +1,15 @@
 ﻿import { Box, Typography, Chip, CircularProgress, Grid } from '@mui/material'
 import type { MarketDynamicsResponse, LeadLagPair } from '../../types/stock'
+import { usePalette } from '../../hooks/usePalette'
+
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: MarketDynamicsResponse | null; loading: boolean }
 
 function PairRow({ pair }: { pair: LeadLagPair }) {
+  const { BORDER, PAPER2, INK3 } = usePalette()
   const isLeader = pair.peak_lag > 0
-  const labelColor = isLeader ? '#22c55e' : pair.peak_lag < 0 ? '#3b82f6' : '#94a3b8'
+  const labelColor = isLeader ? '#22c55e' : pair.peak_lag < 0 ? '#3b82f6' : INK3
   const corrColor  = pair.peak_correlation > 0 ? '#22c55e' : '#ef4444'
 
   return (
@@ -17,7 +21,7 @@ function PairRow({ pair }: { pair: LeadLagPair }) {
         py: 0.75,
         px: 1.5,
         borderRadius: 1.5,
-        '&:nth-of-type(odd)': { bgcolor: 'rgba(255,255,255,0.025)' },
+        '&:nth-of-type(odd)': { bgcolor: PAPER2 },
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
@@ -38,6 +42,7 @@ function PairRow({ pair }: { pair: LeadLagPair }) {
 }
 
 export default function MarketDynamics({ data, loading }: Props) {
+  const { BORDER, INK3 } = usePalette()
   if (loading) {
     return (
       <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexDirection: 'column' }}>
@@ -54,13 +59,13 @@ export default function MarketDynamics({ data, loading }: Props) {
 
   return (
     <Box>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#22C55E', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#22C55E', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
         Cross-Stock Correlation · Lags ±5 Days
       </Typography>
-      <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: 'linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: `linear-gradient(135deg, #FFFFFF 30%, ${INK3} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', mb: 0.5, display: 'block' }}>
         Market Dynamics
       </Typography>
-      <Typography sx={{ fontSize: '0.73rem', color: '#4B5563', mb: 2.5, display: 'block', lineHeight: 1.5 }}>
+      <Typography sx={{ fontSize: '0.73rem', color: INK3, mb: 2.5, display: 'block', lineHeight: 1.5 }}>
         Which stocks move first and which follow {data.symbol} — based on cross-correlation at lags ±5 days
       </Typography>
 
@@ -98,7 +103,7 @@ export default function MarketDynamics({ data, loading }: Props) {
               <Typography variant="overline" sx={{ color: '#22c55e', fontSize: '0.6875rem', display: 'block', mb: 1 }}>
                 Stocks that lead {data.symbol}
               </Typography>
-              <Box sx={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' }}>
+              <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2, overflow: 'hidden' }}>
                 {leaders.slice(0, 5).map(p => <PairRow key={p.other_symbol} pair={p} />)}
               </Box>
             </Grid>
@@ -110,7 +115,7 @@ export default function MarketDynamics({ data, loading }: Props) {
               <Typography variant="overline" sx={{ color: '#3b82f6', fontSize: '0.6875rem', display: 'block', mb: 1 }}>
                 Stocks that lag {data.symbol}
               </Typography>
-              <Box sx={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' }}>
+              <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2, overflow: 'hidden' }}>
                 {laggers.slice(0, 5).map(p => <PairRow key={p.other_symbol} pair={p} />)}
               </Box>
             </Grid>
@@ -122,7 +127,7 @@ export default function MarketDynamics({ data, loading }: Props) {
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: '0.6875rem', display: 'block', mb: 1 }}>
                 Coincident
               </Typography>
-              <Box sx={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' }}>
+              <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2, overflow: 'hidden' }}>
                 {coinc.slice(0, 5).map(p => <PairRow key={p.other_symbol} pair={p} />)}
               </Box>
             </Grid>

@@ -1,5 +1,9 @@
 ﻿import { Box, Typography, Chip, CircularProgress, Grid, Stack } from '@mui/material'
 import type { DualMomentumResponse, DualMomentumSignalPerf } from '../../types/stock'
+import { usePalette } from '../../hooks/usePalette'
+
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: DualMomentumResponse | null; loading: boolean }
 
@@ -25,7 +29,7 @@ function Filter({ label, value, suffix, pass }: { label: string; value: number; 
           {label}
         </Typography>
       </Box>
-      <Typography variant="h5" sx={{ fontWeight: 900, color: c }}>
+      <Typography sx={{ ...MONO, fontSize: '1.25rem', fontWeight: 900, color: c }}>
         {value > 0 ? '+' : ''}{value.toFixed(1)}{suffix}
       </Typography>
     </Box>
@@ -33,6 +37,7 @@ function Filter({ label, value, suffix, pass }: { label: string; value: number; 
 }
 
 function PerfRow({ perf, isCurrent }: { perf: DualMomentumSignalPerf; isCurrent: boolean }) {
+  const { BORDER } = usePalette()
   const sc = signalColor(perf.signal)
   const retC21 = retColor(perf.avg_fwd_21d)
   const retC63 = retColor(perf.avg_fwd_63d)
@@ -49,7 +54,7 @@ function PerfRow({ perf, isCurrent }: { perf: DualMomentumSignalPerf; isCurrent:
           sx={{ bgcolor: `${sc}18`, color: sc, fontWeight: 700, fontSize: '0.75rem', height: 20 }} />
       </Box>
       <Box sx={{ flex: 1 }}>
-        <Box sx={{ height: 4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <Box sx={{ height: 4, borderRadius: 2, bgcolor: BORDER, overflow: 'hidden' }}>
           <Box sx={{ height: '100%', width: `${Math.min(100, Math.abs(perf.avg_fwd_21d) * 5)}%`, borderRadius: 2, bgcolor: retC21 }} />
         </Box>
       </Box>
@@ -70,6 +75,7 @@ function PerfRow({ perf, isCurrent }: { perf: DualMomentumSignalPerf; isCurrent:
 }
 
 export default function DualMomentum({ data, loading }: Props) {
+  const { BORDER, PAPER2, INK3 } = usePalette()
   if (loading) {
     return (
       <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexDirection: 'column' }}>
@@ -84,13 +90,13 @@ export default function DualMomentum({ data, loading }: Props) {
 
   return (
     <Box>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#22C55E', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#22C55E', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
         Momentum Framework · 12-month lookback
       </Typography>
-      <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: 'linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', mb: 0.5, display: 'block' }}>
+      <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: `linear-gradient(135deg, #FFFFFF 30%, ${INK3} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', mb: 0.5, display: 'block' }}>
         Dual Momentum
       </Typography>
-      <Typography sx={{ fontSize: '0.73rem', color: '#4B5563', mb: 2.5, display: 'block', lineHeight: 1.5 }}>
+      <Typography sx={{ fontSize: '0.73rem', color: INK3, mb: 2.5, display: 'block', lineHeight: 1.5 }}>
         Absolute momentum (stock beat cash) AND relative momentum (stock beat index) must both pass — a dual-confirmation framework that filters out weak or crowded trades
       </Typography>
 
@@ -121,7 +127,7 @@ export default function DualMomentum({ data, loading }: Props) {
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', mb: 0.5 }}>
               Signal
             </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: sc, mb: 0.75 }}>
+            <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '1.75rem', fontWeight: 900, color: sc, mb: 0.75 }}>
               {data.current_signal}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', lineHeight: 1.6, display: 'block' }}>
@@ -130,7 +136,7 @@ export default function DualMomentum({ data, loading }: Props) {
           </Box>
 
           {/* Index comparison */}
-          <Box sx={{ p: 1.5, borderRadius: 2, border: '1px solid rgba(255,255,255,0.07)', bgcolor: 'rgba(255,255,255,0.025)' }}>
+          <Box sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: PAPER2 }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6875rem', display: 'block', mb: 1 }}>
               12-Month performance comparison
             </Typography>
@@ -145,7 +151,7 @@ export default function DualMomentum({ data, loading }: Props) {
                     {value > 0 ? '+' : ''}{value.toFixed(1)}%
                   </Typography>
                 </Box>
-                <Box sx={{ height: 5, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                <Box sx={{ height: 5, borderRadius: 2.5, bgcolor: BORDER, overflow: 'hidden' }}>
                   <Box sx={{ height: '100%', width: `${Math.min(100, Math.max(0, (value + 50) / 100 * 100))}%`, borderRadius: 2.5, bgcolor: retColor(value) }} />
                 </Box>
               </Box>

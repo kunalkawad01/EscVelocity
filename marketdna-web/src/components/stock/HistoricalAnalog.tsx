@@ -1,5 +1,9 @@
 ﻿import { Box, Typography, Stack, Chip, CircularProgress, Grid } from '@mui/material'
 import type { AnalogResponse, AnalogPeriod, AnalogSnapshot } from '../../types/stock'
+import { usePalette } from '../../hooks/usePalette'
+
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 interface Props { data: AnalogResponse | null; loading: boolean }
 
@@ -10,8 +14,8 @@ function fmt(v: number | null, decimals = 1): string {
   return `${v > 0 ? '+' : ''}${v.toFixed(decimals)}%`
 }
 
-function fwdColor(v: number | null): string {
-  if (v === null) return '#64748b'
+function fwdColor(v: number | null, ink3: string): string {
+  if (v === null) return ink3
   return v > 0 ? '#22c55e' : '#ef4444'
 }
 
@@ -25,13 +29,14 @@ function regimeColor(r: string): string {
 // ── Current snapshot row ──────────────────────────────────────────────────────
 
 function SnapshotBar({ snap }: { snap: AnalogSnapshot }) {
+  const { BORDER, PAPER2, INK3 } = usePalette()
   const color = regimeColor(snap.regime)
   const items = [
-    { label: 'Regime',      value: snap.regime,                       color },
-    { label: '1M Return',   value: fmt(snap.ret_1m),                  color: fwdColor(snap.ret_1m) },
-    { label: '3M Return',   value: fmt(snap.ret_3m ?? null),          color: fwdColor(snap.ret_3m ?? null) },
-    { label: 'Drawdown',    value: fmt(snap.drawdown),                 color: fwdColor(snap.drawdown) },
-    { label: 'ATR(14)',     value: `₹${snap.atr14.toFixed(2)}`,       color: '#94a3b8' },
+    { label: 'Regime',      value: snap.regime,                              color },
+    { label: '1M Return',   value: fmt(snap.ret_1m),                         color: fwdColor(snap.ret_1m, INK3) },
+    { label: '3M Return',   value: fmt(snap.ret_3m ?? null),                 color: fwdColor(snap.ret_3m ?? null, INK3) },
+    { label: 'Drawdown',    value: fmt(snap.drawdown),                        color: fwdColor(snap.drawdown, INK3) },
+    { label: 'ATR(14)',     value: `₹${snap.atr14.toFixed(2)}`,              color: INK3 },
   ]
 
   return (
@@ -42,8 +47,8 @@ function SnapshotBar({ snap }: { snap: AnalogSnapshot }) {
         gap: 2,
         p: 2.5,
         borderRadius: '14px',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        bgcolor: PAPER2,
+        border: `1px solid ${BORDER}`,
         mb: 3,
       }}
     >
@@ -52,7 +57,7 @@ function SnapshotBar({ snap }: { snap: AnalogSnapshot }) {
           <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.6875rem', display: 'block' }}>
             {it.label}
           </Typography>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: it.color }}>
+          <Typography sx={{ ...MONO, fontSize: '0.875rem', fontWeight: 700, color: it.color }}>
             {it.value}
           </Typography>
         </Box>
@@ -64,15 +69,16 @@ function SnapshotBar({ snap }: { snap: AnalogSnapshot }) {
 // ── Similarity arc ─────────────────────────────────────────────────────────────
 
 function SimilarityArc({ pct }: { pct: number }) {
+  const { BORDER, INK3 } = usePalette()
   const R = 22
   const circ = 2 * Math.PI * R
   const dash = (pct / 100) * circ
-  const color = pct >= 85 ? '#22c55e' : pct >= 70 ? '#f59e0b' : '#64748b'
+  const color = pct >= 85 ? '#22c55e' : pct >= 70 ? '#f59e0b' : INK3
 
   return (
     <Box sx={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
       <svg width={56} height={56} viewBox="0 0 56 56">
-        <circle cx={28} cy={28} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={5} />
+        <circle cx={28} cy={28} r={R} fill="none" stroke={BORDER} strokeWidth={5} />
         <circle
           cx={28} cy={28} r={R}
           fill="none"
@@ -84,7 +90,7 @@ function SimilarityArc({ pct }: { pct: number }) {
         />
       </svg>
       <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color }}>
+        <Typography sx={{ ...MONO, fontSize: '0.75rem', fontWeight: 800, color }}>
           {pct.toFixed(0)}%
         </Typography>
       </Box>
@@ -95,6 +101,7 @@ function SimilarityArc({ pct }: { pct: number }) {
 // ── Analog card ───────────────────────────────────────────────────────────────
 
 function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
+  const { BORDER, PAPER2, INK3 } = usePalette()
   const rc = regimeColor(analog.regime)
   const dateLabel = new Date(analog.date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
 
@@ -103,8 +110,8 @@ function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
       sx={{
         p: 2,
         borderRadius: '14px',
-        border: '1px solid rgba(255,255,255,0.08)',
-        background: 'rgba(255,255,255,0.025)',
+        border: `1px solid ${BORDER}`,
+        bgcolor: PAPER2,
         display: 'flex',
         gap: 2,
         alignItems: 'flex-start',
@@ -137,7 +144,7 @@ function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6875rem', display: 'block' }}>
               1M leading
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: fwdColor(analog.ret_1m) }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: fwdColor(analog.ret_1m, INK3) }}>
               {fmt(analog.ret_1m)}
             </Typography>
           </Box>
@@ -145,7 +152,7 @@ function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6875rem', display: 'block' }}>
               Drawdown
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: fwdColor(analog.drawdown) }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: fwdColor(analog.drawdown, INK3) }}>
               {fmt(analog.drawdown)}
             </Typography>
           </Box>
@@ -157,7 +164,7 @@ function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
             display: 'flex',
             gap: 1.5,
             pt: 1,
-            borderTop: '1px solid rgba(255,255,255,0.06)',
+            borderTop: `1px solid ${BORDER}`,
           }}
         >
           {[
@@ -169,7 +176,7 @@ function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
               <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', display: 'block' }}>
                 {label}
               </Typography>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: fwdColor(val), fontSize: '0.75rem' }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: fwdColor(val, INK3), fontSize: '0.75rem' }}>
                 {fmt(val)}
               </Typography>
             </Box>
@@ -183,6 +190,7 @@ function AnalogCard({ analog, rank }: { analog: AnalogPeriod; rank: number }) {
 // ── Aggregate stats panel ─────────────────────────────────────────────────────
 
 function AggregatePanel({ stats }: { stats: AnalogResponse['stats']; count: number }) {
+  const { BORDER, PAPER2, INK3 } = usePalette()
   const rows = [
     { horizon: '1 Month',  avg: stats.avg_fwd_1m, pctPos: stats.pct_positive_1m },
     { horizon: '3 Months', avg: stats.avg_fwd_3m, pctPos: stats.pct_positive_3m },
@@ -194,8 +202,8 @@ function AggregatePanel({ stats }: { stats: AnalogResponse['stats']; count: numb
       sx={{
         p: 2.5,
         borderRadius: 2,
-        border: '1px solid rgba(255,255,255,0.08)',
-        bgcolor: 'rgba(255,255,255,0.025)',
+        border: `1px solid ${BORDER}`,
+        bgcolor: PAPER2,
         height: '100%',
       }}
     >
@@ -217,20 +225,19 @@ function AggregatePanel({ stats }: { stats: AnalogResponse['stats']; count: numb
                   </Typography>
                 )}
                 <Typography
-                  variant="body2"
-                  sx={{ fontWeight: 800, color: fwdColor(r.avg), minWidth: 52, textAlign: 'right' }}
+                  sx={{ ...MONO, fontSize: '0.875rem', fontWeight: 800, color: fwdColor(r.avg, INK3), minWidth: 52, textAlign: 'right' }}
                 >
                   {fmt(r.avg)}
                 </Typography>
               </Stack>
             </Box>
-            <Box sx={{ height: 4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)' }}>
+            <Box sx={{ height: 4, borderRadius: 2, bgcolor: BORDER }}>
               <Box
                 sx={{
                   height: '100%',
                   width: `${Math.min(100, Math.abs(r.avg) * 3)}%`,
                   borderRadius: 2,
-                  bgcolor: fwdColor(r.avg),
+                  bgcolor: fwdColor(r.avg, INK3),
                   transition: 'width 0.8s ease',
                 }}
               />
@@ -239,7 +246,7 @@ function AggregatePanel({ stats }: { stats: AnalogResponse['stats']; count: numb
         ))}
       </Stack>
 
-      <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${BORDER}` }}>
         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6875rem', lineHeight: 1.6, display: 'block' }}>
           Based on weighted similarity across regime, momentum, drawdown, and volatility.
           Past analogs are not a guarantee of future returns.
@@ -252,6 +259,7 @@ function AggregatePanel({ stats }: { stats: AnalogResponse['stats']; count: numb
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function HistoricalAnalog({ data, loading }: Props) {
+  const { BORDER, INK3 } = usePalette()
   if (loading) {
     return (
       <Box sx={{ height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
@@ -269,18 +277,18 @@ export default function HistoricalAnalog({ data, loading }: Props) {
     <Box>
       {/* Header */}
       <Box mb={2.5}>
-        <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#14B8A6', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
+        <Typography sx={{ ...COND, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.18em', color: '#14B8A6', textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
           Pattern Memory
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: 'linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+          <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.025em', background: `linear-gradient(135deg, #FFFFFF 30%, ${INK3} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
             Historical Analog Engine
           </Typography>
           <Box sx={{ px: 1.25, py: 0.3, borderRadius: '8px', background: 'rgba(20,184,166,0.1)', border: '1px solid rgba(20,184,166,0.2)' }}>
             <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#14B8A6' }}>{data.analogs.length} analogs</Typography>
           </Box>
         </Box>
-        <Typography sx={{ fontSize: '0.73rem', color: '#4B5563', mt: 0.5, lineHeight: 1.5 }}>
+        <Typography sx={{ fontSize: '0.73rem', color: INK3, mt: 0.5, lineHeight: 1.5 }}>
           Find historical periods with a similar regime, momentum, drawdown, and volatility signature — then see what the next 1–6 months actually returned
         </Typography>
       </Box>

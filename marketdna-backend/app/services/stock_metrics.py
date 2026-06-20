@@ -1074,3 +1074,10 @@ def get_summary(symbol: str) -> StockSummary:
         regime=regime,
         date=row[0],
     )
+
+
+def invalidate_cache() -> int:
+    """Clear all day-cached results. Returns number of entries cleared."""
+    count = len(_cache)
+    _cache.clear()
+    return count

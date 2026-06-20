@@ -103,7 +103,7 @@ export interface StockIndicators {
   computed_at: string
 }
 
-export interface IndicatorScanItem {
+export interface IndicatorScanItem extends Record<string, unknown> {
   symbol: string
   price: number
   rsi14: number

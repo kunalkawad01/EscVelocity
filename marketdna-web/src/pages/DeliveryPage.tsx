@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Box, Typography, CircularProgress, Collapse } from '@mui/material'
 import Navbar from '../components/Navbar'
+import { Footer } from '../components/Footer'
+import FilterChip from '../components/shared/FilterChip'
+import SearchBox from '../components/shared/SearchBox'
 import { deliveryApi } from '../api/deliveryApi'
 import type {
   DeliverySummaryResult, DeliveryReport, DeliverySignal, DeliveryBar, SignalOccurrence,
@@ -1295,53 +1299,13 @@ function IntentPanel({ intent, onSelect }: {
   )
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function Footer() {
-  const { PAPER, BORDER, CYAN, INK, INK2, INK3 } = usePalette()
-  const NAV = [
-    { label: 'Platform',     links: ['Stock DNA', 'Pattern DNA', 'Markov Options', 'Quant Strategies', 'Indicators'] },
-    { label: 'Intelligence', links: ['Market Regime', 'Breadth Score', 'Edge Lab', 'Cointegration', 'Delivery Intel'] },
-    { label: 'Research',     links: ['Validation Framework', 'MCP Architecture', 'AI Agents', 'Feature Store', 'Backtests'] },
-  ]
-  return (
-    <Box component="footer" sx={{ bgcolor: PAPER, borderTop: `1px solid ${BORDER}`, mt: 8 }}>
-      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 3, md: 8, lg: 12 }, pt: 6, pb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 6, flexWrap: 'wrap', mb: 5 }}>
-          <Box sx={{ flex: '0 0 auto', maxWidth: 260 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{ width: 7, height: 7, bgcolor: CYAN, animation: 'blink 1.4s step-end infinite', '@keyframes blink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } } }} />
-              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: 800, fontSize: '1rem', color: INK, letterSpacing: '0.08em' }}>
-                MARKET<Box component="span" sx={{ color: CYAN }}>DNA</Box>
-              </Typography>
-            </Box>
-            <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem', color: INK3, lineHeight: 1.7 }}>
-              Quantitative market intelligence for Indian equities and options. Research precedes product. Validation is mandatory.
-            </Typography>
-          </Box>
-          {NAV.map(col => (
-            <Box key={col.label} sx={{ flex: '1 1 140px' }}>
-              <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, color: CYAN, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1.75 }}>{col.label}</Typography>
-              {col.links.map(link => (
-                <Typography key={link} sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem', color: INK3, mb: 0.875, cursor: 'default', transition: 'color 0.12s', '&:hover': { color: INK2 } }}>{link}</Typography>
-              ))}
-            </Box>
-          ))}
-        </Box>
-        <Box sx={{ borderTop: `1px solid ${BORDER}`, pt: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
-          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK3 }}>© 2024 MarketDNA · For research purposes only</Typography>
-          <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK3 }}>Not investment advice</Typography>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
 
 // ─── Summary table ────────────────────────────────────────────────────────────
 
 type SortKey = 'delivery_ratio' | 'current_delivery_pct' | 'win_rate' | 'edge_score' | 'grade' | 'mkt_high' | 'mkt_low' | 'vol_ratio'
 
 export default function DeliveryPage() {
+  const navigate = useNavigate()
   const { BG, INK, INK2, INK3, BORDER, PAPER, PAPER2, CYAN } = usePalette()
   const { CARD } = useTokens()
   const { mode } = useThemeMode()
@@ -1353,6 +1317,7 @@ export default function DeliveryPage() {
   const [sortKey, setSortKey]   = useState<SortKey>('edge_score')
   const [sortAsc, setSortAsc]   = useState(false)
   const [filter, setFilter]     = useState<'all' | 'active' | 'spike'>('all')
+  const [symSearch, setSymSearch] = useState('')
   const [userIntent, setUserIntent] = useState<UserIntent | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
 
@@ -1377,6 +1342,7 @@ export default function DeliveryPage() {
       if (filter === 'spike')  return item.delivery_ratio >= 1.5
       return true
     })
+    .filter(item => !symSearch || item.symbol.toLowerCase().includes(symSearch.toLowerCase()))
     .filter(item => {
       if (!userIntent) return true
       const cfg = INTENT_CONFIG[userIntent]
@@ -1516,24 +1482,17 @@ export default function DeliveryPage() {
             <>
               {/* Filters */}
               <Box sx={{ display: 'flex', gap: 1, mb: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                {(['all', 'active', 'spike'] as const).map(f => (
-                  <Box key={f} onClick={() => setFilter(f)} sx={{
-                    px: 1.5, py: 0.5, borderRadius: '6px', cursor: 'pointer',
-                    fontSize: '0.65rem', fontWeight: 700, ...JAKARTA,
-                    bgcolor: filter === f ? `${CYAN}25` : PAPER2,
-                    color: filter === f ? CYAN : INK2,
-                    border: `1px solid ${filter === f ? `${CYAN}50` : BORDER}`,
-                  }}>
-                    {f === 'active' ? '🔴 Active' : f === 'spike' ? '📈 Del Spike >1.5×' : 'All Stocks'}
-                  </Box>
-                ))}
+                <SearchBox value={symSearch} onChange={setSymSearch} placeholder="Symbol…" width={110} />
+                <FilterChip label="All"              value="all"    current={filter} onChange={v => setFilter(v as typeof filter)} count={rows.length} />
+                <FilterChip label="Active Signals"   value="active" current={filter} onChange={v => setFilter(v as typeof filter)} dot="#ef4444" />
+                <FilterChip label="Del Spike ≥1.5×"  value="spike"  current={filter} onChange={v => setFilter(v as typeof filter)} />
                 <Typography sx={{ ...JAKARTA, fontSize: '0.62rem', color: INK3, ml: 'auto' }}>
                   {rows.length} stocks · click row to expand
                   {summary && <Box component="span" sx={{ ml: 1 }}>· {summary.computed_at}</Box>}
                 </Typography>
               </Box>
 
-              <Box sx={{ overflowX: 'auto' }}>
+              <Box className="mdna-table-scroll">
                 <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
                   <Box component="thead">
                     <Box component="tr">
@@ -1565,7 +1524,11 @@ export default function DeliveryPage() {
                         {/* Symbol */}
                         <Box component="td" sx={{ px: 1.25, py: 1.1, borderBottom: `1px solid ${BORDER}` }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography sx={{ ...JAKARTA, fontSize: '0.78rem', fontWeight: 800, color: INK }}>
+                            <Typography
+                              onClick={e => { e.stopPropagation(); navigate(`/stock/${item.symbol}`) }}
+                              sx={{ ...JAKARTA, fontSize: '0.78rem', fontWeight: 800, color: INK,
+                                cursor: 'pointer', '&:hover': { color: CYAN }, transition: 'color 0.12s' }}
+                            >
                               {item.symbol}
                             </Typography>
                             {item.is_active && (

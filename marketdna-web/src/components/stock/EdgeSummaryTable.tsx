@@ -550,7 +550,7 @@ function InterpretationPanel({
             Historical Stats
           </Typography>
           <Box sx={{ p: 1.5, borderRadius: '8px', bgcolor: PAPER2,
-            border: '1px solid rgba(255,255,255,0.05)' }}>
+            border: `1px solid ${BORDER}` }}>
             <StatRow label="Occurrences">
               <Typography sx={{ fontSize: '0.875rem', fontWeight: 700, color: INK }}>
                 {st.occurrences}
@@ -582,7 +582,7 @@ function InterpretationPanel({
             </StatRow>
             <StatRow label="Expected Value"><Ret v={st.expected_value} /></StatRow>
             <StatRow label="Std Deviation">
-              <Typography sx={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+              <Typography sx={{ fontSize: '0.875rem', color: INK3 }}>
                 {st.std_1m.toFixed(2)}%
               </Typography>
             </StatRow>

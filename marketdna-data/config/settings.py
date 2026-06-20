@@ -20,7 +20,7 @@ class Settings(BaseModel):
 
 
 settings = Settings(
-    kite_api_key=os.getenv('KITE_API_KEY', ''),
-    kite_api_secret=os.getenv('KITE_API_SECRET', ''),
-    kite_access_token=os.getenv('KITE_ACCESS_TOKEN', ''),
+    kite_api_key=os.getenv('KITE_API_KEY', '').strip(),
+    kite_api_secret=os.getenv('KITE_API_SECRET', '').strip(),
+    kite_access_token=os.getenv('KITE_ACCESS_TOKEN', '').strip(),
 )

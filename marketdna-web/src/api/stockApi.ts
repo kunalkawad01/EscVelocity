@@ -7,9 +7,11 @@ import type {
   ZScoreResponse, DualMomentumResponse,
   StatisticalSignalsResponse, VolatilityLabResponse,
   RegimeClustersResponse, PatternMatchResponse, MarketDynamicsResponse,
+  OIAnalysis,
 } from '../types/stock'
 
 const BASE = '/api/stock'
+const OPTIONS_BASE = '/api/options'
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -55,4 +57,5 @@ export const stockApi = {
   getRegimeClusters: (symbol: string) => get<RegimeClustersResponse>(`${BASE}/${symbol}/regime-clusters`),
   getPatternMatch: (symbol: string) => get<PatternMatchResponse>(`${BASE}/${symbol}/pattern-match`),
   getMarketDynamics: (symbol: string) => get<MarketDynamicsResponse>(`${BASE}/${symbol}/market-dynamics`),
+  getOIAnalysis: (symbol: string) => get<OIAnalysis>(`${OPTIONS_BASE}/${symbol}`),
 }

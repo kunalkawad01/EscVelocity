@@ -15,6 +15,11 @@ import ShortPage from './pages/ShortPage'
 import AgentsPage from './pages/AgentsPage'
 import DataVizPage from './pages/DataVizPage'
 import StockHealthPage from './pages/StockHealthPage'
+import RandomnessPage from './pages/RandomnessPage'
+import OptionsPage from './pages/OptionsPage'
+import ExpectedMovePage from './pages/ExpectedMovePage'
+import BreakoutScannerPage from './pages/BreakoutScannerPage'
+import LiveTradingPage from './pages/LiveTradingPage'
 
 export default function App() {
   return (
@@ -38,6 +43,11 @@ export default function App() {
           <Route path="/dataviz"           element={<DataVizPage />} />
           <Route path="/stock-health"          element={<StockHealthPage />} />
           <Route path="/stock-health/:symbol"  element={<StockHealthPage />} />
+          <Route path="/randomness"            element={<RandomnessPage />} />
+          <Route path="/options"               element={<OptionsPage />} />
+          <Route path="/expected-move"         element={<ExpectedMovePage />} />
+          <Route path="/breakout-scanner"      element={<BreakoutScannerPage />} />
+          <Route path="/live-trading"          element={<LiveTradingPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

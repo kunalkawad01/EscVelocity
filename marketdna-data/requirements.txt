@@ -1,4 +1,5 @@
 kiteconnect
+requests
 polars
 duckdb
 pydantic

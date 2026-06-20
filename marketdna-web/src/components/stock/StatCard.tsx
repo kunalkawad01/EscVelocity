@@ -1,14 +1,8 @@
-﻿import { Box, Typography } from '@mui/material'
+import { Box, Typography } from '@mui/material'
+import { usePalette } from '../../hooks/usePalette'
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-
-const PAPER  = '#07090F'
-const INK    = '#F2EDE4'
-const INK2   = '#8B95AC'
-const BORDER = '#0F1526'
-const JAKARTA = { fontFamily: "'IBM Plex Sans', sans-serif" } as const
-
-// ─────────────────────────────────────────────────────────────────────────────
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
+const COND = { fontFamily: "'IBM Plex Sans Condensed', sans-serif" } as const
 
 type Accent = 'primary' | 'success' | 'error' | 'secondary' | 'default'
 
@@ -29,6 +23,7 @@ interface Props {
 }
 
 export default function StatCard({ label, value, sub, accent = 'default', fullWidth }: Props) {
+  const { PAPER, BORDER, INK2 } = usePalette()
   const color = accentColors[accent]
   return (
     <Box
@@ -41,29 +36,18 @@ export default function StatCard({ label, value, sub, accent = 'default', fullWi
         bgcolor: PAPER,
         border: `1.5px solid ${BORDER}`,
         borderLeft: `3px solid ${color}`,
-        boxShadow: '1px 2px 8px rgba(0,0,0,0.4)',
         transition: 'border-color 0.2s, box-shadow 0.2s',
-        '&:hover': { borderColor: `${color}60`, boxShadow: `0 2px 16px rgba(0,0,0,0.6)` },
+        '&:hover': { borderColor: `${color}60` },
       }}
     >
-      <Typography
-        variant="caption"
-        sx={{
-          color: INK2,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          fontSize: '0.75rem',
-          display: 'block',
-          ...JAKARTA,
-        }}
-      >
+      <Typography sx={{ ...COND, fontSize: '0.7rem', fontWeight: 700, color: INK2, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', mb: 0.3 }}>
         {label}
       </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 700, color, mt: 0.4, lineHeight: 1.1, letterSpacing: '-0.02em', ...JAKARTA }}>
+      <Typography sx={{ ...MONO, fontSize: '1.25rem', fontWeight: 700, color, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
         {value}
       </Typography>
       {sub && (
-        <Typography variant="caption" sx={{ color: INK2, fontSize: '0.75rem', ...JAKARTA }}>
+        <Typography sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.7rem', color: INK2, mt: 0.25, display: 'block' }}>
           {sub}
         </Typography>
       )}
