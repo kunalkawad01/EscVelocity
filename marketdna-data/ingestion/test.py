@@ -1,12 +1,13 @@
 from kiteconnect import KiteConnect
 import os
 
-
+    #https://kite.zerodha.com/connect/login?v=3&api_key=2xbeidvrouv0nwv3
 
 API_KEY = "2xbeidvrouv0nwv3"
 API_SECRET = "m3ni9uwnvbys4zhnfu5v8jloypswuarv"
 
-REQUEST_TOKEN = "n74Yxyu8eEoyZP1uF4cEUlLDdmJ1F6uE"
+REQUEST_TOKEN = "2g2L9H0rD8EULpavEP5jfprQbDI7tzo2" \
+""
 
 kite = KiteConnect(api_key=API_KEY)
 

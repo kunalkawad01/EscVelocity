@@ -20,6 +20,10 @@ import OptionsPage from './pages/OptionsPage'
 import ExpectedMovePage from './pages/ExpectedMovePage'
 import BreakoutScannerPage from './pages/BreakoutScannerPage'
 import LiveTradingPage from './pages/LiveTradingPage'
+import IntradayRacePage from './pages/IntradayRacePage'
+import DruckenmillerROCPage from './pages/DruckenmillerROCPage'
+import SectorHeatmapPage from './pages/SectorHeatmapPage'
+import CompanyIntelligencePage from './pages/CompanyIntelligencePage'
 
 export default function App() {
   return (
@@ -48,6 +52,11 @@ export default function App() {
           <Route path="/expected-move"         element={<ExpectedMovePage />} />
           <Route path="/breakout-scanner"      element={<BreakoutScannerPage />} />
           <Route path="/live-trading"          element={<LiveTradingPage />} />
+          <Route path="/intraday-race"         element={<IntradayRacePage />} />
+          <Route path="/druckenmiller-roc"     element={<DruckenmillerROCPage />} />
+          <Route path="/sector-heatmap"                    element={<SectorHeatmapPage />} />
+          <Route path="/company-intelligence"           element={<CompanyIntelligencePage />} />
+          <Route path="/company-intelligence/:symbol"   element={<CompanyIntelligencePage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
