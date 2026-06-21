@@ -7,44 +7,44 @@ Data flow:
 
 Thread safety: one lock per shared mutable dict; no per-request DuckDB connections.
 """
+import csv
 import hashlib
 import logging
 import threading
 from datetime import date, datetime
+from pathlib import Path
 
 import numpy as np
 
 from app.services.duckdb_client import get_connection
 from app.services.kite_client import get_kite
+from app.services.stock_metrics import get_universe
 
 log = logging.getLogger(__name__)
 
-# ── Sector → constituent symbol mapping ──────────────────────────────────────
-SECTOR_MAP: dict[str, list[str]] = {
-    "Banking":        ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK",
-                       "INDUSINDBK", "BANDHANBNK", "FEDERALBNK", "IDFCFIRSTB"],
-    "Finance":        ["BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "SBILIFE",
-                       "HDFCLIFE", "MUTHOOTFIN", "ICICIGI"],
-    "IT":             ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM",
-                       "LTIM", "MPHASIS", "PERSISTENT", "COFORGE"],
-    "Energy":         ["RELIANCE", "ONGC", "NTPC", "BPCL", "POWERGRID",
-                       "COALINDIA", "TATAPOWER", "ADANIGREEN", "ADANIPOWER"],
-    "Auto":           ["MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO",
-                       "EICHERMOT", "HEROMOTOCO", "MOTHERSON", "BOSCHLTD"],
-    "Pharma":         ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB",
-                       "APOLLOHOSP", "AUROPHARMA", "TORNTPHARM", "ALKEM"],
-    "FMCG":           ["HINDUNILVR", "ITC", "NESTLE", "BRITANNIA",
-                       "TATACONSUM", "DABUR", "GODREJCP", "MARICO", "COLPAL"],
-    "Metals":         ["TATASTEEL", "HINDALCO", "JSWSTEEL", "VEDL",
-                       "SAIL", "NMDC", "NATIONALUM", "JINDALSTEL"],
-    "Infrastructure": ["LT", "ADANIPORTS", "ULTRACEMCO", "GRASIM",
-                       "SIEMENS", "ABB", "BHEL", "BEL", "HAL"],
-    "Telecom":        ["BHARTIARTL", "IDEA"],
-    "Consumer":       ["TITAN", "ASIANPAINT", "PIDILITIND", "VOLTAS",
-                       "HAVELLS", "VGUARD"],
-}
+# ── Sector → constituent symbol mapping (loaded from ind_nifty500list.csv) ────
+def _build_sector_map(csv_name: str) -> dict[str, list[str]]:
+    csv_path = Path(__file__).parents[3] / "marketdna-data" / csv_name
+    sector_map: dict[str, list[str]] = {}
+    try:
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                symbol = row["Symbol"].strip()
+                sector = row["Industry"].strip()
+                if symbol and sector:
+                    sector_map.setdefault(sector, []).append(symbol)
+        log.info("Sector map loaded from %s: %d sectors, %d symbols",
+                 csv_name, len(sector_map), sum(len(v) for v in sector_map.values()))
+    except Exception:
+        log.exception("Failed to load sector map from %s", csv_path)
+    return sector_map
 
-_ALL_SYMBOLS: list[str] = list({s for syms in SECTOR_MAP.values() for s in syms})
+_SECTOR_MAPS: dict[str, dict[str, list[str]]] = {
+    "nifty500": _build_sector_map("ind_nifty500list.csv"),
+    "nifty200": _build_sector_map("ind_nifty200list.csv"),
+}
+SECTOR_MAP = _SECTOR_MAPS["nifty500"]  # default — used by _symbol_sector / chart functions
+
 
 
 # ── Historical context cache (daily refresh) ──────────────────────────────────
@@ -118,7 +118,7 @@ def _get_hist() -> dict[str, dict]:
     if _hist_date != today:
         with _hist_lock:
             if _hist_date != today:
-                _hist = _compute_hist(_ALL_SYMBOLS)
+                _hist = _compute_hist(get_universe())
                 _hist_date = today
     return _hist
 
@@ -328,9 +328,9 @@ def _corr_history(symbols: list[str], n_snaps: int = 20) -> tuple[list[str], lis
     return times, corrs
 
 
-# ── All-sector progression cache (15-min, keyed by trade date) ───────────────
-_all_prog_cache: dict[str, list[dict]] = {}   # sector → progression
-_all_prog_trade_date: str = ""
+# ── All-sector progression cache (15-min, keyed by universe + trade date) ────
+_all_prog_cache: dict[str, dict[str, list[dict]]] = {}  # universe → {sector → progression}
+_all_prog_trade_date: dict[str, str] = {}               # universe → trade_date
 _all_prog_lock = threading.Lock()
 
 
@@ -348,7 +348,7 @@ def _last_trade_date_str() -> str:
     return d.isoformat()
 
 
-def _get_all_sectors_live_progression() -> dict[str, list[dict]]:
+def _get_all_sectors_live_progression(sector_map: dict[str, list[str]]) -> dict[str, list[dict]]:
     """Build return progression for all sectors from the live _iday accumulator."""
     if not _iday:
         return {}
@@ -360,7 +360,7 @@ def _get_all_sectors_live_progression() -> dict[str, list[dict]]:
     result: dict[str, list[dict]] = {}
     for idx in range(0, len(ref_buf), step):
         t = ref_buf[idx][0]
-        for sector, syms in SECTOR_MAP.items():
+        for sector, syms in sector_map.items():
             pt_rets: list[float] = []
             for sym in syms:
                 buf  = _iday.get(sym, [])
@@ -376,35 +376,33 @@ def _get_all_sectors_live_progression() -> dict[str, list[dict]]:
     return result
 
 
-def _get_all_sectors_15min_progression() -> dict[str, list[dict]]:
+def _get_all_sectors_15min_progression(universe: str, sector_map: dict[str, list[str]]) -> dict[str, list[dict]]:
     """Fetch 15-min Kite bars for 2 rep symbols per sector, normalised to 0% at 9:15 AM.
 
-    Result is cached per trade date so Kite is only hit once per day.
+    Result is cached per (universe, trade_date) so Kite is only hit once per day per universe.
     """
-    global _all_prog_cache, _all_prog_trade_date
-
     trade_date = _last_trade_date_str()
-    if _all_prog_trade_date == trade_date and _all_prog_cache:
-        return _all_prog_cache
+    if _all_prog_trade_date.get(universe) == trade_date and _all_prog_cache.get(universe):
+        return _all_prog_cache[universe]
 
     with _all_prog_lock:
-        if _all_prog_trade_date == trade_date and _all_prog_cache:
-            return _all_prog_cache
+        if _all_prog_trade_date.get(universe) == trade_date and _all_prog_cache.get(universe):
+            return _all_prog_cache[universe]
 
-        data = _fetch_all_sectors_15min(trade_date)
-        _all_prog_cache = data
-        _all_prog_trade_date = trade_date
+        data = _fetch_all_sectors_15min(trade_date, sector_map)
+        _all_prog_cache[universe] = data
+        _all_prog_trade_date[universe] = trade_date
 
-    return _all_prog_cache
+    return _all_prog_cache[universe]
 
 
-def _fetch_all_sectors_15min(trade_date: str) -> dict[str, list[dict]]:
-    """Inner: actually call Kite. Called at most once per trade date."""
+def _fetch_all_sectors_15min(trade_date: str, sector_map: dict[str, list[str]]) -> dict[str, list[dict]]:
+    """Inner: actually call Kite. Called at most once per (trade_date, universe)."""
     from datetime import timedelta
 
     # 2 representative symbols per sector
     rep_map: dict[str, list[str]] = {
-        sector: syms[:2] for sector, syms in SECTOR_MAP.items() if syms
+        sector: syms[:2] for sector, syms in sector_map.items() if syms
     }
     all_rep = list({s for syms in rep_map.values() for s in syms})
 
@@ -468,15 +466,16 @@ def _fetch_all_sectors_15min(trade_date: str) -> dict[str, list[dict]]:
         return {}
 
 
-def get_sector_progressions() -> dict:
+def get_sector_progressions(universe: str = "nifty500") -> dict:
     """Return progression time-series for all sectors (live or 15-min Kite)."""
+    sector_map = _SECTOR_MAPS.get(universe, _SECTOR_MAPS["nifty500"])
     trade_date = _last_trade_date_str()
 
     if _market_is_open():
-        prog = _get_all_sectors_live_progression()
+        prog = _get_all_sectors_live_progression(sector_map)
         source = "live" if prog else "none"
     else:
-        prog = _get_all_sectors_15min_progression()
+        prog = _get_all_sectors_15min_progression(universe, sector_map)
         source = "15min_kite" if prog else "none"
 
     return {
@@ -493,7 +492,8 @@ def _sig_id(symbol: str, signal_type: str) -> str:
 
 
 # ── Layer 1 — Sector Scatter ──────────────────────────────────────────────────
-def get_sector_scatter() -> dict:
+def get_sector_scatter(universe: str = "nifty500") -> dict:
+    sector_map = _SECTOR_MAPS.get(universe, _SECTOR_MAPS["nifty500"])
     hist = _get_hist()
     live, data_mode = _get_quotes(hist)
     if data_mode == "live":
@@ -508,7 +508,7 @@ def get_sector_scatter() -> dict:
     nifty_return = round(float(np.mean(list(sym_ret.values()))), 2) if sym_ret else 0.0
 
     sectors = []
-    for sector, syms in SECTOR_MAP.items():
+    for sector, syms in sector_map.items():
         valid = [s for s in syms if s in sym_ret and s in hist]
         if not valid:
             continue
@@ -567,7 +567,7 @@ def _get_sector_15min_data(syms: list[str]) -> tuple[list[dict], dict[str, list[
         to_dt   = datetime(trade_date.year, trade_date.month, trade_date.day, 15, 35)
 
         all_bars: dict[str, list] = {}
-        for sym, token in list(tokens.items())[:8]:
+        for sym, token in tokens.items():
             try:
                 bars = kite.historical_data(token, from_dt, to_dt, "15minute")
                 if bars:
@@ -669,8 +669,9 @@ def _get_stock_15min_sparkline(sym: str) -> list[float]:
 
 
 # ── Layer 2 — Sector Drill-Down ───────────────────────────────────────────────
-def get_sector_detail(sector_name: str) -> dict | None:
-    syms = SECTOR_MAP.get(sector_name)
+def get_sector_detail(sector_name: str, universe: str = "nifty500") -> dict | None:
+    sector_map = _SECTOR_MAPS.get(universe, _SECTOR_MAPS["nifty500"])
+    syms = sector_map.get(sector_name)
     if not syms:
         return None
 
@@ -957,7 +958,9 @@ def _make_card(
     }
 
 
-def get_breakthrough_signals() -> dict:
+def get_breakthrough_signals(universe: str = "nifty500") -> dict:
+    sector_map = _SECTOR_MAPS.get(universe, _SECTOR_MAPS["nifty500"])
+    universe_syms = {s for syms in sector_map.values() for s in syms}
     hist = _get_hist()
     live, data_mode = _get_quotes(hist)
     if data_mode == "live":
@@ -967,6 +970,8 @@ def get_breakthrough_signals() -> dict:
     seen_ids: set[str] = set()
 
     for sym, q in live.items():
+        if sym not in universe_syms:
+            continue
         h = hist.get(sym)
         if not h:
             continue
@@ -1189,7 +1194,7 @@ def get_stock_chart(symbol: str) -> dict | None:
     ]
 
     # Batch universe rank query
-    sym_sql = ", ".join(f"'{s}'" for s in _ALL_SYMBOLS)
+    sym_sql = ", ".join(f"'{s}'" for s in get_universe())
     rank_rows = con.execute(f"""
         WITH ranked AS (
             SELECT symbol, close,
