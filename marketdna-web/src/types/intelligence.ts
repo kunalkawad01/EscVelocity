@@ -49,6 +49,37 @@ export interface Predictor {
   why: string
 }
 
+export interface BizSegment {
+  name: string
+  pct: number
+  desc: string
+  margin_note: string
+}
+
+export interface BusinessModel {
+  type: string
+  value_creation: string
+  segments: BizSegment[]
+  moat: string[]
+  moat_durability: 'STRONG' | 'MODERATE' | 'WEAK'
+}
+
+export interface RevenueStream {
+  name: string
+  type: 'SUBSCRIPTION' | 'TRANSACTIONAL' | 'CONTRACT' | 'INTEREST' | 'FEE'
+  pct: number
+  growth: 'GROWING' | 'STABLE' | 'DECLINING'
+  desc: string
+}
+
+export interface RevenueModel {
+  streams: RevenueStream[]
+  pricing_power: 'HIGH' | 'MODERATE' | 'LOW'
+  pricing_power_note: string
+  revenue_visibility: 'HIGH' | 'MODERATE' | 'LOW'
+  revenue_visibility_note: string
+}
+
 export interface IntelligenceData {
   company: string
   ticker: string
@@ -78,6 +109,8 @@ export interface IntelligenceData {
   tailwinds: string[]
   headwinds: string[]
   predictors: Predictor[]
+  business_model: BusinessModel
+  revenue_model: RevenueModel
   _cache: 'hit' | 'miss'
 }
 

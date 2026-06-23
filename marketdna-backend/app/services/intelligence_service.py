@@ -127,6 +127,33 @@ _MOCK_DB: dict[str, dict] = {
             {"name": "Retail footfall index (metro cities)",  "why": "Mall footfall and festive season spending data lead Reliance Retail revenue by 6–8 weeks."},
             {"name": "Polypropylene / PX-PTA spread",        "why": "Petrochemical product spreads are the swing factor in O2C margins — widen when downstream demand outpaces feedstock."},
         ],
+        "business_model": {
+            "type": "Vertically Integrated Conglomerate",
+            "value_creation": "Reliance creates value through vertical integration — it controls the full O2C chain from crude procurement to retail fuel and petrochemical sales, capturing margin at each stage. Jio monetizes its subscriber base through ARPU growth and platform services. Retail captures the organized commerce opportunity by controlling real estate, logistics, and inventory.",
+            "segments": [
+                {"name": "O2C — Refining & Chemicals", "pct": 55, "desc": "Refines crude into fuel and exports petrochemicals globally", "margin_note": "EBITDA ~16% — commodity-dependent, GRM-driven"},
+                {"name": "Jio Platforms — Telecom", "pct": 25, "desc": "Wireless + fiber + digital services for 450M+ subscribers", "margin_note": "EBITDA ~35% — improving as 5G scales"},
+                {"name": "Reliance Retail", "pct": 20, "desc": "Grocery, fashion, electronics, B2B commerce (18,000+ stores)", "margin_note": "EBITDA ~8% — scaling; margin expansion ahead"},
+            ],
+            "moat": [
+                "World's largest single-site refinery — unmatched scale in Asia",
+                "Jio's 450M subscriber base creates a telecom network effect",
+                "Retail real estate footprint is an asset moat (18,000+ stores)",
+                "Vertical integration across the energy value chain",
+            ],
+            "moat_durability": "STRONG",
+        },
+        "revenue_model": {
+            "streams": [
+                {"name": "Fuel & Petrochemical Sales", "type": "TRANSACTIONAL", "pct": 55, "growth": "STABLE", "desc": "Commodity-linked revenue tied to crude prices and GRM spread. Refinery utilisation at 100%+ and export-oriented — revenue moves with global product prices."},
+                {"name": "Jio Telecom — ARPU × Subscribers", "type": "SUBSCRIPTION", "pct": 25, "growth": "GROWING", "desc": "₹180 avg ARPU × 450M subscribers = monthly recurring revenue. 5G upgrade cycle targeting ₹250+ ARPU. Disclosed monthly by TRAI."},
+                {"name": "Reliance Retail Sales", "type": "TRANSACTIONAL", "pct": 20, "growth": "GROWING", "desc": "GMV across grocery (JioMart), fashion (Trends), electronics, and B2B (JioMart Partners). Festive season Q3 contributes ~30% of annual retail revenue."},
+            ],
+            "pricing_power": "MODERATE",
+            "pricing_power_note": "Jio has moderate pricing power as a duopoly with Airtel. O2C is commodity-priced — zero pricing power. Retail is competitive but scale provides some cost leverage.",
+            "revenue_visibility": "MODERATE",
+            "revenue_visibility_note": "Jio subscription revenue is highly visible (monthly recurring, low churn). O2C is lumpy and tied to crude volatility. Retail is seasonal — Q3 (Oct–Dec) dominates.",
+        },
     },
     "TCS": {
         "company": "Tata Consultancy Services Limited",
@@ -207,6 +234,33 @@ _MOCK_DB: dict[str, dict] = {
             {"name": "US 10Y treasury yield",         "why": "Higher rates increase US client borrowing costs, reducing IT discretionary budgets within 6–9 months."},
             {"name": "TCS attrition rate (TTM)",      "why": "Rising attrition precedes margin compression by 1–2 quarters as replacement costs and fresher training ramp up."},
         ],
+        "business_model": {
+            "type": "IT Services Outsourcing (Time-and-Material + Fixed-Price)",
+            "value_creation": "TCS creates value through India labor arbitrage — it hires engineers at Indian wage rates and delivers services to US/European clients at a significant cost discount vs local alternatives. Multi-year managed service contracts create high revenue lock-in, while platform products (BaNCS, Ignio) are moving toward higher-margin SaaS revenue.",
+            "segments": [
+                {"name": "IT Services", "pct": 85, "desc": "Consulting, application development, infrastructure management, testing", "margin_note": "EBITDA ~25% — core business, stable"},
+                {"name": "Business Process Services (BPS)", "pct": 10, "desc": "Back-office processing for banks, insurers, and retailers", "margin_note": "EBITDA ~18% — commoditizing under AI pressure"},
+                {"name": "Products & Platforms", "pct": 5, "desc": "TCS BaNCS (banking), TCS iON (education), Ignio (AIOps)", "margin_note": "EBITDA ~45% — small but strategically critical"},
+            ],
+            "moat": [
+                "Client stickiness — average engagement tenure of 7+ years with top clients",
+                "TCS BaNCS installed in 450+ financial institutions globally",
+                "India talent pipeline at scale — 600,000+ engineers across delivery centers",
+                "Tata brand trust in regulated industries (BFSI, government)",
+            ],
+            "moat_durability": "MODERATE",
+        },
+        "revenue_model": {
+            "streams": [
+                {"name": "Managed Services Contracts", "type": "CONTRACT", "pct": 65, "growth": "STABLE", "desc": "Multi-year contracts (3–7 years) for application management, infrastructure, and BPO. Highly recurring — TCV order book >₹1.2L Cr gives 12–18 months of forward visibility."},
+                {"name": "Digital Transformation Projects", "type": "TRANSACTIONAL", "pct": 25, "growth": "GROWING", "desc": "Cloud migration, AI/GenAI implementation, and ERP modernisation. Higher margin (30%+) but lumpy — driven by client IT budget cycles and deal wins."},
+                {"name": "Products & Platform Licensing", "type": "SUBSCRIPTION", "pct": 10, "growth": "GROWING", "desc": "TCS BaNCS SaaS, iON per-seat licensing, and Ignio AIOps subscriptions. Structurally moving to subscription — recurring and significantly higher margin than services."},
+            ],
+            "pricing_power": "MODERATE",
+            "pricing_power_note": "TCS commands a 10–15% premium over Tier-2 IT vendors due to delivery quality and brand. However, large-deal pricing is under pressure from Infosys and HCL in competitive RFPs.",
+            "revenue_visibility": "HIGH",
+            "revenue_visibility_note": "TCV (total contract value) order book provides 12–18 months forward visibility. 65% recurring managed services makes quarterly revenue highly predictable — deal ramp timing is the main variance.",
+        },
     },
     "HDFCBANK": {
         "company": "HDFC Bank Limited",
@@ -285,6 +339,33 @@ _MOCK_DB: dict[str, dict] = {
             {"name": "Credit card spend data (RBI)",    "why": "Monthly credit card outstanding from RBI leads HDFC fee income (interchange + interest) by 6 weeks."},
             {"name": "GNP (Gross NPA) ratio trend",    "why": "Early stress in retail book shows up in slippages 2 quarters before provisioning hits PAT."},
         ],
+        "business_model": {
+            "type": "Spread-Based Financial Intermediary + Fee Income",
+            "value_creation": "HDFC Bank creates value by borrowing cheaply through its CASA franchise (current + savings deposits at 3–4%) and lending at higher rates (MCLR-linked at 9–18% depending on product). The NIM spread is the core value engine. Fee income from credit cards, insurance cross-sell, and transaction banking is the high-margin overlay on the lending book.",
+            "segments": [
+                {"name": "Retail Banking", "pct": 52, "desc": "Home loans, auto loans, personal loans, credit cards, and savings accounts", "margin_note": "Highest NIM — unsecured retail earns 12–18%, home loans 8–9%"},
+                {"name": "Corporate & Wholesale Banking", "pct": 30, "desc": "Working capital, trade finance, cash management for top-500 corporates", "margin_note": "Thin NIM (7–9%) but rich in fee income (forex, processing, derivatives)"},
+                {"name": "SME / MSME Banking", "pct": 18, "desc": "Business loans, current accounts, and equipment finance for small businesses", "margin_note": "Good NIM (10–13%) with managed NPA — HDFC's underwriting edge here"},
+            ],
+            "moat": [
+                "CASA ratio of 46% — cheapest cost of funds among large private banks",
+                "RBI banking licence — a near-impenetrable regulatory moat",
+                "90M+ customer base — cross-sell machine for insurance, MF, and wealth",
+                "HDFC brand = trust — NPAs consistently 40–50bps below industry average",
+            ],
+            "moat_durability": "STRONG",
+        },
+        "revenue_model": {
+            "streams": [
+                {"name": "Net Interest Income (NII)", "type": "INTEREST", "pct": 75, "growth": "GROWING", "desc": "Core spread income = (loan yield – deposit cost) × loan book size. NIM ~3.5%, growing as the book expands at 15–17% YoY. Rate cycle timing is the main NIM swing factor."},
+                {"name": "Fee & Commission Income", "type": "FEE", "pct": 20, "growth": "GROWING", "desc": "Credit card interchange and revolving interest, insurance and mutual fund distribution fees, trade finance processing, and forex. Growing faster than NII as the customer base deepens."},
+                {"name": "Treasury & Other Income", "type": "TRANSACTIONAL", "pct": 5, "growth": "STABLE", "desc": "Mark-to-market gains on bond portfolio and forex trading desk. Volatile and non-core — RBI's rate stance and bond yield movements drive quarter-to-quarter swings."},
+            ],
+            "pricing_power": "MODERATE",
+            "pricing_power_note": "On liabilities (deposits), pricing is driven by RBI rates and competition — limited control. On assets (loans), HDFC commands a premium on unsecured retail due to its credit risk engine and brand, but corporate lending is competitively priced.",
+            "revenue_visibility": "HIGH",
+            "revenue_visibility_note": "75% is NII — highly predictable as it derives from the existing loan stock repricing quarterly. Fee income has 85%+ repeat rate from existing card and deposit customers. Treasury is the only volatile component.",
+        },
     },
 }
 
@@ -346,6 +427,22 @@ def _mock_for(ticker: str) -> dict[str, Any]:
         "predictors": [
             {"name": "Enable Anthropic API", "why": "Set ANTHROPIC_API_KEY in .env to get real revenue predictors for this company."},
         ],
+        "business_model": {
+            "type": "Unknown — enable Anthropic API",
+            "value_creation": "Set ANTHROPIC_API_KEY in marketdna-backend/.env to generate real business model analysis for this company.",
+            "segments": [{"name": "Unknown", "pct": 100, "desc": "—", "margin_note": "Enable API for real data"}],
+            "moat": ["Enable Anthropic API for moat analysis"],
+            "moat_durability": "MODERATE",
+        },
+        "revenue_model": {
+            "streams": [
+                {"name": "Unknown", "type": "TRANSACTIONAL", "pct": 100, "growth": "STABLE", "desc": "Set ANTHROPIC_API_KEY in .env to generate real revenue model analysis for this company."},
+            ],
+            "pricing_power": "MODERATE",
+            "pricing_power_note": "Enable Anthropic API for pricing power analysis.",
+            "revenue_visibility": "MODERATE",
+            "revenue_visibility_note": "Enable Anthropic API for revenue visibility analysis.",
+        },
     }
 
 

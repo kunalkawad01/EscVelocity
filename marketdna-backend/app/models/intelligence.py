@@ -32,6 +32,8 @@ class IntelligenceResponse(BaseModel):
     tailwinds: list[str]
     headwinds: list[str]
     predictors: list[dict[str, str]]
+    business_model: dict[str, Any]
+    revenue_model: dict[str, Any]
     _cache: str = "miss"
 
     model_config = {"populate_by_name": True}

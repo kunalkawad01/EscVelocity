@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Grid, IconButton, Tooltip, Typography } from '@mui/material'
 import Highcharts from 'highcharts/highstock'
 import HighchartsReact from 'highcharts-react-official'
@@ -13,7 +13,8 @@ import type { IntradayReturnsResponse, IntradaySymbol, NormHistoryResponse, Cate
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
 const SANS = { fontFamily: "'IBM Plex Sans', sans-serif" } as const
-const REFRESH_MS = 60_000
+const REFRESH_MS = 5_000
+const HISTORY_REFRESH_MS = 60_000  // norm-history shape changes slowly; no need to refresh every 5s
 
 const CAT_COLOR: Record<Category, string> = {
   top: '#1D9E75',
@@ -162,35 +163,81 @@ function BarPanel({
   )
 }
 
-// ── Module 2: ATR Scatter ─────────────────────────────────────────────────────
+// ── Module 2: ATR Scatter — pure helpers (exported for unit tests) ────────────
+const SCATTER_CATS: readonly Category[] = ['top', 'rec', 'dec', 'bot', 'neu']
+
+export function buildScatterSeriesData(
+  symbols: IntradaySymbol[],
+): Record<Category, Highcharts.PointOptionsObject[]> {
+  const byCat: Record<Category, Highcharts.PointOptionsObject[]> = {
+    top: [], rec: [], dec: [], bot: [], neu: [],
+  }
+  for (const s of symbols) {
+    byCat[s.category as Category].push({ x: s.atr2, y: s.return_pct, name: s.symbol })
+  }
+  return byCat
+}
+
+export function computeMedianAtr(symbols: IntradaySymbol[]): number {
+  const atrs = symbols.map(s => s.atr2).filter(a => a > 0).sort((a, b) => a - b)
+  if (!atrs.length) return 0
+  const mid = Math.floor(atrs.length / 2)
+  return atrs.length % 2 ? atrs[mid] : (atrs[mid - 1] + atrs[mid]) / 2
+}
+
 function AtrScatterChart({ symbols, marketOpen }: { symbols: IntradaySymbol[]; marketOpen: boolean }) {
-  const { PAPER, INK, INK2, INK3, BORDER, CYAN } = usePalette()
+  const { PAPER, INK, INK2, INK3, BORDER } = usePalette()
   const { CARD } = useTokens()
   const chartRef = useRef<HighchartsReact.RefObject>(null)
 
   const atr2Available = useMemo(() => symbols.some(s => s.atr2 > 0), [symbols])
+  const medianAtr = useMemo(() => computeMedianAtr(symbols), [symbols])
 
-  const medianAtr = useMemo(() => {
-    const atrs = symbols.map(s => s.atr2).filter(a => a > 0).sort((a, b) => a - b)
-    if (!atrs.length) return 0
-    const mid = Math.floor(atrs.length / 2)
-    return atrs.length % 2 ? atrs[mid] : (atrs[mid - 1] + atrs[mid]) / 2
-  }, [symbols])
-
-  const options = useMemo((): Highcharts.Options => {
-    const byCat: Record<Category, Highcharts.PointOptionsObject[]> = {
-      top: [], rec: [], dec: [], bot: [], neu: [],
-    }
-    for (const s of symbols) {
-      byCat[s.category as Category].push({
-        x: s.atr2,
-        y: s.return_pct,
-        name: s.symbol,
-      })
-    }
-    const seriesList: Highcharts.SeriesOptionsType[] = (
-      ['top', 'rec', 'dec', 'bot', 'neu'] as Category[]
-    ).map(cat => ({
+  // Static chart skeleton — only rebuilt when palette/theme changes, NOT on every 5s data tick.
+  // Series data is injected imperatively via useEffect below so Highcharts never destroys/rebuilds.
+  const staticOptions = useMemo((): Highcharts.Options => ({
+    chart: {
+      type: 'scatter',
+      backgroundColor: 'transparent',
+      style: { fontFamily: "'IBM Plex Sans', sans-serif" },
+      height: 340,
+      animation: false,
+    },
+    title: { text: undefined },
+    credits: { enabled: false },
+    legend: {
+      enabled: true,
+      itemStyle: { color: INK2, fontSize: '0.7rem', fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: '400' },
+      itemHoverStyle: { color: INK },
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+    },
+    xAxis: {
+      title: { text: 'ATR(2)', style: { color: INK3, fontSize: '0.7rem' } },
+      labels: { style: { color: INK3, fontSize: '0.65rem', fontFamily: "'IBM Plex Mono', monospace" } },
+      gridLineColor: BORDER + '55',
+      lineColor: BORDER,
+      tickColor: BORDER,
+      plotLines: [],  // updated imperatively per tick
+    },
+    yAxis: {
+      title: { text: 'Return %', style: { color: INK3, fontSize: '0.7rem' } },
+      labels: { style: { color: INK3, fontSize: '0.65rem', fontFamily: "'IBM Plex Mono', monospace" } },
+      gridLineColor: BORDER + '55',
+      plotLines: [{ value: 0, dashStyle: 'Dash', color: INK3 + '88', width: 1 }],
+    },
+    tooltip: {
+      backgroundColor: PAPER + 'ee',
+      borderColor: BORDER,
+      style: { color: INK, fontSize: '0.72rem', fontFamily: "'IBM Plex Mono', monospace" },
+      formatter() {
+        const p = this.point as { name?: string; x: number; y: number }
+        return `<b>${p.name ?? ''}</b><br/>Return: ${fmtRet(p.y)}<br/>ATR(2): ${p.x.toFixed(4)}`
+      },
+    },
+    plotOptions: { scatter: { animation: false } },
+    // Empty data arrays — populated imperatively; series order must match SCATTER_CATS
+    series: SCATTER_CATS.map(cat => ({
       type: 'scatter' as const,
       name: CAT_LABEL[cat],
       color: CAT_COLOR[cat],
@@ -201,68 +248,31 @@ function AtrScatterChart({ symbols, marketOpen }: { symbols: IntradaySymbol[]; m
         lineColor: CAT_COLOR[cat],
         lineWidth: 1,
       },
-      data: byCat[cat],
-    }))
+      data: [],
+    })),
+  }), [PAPER, INK, INK2, INK3, BORDER])
 
-    return {
-      chart: {
-        type: 'scatter',
-        backgroundColor: 'transparent',
-        style: { fontFamily: "'IBM Plex Sans', sans-serif" },
-        height: 340,
-        animation: false,
-      },
-      title: { text: undefined },
-      credits: { enabled: false },
-      legend: {
-        enabled: true,
-        itemStyle: { color: INK2, fontSize: '0.7rem', fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: '400' },
-        itemHoverStyle: { color: INK },
-        backgroundColor: 'transparent',
-        borderWidth: 0,
-      },
-      xAxis: {
-        title: { text: 'ATR(2)', style: { color: INK3, fontSize: '0.7rem' } },
-        labels: { style: { color: INK3, fontSize: '0.65rem', fontFamily: "'IBM Plex Mono', monospace" } },
-        gridLineColor: BORDER + '55',
-        lineColor: BORDER,
-        tickColor: BORDER,
-        plotLines: medianAtr > 0 ? [{
-          value: medianAtr,
-          dashStyle: 'Dash',
-          color: INK3 + '88',
-          width: 1,
-          label: { text: 'med ATR', style: { color: INK3, fontSize: '0.6rem' } },
-        }] : [],
-      },
-      yAxis: {
-        title: { text: 'Return %', style: { color: INK3, fontSize: '0.7rem' } },
-        labels: { style: { color: INK3, fontSize: '0.65rem', fontFamily: "'IBM Plex Mono', monospace" } },
-        gridLineColor: BORDER + '55',
-        plotLines: [{
-          value: 0,
-          dashStyle: 'Dash',
-          color: INK3 + '88',
-          width: 1,
-        }],
-      },
-      tooltip: {
-        backgroundColor: PAPER + 'ee',
-        borderColor: BORDER,
-        style: { color: INK, fontSize: '0.72rem', fontFamily: "'IBM Plex Mono', monospace" },
-        formatter() {
-          const p = this.point as { name?: string; x: number; y: number }
-          return `<b>${p.name ?? ''}</b><br/>
-            Return: ${fmtRet(p.y)}<br/>
-            ATR(2): ${p.x.toFixed(4)}`
-        },
-      },
-      plotOptions: {
-        scatter: { animation: false },
-      },
-      series: seriesList,
-    }
-  }, [symbols, medianAtr, PAPER, INK, INK2, INK3, BORDER, CYAN])
+  // Imperatively push fresh data on every 5s tick — one chart.redraw(), no destroy/rebuild.
+  // When theme changes, staticOptions ref changes → HighchartsReact calls chart.update() →
+  // series reset to []; INK3 change also fires this effect → data re-injected immediately after.
+  useEffect(() => {
+    const chart = chartRef.current?.chart
+    if (!chart || !atr2Available) return
+    const byCat = buildScatterSeriesData(symbols)
+    SCATTER_CATS.forEach((cat, i) => {
+      chart.series[i]?.setData(byCat[cat], false, false, false)
+    })
+    chart.xAxis[0].update({
+      plotLines: medianAtr > 0 ? [{
+        value: medianAtr,
+        dashStyle: 'Dash' as const,
+        color: INK3 + '88',
+        width: 1,
+        label: { text: 'med ATR', style: { color: INK3, fontSize: '0.6rem' } },
+      }] : [],
+    }, false)
+    chart.redraw()
+  }, [symbols, medianAtr, atr2Available, INK3])
 
   if (!atr2Available) {
     return (
@@ -283,7 +293,7 @@ function AtrScatterChart({ symbols, marketOpen }: { symbols: IntradaySymbol[]; m
   return (
     <Box sx={{ ...CARD, p: 2 }}>
       <SectionHead title="Return vs ATR(2) Scatter" accent="#a78bfa" meta="ATR(2) from intraday minute candles" />
-      <HighchartsReact highcharts={Highcharts} options={options} ref={chartRef} />
+      <HighchartsReact highcharts={Highcharts} options={staticOptions} ref={chartRef} />
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1, px: 0.5 }}>
         {[
           { label: 'Low ATR · High Return', note: 'Steady outperformers', corner: 'top-left' },
@@ -458,21 +468,28 @@ function NormReturnChart({ history, marketOpen }: { history: NormHistoryResponse
 }
 
 // ── Tiny sparkline SVG (last 30 norm_return ticks) ────────────────────────────
-function MiniSpark({ data, color }: { data: number[]; color: string }) {
-  const pts = data.slice(-30)
-  if (pts.length < 2) return <Box sx={{ height: 24 }} />
-  const min = Math.min(...pts), max = Math.max(...pts)
-  const range = max - min || 0.01
-  const W = 64, H = 20
-  const xs = pts.map((_, i) => (i / (pts.length - 1)) * W)
-  const ys = pts.map(v => H - ((v - min) / range) * (H - 4) - 2)
-  const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')
-  return (
-    <svg width={W} height={H} style={{ display: 'block' }}>
-      <path d={path} fill="none" stroke={color} strokeWidth={1.2} />
-    </svg>
-  )
-}
+// memo: skip re-render when data length and last tick value are unchanged
+const MiniSpark = memo(
+  function MiniSpark({ data, color }: { data: number[]; color: string }) {
+    const pts = data.slice(-30)
+    if (pts.length < 2) return <Box sx={{ height: 24 }} />
+    const min = Math.min(...pts), max = Math.max(...pts)
+    const range = max - min || 0.01
+    const W = 64, H = 20
+    const xs = pts.map((_, i) => (i / (pts.length - 1)) * W)
+    const ys = pts.map(v => H - ((v - min) / range) * (H - 4) - 2)
+    const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')
+    return (
+      <svg width={W} height={H} style={{ display: 'block' }}>
+        <path d={path} fill="none" stroke={color} strokeWidth={1.2} />
+      </svg>
+    )
+  },
+  (prev, next) =>
+    prev.color === next.color &&
+    prev.data.length === next.data.length &&
+    prev.data[prev.data.length - 1] === next.data[next.data.length - 1],
+)
 
 // ── Module 4: Mini Sparkline Grid ─────────────────────────────────────────────
 function MiniGrid({ symbols, history }: { symbols: IntradaySymbol[]; history: NormHistoryResponse | null }) {
@@ -629,30 +646,34 @@ export default function IntradayRacePage() {
   const isMarketOpen = data?.market_open ?? false             // use raw data, not frozen snapshot
 
   // ── Fetch live data ─────────────────────────────────────────────────────────
-  const fetchAll = useCallback(async () => {
-    // Fetch independently — a norm-history failure must not kill the returns data
-    const [retResult, histResult] = await Promise.allSettled([
-      intradayApi.getReturns(),
-      intradayApi.getNormHistory(),
-    ])
-    if (retResult.status === 'fulfilled') {
-      setData(retResult.value)
+  // Returns (rank/return/category) refresh every 5s — small payload, drives all panels.
+  // Norm-history (full tick series for chart) refreshes every 60s — larger payload,
+  // shape changes slowly; keeping it on the 5s cycle was wasteful bandwidth.
+  const fetchReturns = useCallback(async () => {
+    try {
+      const result = await intradayApi.getReturns()
+      setData(result)
       setError(null)
-    } else {
-      setError(retResult.reason instanceof Error ? retResult.reason.message : 'Returns fetch failed')
-    }
-    if (histResult.status === 'fulfilled') {
-      setHistory(histResult.value)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Returns fetch failed')
     }
     setLastRefresh(new Date())
     setLoading(false)
   }, [])
 
+  const fetchHistory = useCallback(async () => {
+    try {
+      const result = await intradayApi.getNormHistory()
+      setHistory(result)
+    } catch { /* history failures are non-fatal — chart keeps previous data */ }
+  }, [])
+
   useEffect(() => {
-    fetchAll()
-    const id = setInterval(fetchAll, REFRESH_MS)
-    return () => clearInterval(id)
-  }, [fetchAll])
+    Promise.allSettled([fetchReturns(), fetchHistory()])
+    const rid = setInterval(fetchReturns, REFRESH_MS)
+    const hid = setInterval(fetchHistory, HISTORY_REFRESH_MS)
+    return () => { clearInterval(rid); clearInterval(hid) }
+  }, [fetchReturns, fetchHistory])
 
   // ── Auto-freeze to 15:30 snapshot when market is closed ─────────────────────
   // Spec: "Freeze all modules to 15:30 snapshot" when market is closed.
@@ -878,7 +899,7 @@ export default function IntradayRacePage() {
                 }
                 emptyLine2={
                   isMarketOpen
-                    ? 'Updates each 60s refresh'
+                    ? 'Updates each 5s refresh'
                     : !replayData
                       ? 'Fetching Kite closing candles'
                       : replayData.replay_source === 'eod'
@@ -906,7 +927,7 @@ export default function IntradayRacePage() {
                 }
                 emptyLine2={
                   isMarketOpen
-                    ? 'Updates each 60s refresh'
+                    ? 'Updates each 5s refresh'
                     : !replayData
                       ? 'Fetching Kite closing candles'
                       : replayData.replay_source === 'eod'

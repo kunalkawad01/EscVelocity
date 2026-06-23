@@ -222,13 +222,16 @@ def _fallback_quotes(hist: dict[str, dict]) -> dict[str, dict]:
 def _get_quotes(hist: dict[str, dict], symbols: list[str] | None = None) -> tuple[dict[str, dict], str]:
     """Return (quotes_dict, data_mode).
 
-    data_mode is "live" when Kite responds, "eod_fallback" when Kite is offline
-    and DuckDB EOD data is used instead.
+    data_mode is "live" when Kite responds during market hours.
+    Outside market hours Kite's last_price == ohlc.close (both yesterday's close),
+    making every return 0 — so we skip the Kite call and use the EOD fallback
+    which computes returns as (rn=1 close) / (rn=2 close) - 1 from DuckDB.
     """
     syms = symbols or list(hist.keys())
-    live = _quotes(syms)
-    if live:
-        return live, "live"
+    if _market_is_open():
+        live = _quotes(syms)
+        if live:
+            return live, "live"
     fb = _fallback_quotes({s: hist[s] for s in syms if s in hist})
     return fb, "eod_fallback"
 

@@ -24,6 +24,10 @@ from app.services import stock_health_service
 from app.services import indicators_service, indicator_edge_service
 from app.services import regime_service
 from app.services import delivery_service
+from app.services import pattern_service
+from app.services.pattern_service import start_screener_prewarm
+from app.services import breakout_service
+from app.services import live_trading_service
 
 app = FastAPI(
     title="MarketDNA API",
@@ -81,6 +85,7 @@ def _background_prewarm() -> None:
     import time
     for name, fn in [
         ("cointegration",    start_preload),              # ~3s, user-visible page
+        ("screener prewarm", start_screener_prewarm),    # ~3min, all 9 pattern tabs
         ("health scan",      stock_health_service.start_scan_warmup),
         ("indicator edge",   indicator_edge_service.get_edge_summary),
         ("validation suite", validation_service.run_full_validation),
@@ -106,6 +111,9 @@ async def startup():
         ("delivery reports",     delivery_service.preload_all_reports),
         ("regime snapshot",      regime_service.get_snapshot),
         ("indicators scan",      indicators_service.get_scan),
+        ("pattern scanner",      pattern_service.get_scanner),
+        ("breakout levels",      breakout_service._get_historical_levels),
+        ("live trading hist",    live_trading_service._get_hist),
     ]:
         _run_task(name, fn)
     threading.Thread(target=_background_prewarm, daemon=True).start()
