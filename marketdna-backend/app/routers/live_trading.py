@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from app.models.live_trading import (
     SectorScatterResponse,
     SectorDrillDownResponse,
@@ -17,21 +17,21 @@ router = APIRouter(prefix="/api/live", tags=["live-trading"])
 
 
 @router.get("/sectors", response_model=SectorScatterResponse, response_model_exclude_none=True)
-def sector_scatter():
+def sector_scatter(universe: str = Query("nifty500", pattern="^(nifty500|nifty200)$")):
     """Layer 1 — Sector scatter: Return vs ATR for all sectors."""
-    return live_trading_service.get_sector_scatter()
+    return live_trading_service.get_sector_scatter(universe)
 
 
 @router.get("/sector-progressions", response_model=SectorProgressionsResponse, response_model_exclude_none=True)
-def sector_progressions():
+def sector_progressions(universe: str = Query("nifty500", pattern="^(nifty500|nifty200)$")):
     """Layer 1 supplementary — All-sector return progression (live 5s ticks or 15-min Kite history)."""
-    return live_trading_service.get_sector_progressions()
+    return live_trading_service.get_sector_progressions(universe)
 
 
 @router.get("/sector/{sector_name}", response_model=SectorDrillDownResponse, response_model_exclude_none=True)
-def sector_detail(sector_name: str):
+def sector_detail(sector_name: str, universe: str = Query("nifty500", pattern="^(nifty500|nifty200)$")):
     """Layer 2 — 4-panel sector drill-down."""
-    result = live_trading_service.get_sector_detail(sector_name)
+    result = live_trading_service.get_sector_detail(sector_name, universe)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Sector '{sector_name}' not found")
     return result
@@ -47,9 +47,9 @@ def stock_intelligence(symbol: str):
 
 
 @router.get("/signals", response_model=BreakthroughSignalsResponse, response_model_exclude_none=True)
-def breakthrough_signals():
+def breakthrough_signals(universe: str = Query("nifty500", pattern="^(nifty500|nifty200)$")):
     """Layer 4 — Breakthrough intelligence: live long/short signals with Why Now cards."""
-    return live_trading_service.get_breakthrough_signals()
+    return live_trading_service.get_breakthrough_signals(universe)
 
 
 @router.get("/stock/{symbol}/strike-chart", response_model=StrikeChartResponse, response_model_exclude_none=True)

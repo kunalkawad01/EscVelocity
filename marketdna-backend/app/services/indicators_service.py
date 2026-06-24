@@ -14,6 +14,7 @@ import numpy as np
 from scipy.signal import lfilter, lfilter_zi
 
 from app.services.duckdb_client import get_connection
+from app.services.redis_client import cache, TTL_24H
 from app.models.indicators import (
     TrendReading, MomentumReading, VolatilityReading, VolumeReading,
     IndicatorDivergence, StockIndicators,
@@ -22,7 +23,8 @@ from app.models.indicators import (
 
 log = logging.getLogger(__name__)
 
-# ─── Module-level cache ────────────────────────────────────────────────────────
+# ─── Module-level L1 cache ────────────────────────────────────────────────────
+# L2 is Redis. L1 avoids Redis round-trip on repeated same-request calls.
 
 _symbol_cache: dict[tuple[str, str], StockIndicators] = {}
 _scan_cache:   tuple[str, IndicatorScanResult] | None = None
@@ -431,6 +433,12 @@ def get_symbol(symbol: str) -> StockIndicators:
     if cache_key in _symbol_cache:
         return _symbol_cache[cache_key]
 
+    r_key  = f"indicators:symbol:{symbol}:{today}"
+    cached = cache.get(r_key)
+    if cached is not None:
+        _symbol_cache[cache_key] = cached
+        return cached
+
     con  = get_connection()
     rows = con.execute("""
         SELECT STRFTIME('%Y-%m-%d', CAST(date AS DATE)), close, high, low, volume
@@ -452,6 +460,7 @@ def get_symbol(symbol: str) -> StockIndicators:
 
     result = _build_stock_indicators(symbol, closes, highs, lows, volumes, dates)
     _symbol_cache[cache_key] = result
+    cache.set(r_key, result, ttl=TTL_24H)
     return result
 
 
@@ -460,6 +469,12 @@ def get_scan() -> IndicatorScanResult:
     today = _date.today().isoformat()
     if _scan_cache and _scan_cache[0] == today:
         return _scan_cache[1]
+
+    r_key  = f"indicators:scan:{today}"
+    cached = cache.get(r_key)
+    if cached is not None:
+        _scan_cache = (today, cached)
+        return cached
 
     con  = get_connection()
     rows = con.execute("""
@@ -526,8 +541,9 @@ def get_scan() -> IndicatorScanResult:
                 signals         = active,
             ))
             signal_dist[si.overall_signal] = signal_dist.get(si.overall_signal, 0) + 1
+
         except Exception as e:
-            log.warning("indicators: skipping %s — %s", sym, e)
+            log.warning("indicators: skipping — %s — %s", sym, e)
 
     result = IndicatorScanResult(
         items               = items,
@@ -535,6 +551,7 @@ def get_scan() -> IndicatorScanResult:
         computed_at         = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
     )
     _scan_cache = (today, result)
+    cache.set(r_key, result, ttl=TTL_24H)
     return result
 
 
@@ -542,4 +559,5 @@ def invalidate_cache() -> None:
     global _scan_cache
     _symbol_cache.clear()
     _scan_cache = None
+    cache.delete_pattern("indicators:*")
     log.info("indicators: cache cleared")

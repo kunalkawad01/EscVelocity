@@ -4,26 +4,45 @@ import numpy as np
 from datetime import date as _date
 from typing import Any, Optional
 from app.services.duckdb_client import get_connection
+from app.services.redis_client import cache, TTL_24H
 
 # ── Day-level result cache ────────────────────────────────────────────────────
-# Keyed by (fn_name, today_str, *positional_args).
-# Entries from previous days are evicted on first write of a new day.
+# L1: in-process dict (zero-latency within a single request burst)
+# L2: Redis (survives server restarts, shared across workers)
+# Keys: "stock:{fn_name}:{today}:{args_str}"
 _cache: dict[tuple, Any] = {}
 
 
 def _day_cached(fn: Any) -> Any:
-    """Decorator: cache results by (today, *args), evict yesterday's entries."""
+    """Decorator: L1 in-process dict → L2 Redis → compute → write both."""
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         today = str(_date.today())
-        key = (fn.__name__, today) + args
-        if key in _cache:
-            return _cache[key]
+
+        # L1 — in-process dict
+        l1_key = (fn.__name__, today) + args
+        if l1_key in _cache:
+            return _cache[l1_key]
+
+        # Evict stale L1 entries from previous days
         stale = [k for k in list(_cache) if k[1] != today]
         for k in stale:
             del _cache[k]
+
+        # L2 — Redis
+        args_str = ":".join(str(a) for a in args) if args else "noargs"
+        r_key = f"stock:{fn.__name__}:{today}:{args_str}"
+        cached = cache.get(r_key)
+        if cached is not None:
+            _cache[l1_key] = cached
+            return cached
+
+        # Compute
         result = fn(*args, **kwargs)
-        _cache[key] = result
+
+        # Write both layers
+        _cache[l1_key] = result
+        cache.set(r_key, result, ttl=TTL_24H)
         return result
     return wrapper
 from app.models.stock import (
@@ -1077,7 +1096,8 @@ def get_summary(symbol: str) -> StockSummary:
 
 
 def invalidate_cache() -> int:
-    """Clear all day-cached results. Returns number of entries cleared."""
+    """Clear all day-cached results from L1 and L2. Returns L1 entries cleared."""
     count = len(_cache)
     _cache.clear()
+    cache.delete_pattern("stock:*")
     return count

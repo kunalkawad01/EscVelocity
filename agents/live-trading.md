@@ -1,6 +1,6 @@
 ---
 name: marketdna:sector-stock-intelligence
-description: >
+description: >r
   Use this skill when the user asks to "analyze the market", "show sector scatter",
   "which sectors are moving", "drill into a sector", "show me the best stocks right now",
   "find breakout stocks", "find breakdown stocks", "show stock intelligence",
@@ -18,7 +18,7 @@ metadata:
   storage: DuckDB
   visualization: Highcharts / Highstock (dark/gold theme)
   benchmark: Nifty 50
-  refresh_cadence: 5 seconds (scatter layers), on-demand (drill-downs)
+  refresh_cadence: 10 seconds (scatter layers), on-demand (drill-downs)
   trading_direction: Both Long and Short
 ---
 

@@ -7,7 +7,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
-import { liveApi } from '../api/liveApi'
+import { liveApi, type Universe } from '../api/liveApi'
 import type {
   SectorPoint,
   SectorDrillDownResponse,

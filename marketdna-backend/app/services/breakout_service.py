@@ -54,12 +54,12 @@ def _compute_levels() -> dict[str, dict]:
         levels AS (
             SELECT
                 symbol,
-                MAX(CASE WHEN rn <= 1   THEN high END) AS high_1d,
-                MAX(CASE WHEN rn <= 2   THEN high END) AS high_2d,
-                MAX(CASE WHEN rn <= 3   THEN high END) AS high_3d,
-                MAX(CASE WHEN rn <= 4   THEN high END) AS high_4d,
-                MAX(CASE WHEN rn <= 5   THEN high END) AS high_5d,
-                MAX(CASE WHEN rn <= 10  THEN high END) AS high_10d,
+                MAX(CASE WHEN rn = 1   THEN high END) AS high_1d,
+                MAX(CASE WHEN rn = 2   THEN high END) AS high_2d,
+                MAX(CASE WHEN rn = 3   THEN high END) AS high_3d,
+                MAX(CASE WHEN rn = 4   THEN high END) AS high_4d,
+                MAX(CASE WHEN rn = 5   THEN high END) AS high_5d,
+                MAX(CASE WHEN rn = 10  THEN high END) AS high_10d,
                 AVG(CASE WHEN rn <= 20  THEN close END) AS sma20,
                 AVG(CASE WHEN rn <= 50  THEN close END) AS sma50,
                 AVG(CASE WHEN rn <= 200 THEN close END) AS sma200,

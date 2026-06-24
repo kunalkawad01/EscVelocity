@@ -54,6 +54,7 @@ import numpy as np
 from app.services.duckdb_client import get_connection
 from app.services.indicators_service import _sma
 from app.services.stock_metrics import get_universe as _fetch_universe
+from app.services.redis_client import cache, TTL_24H
 from app.models.regime import (
     RegimeComponents, SMASummary, SlopeInfo,
     RegimeHistoryPoint, RegimeScoreResult,
@@ -69,7 +70,8 @@ def get_universe() -> list[str]:
     """Return NSE 500 universe from DuckDB (day-cached via stock_metrics)."""
     return _fetch_universe()
 
-# ─── Module-level caches (keyed by date string) ────────────────────────────────
+# ─── Module-level L1 caches (in-process, keyed by date string) ────────────────
+# L2 is Redis. L1 is kept so repeated intra-request calls are zero-latency.
 
 _regime_cache:        dict[tuple[str, str], RegimeScoreResult]  = {}
 _breadth_cache:       dict[str, BreadthScoreResult]             = {}
@@ -180,6 +182,12 @@ def get_regime_score(symbol: str) -> RegimeScoreResult:
     if key in _regime_cache:
         return _regime_cache[key]
 
+    r_key = f"regime:score:{symbol}:{today}"
+    cached = cache.get(r_key)
+    if cached is not None:
+        _regime_cache[key] = cached
+        return cached
+
     con = get_connection()
     rows = con.execute(
         """
@@ -263,6 +271,7 @@ def get_regime_score(symbol: str) -> RegimeScoreResult:
     )
 
     _regime_cache[key] = result
+    cache.set(r_key, result, ttl=TTL_24H)
     return result
 
 
@@ -278,6 +287,12 @@ def get_breadth_score() -> BreadthScoreResult:
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if today in _breadth_cache:
         return _breadth_cache[today]
+
+    r_key = f"regime:breadth:{today}"
+    cached = cache.get(r_key)
+    if cached is not None:
+        _breadth_cache[today] = cached
+        return cached
 
     symbols_sql = ", ".join(f"'{s}'" for s in get_universe())
     con = get_connection()
@@ -367,6 +382,7 @@ def get_breadth_score() -> BreadthScoreResult:
     )
 
     _breadth_cache[today] = result
+    cache.set(r_key, result, ttl=TTL_24H)
     return result
 
 
@@ -379,6 +395,12 @@ def get_snapshot() -> MarketRegimeSnapshot:
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if today in _snapshot_cache:
         return _snapshot_cache[today]
+
+    r_key = f"regime:snapshot:{today}"
+    cached = cache.get(r_key)
+    if cached is not None:
+        _snapshot_cache[today] = cached
+        return cached
 
     breadth = get_breadth_score()
 
@@ -453,6 +475,7 @@ def get_snapshot() -> MarketRegimeSnapshot:
     )
 
     _snapshot_cache[today] = result
+    cache.set(r_key, result, ttl=TTL_24H)
     log.info("regime_service.get_snapshot: %d stocks computed", len(stocks))
     return result
 
@@ -474,6 +497,12 @@ def get_market_regime_series() -> dict[str, float]:
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if today in _mkt_regime_cache:
         return _mkt_regime_cache[today]
+
+    r_key = f"regime:series:{today}"
+    cached = cache.get(r_key)
+    if cached is not None:
+        _mkt_regime_cache[today] = cached
+        return cached
 
     # Cap at 200 symbols with the most history — the market regime average is
     # statistically stable at this sample size and keeps the query under 300k rows.
@@ -523,6 +552,7 @@ def get_market_regime_series() -> dict[str, float]:
 
     result = {d: round(float(np.mean(scores)), 1) for d, scores in date_scores.items()}
     _mkt_regime_cache[today] = result
+    cache.set(r_key, result, ttl=TTL_24H)
     log.info("market_regime_series: computed %d dates across %d symbols", len(result), len(sym_dates))
     return result
 
@@ -538,8 +568,9 @@ def get_market_regime_series_if_ready() -> dict[str, float]:
 
 
 def invalidate_cache() -> None:
-    """Clear all regime caches (called after data refresh)."""
+    """Clear all regime caches from L1 and L2 (called after data refresh)."""
     _regime_cache.clear()
     _breadth_cache.clear()
     _snapshot_cache.clear()
     _mkt_regime_cache.clear()
+    cache.delete_pattern("regime:*")

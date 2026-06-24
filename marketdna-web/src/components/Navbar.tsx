@@ -15,7 +15,8 @@ const NAV_GROUPS = [
       { to: '/stock',        label: 'Stock DNA',    desc: 'Per-stock regime & DNA scores'  },
       { to: '/stock-health', label: 'Stock Health', desc: 'Behavioral archetype scanner'   },
       { to: '/pattern-dna',  label: 'Pattern DNA',  desc: 'Formation detection & history'  },
-      { to: '/randomness',   label: 'Randomness',   desc: 'Luck vs skill decomposition'    },
+      { to: '/randomness',           label: 'Randomness',   desc: 'Luck vs skill decomposition'    },
+      { to: '/company-intelligence', label: 'Co. Intel',    desc: 'Claude-powered company research' },
     ],
   },
   {
@@ -26,13 +27,15 @@ const NAV_GROUPS = [
       { to: '/markov-options',   label: 'Markov',        desc: '6-regime transition matrix'   },
       { to: '/quant-strategies', label: 'Quant',         desc: 'Momentum, MR, Vol, Rotation'  },
       { to: '/dataviz',          label: 'DataViz',       desc: 'NSE 500 return visualisation' },
+      { to: '/druckenmiller-roc',label: 'ROC²',          desc: 'Druckenmiller second-derivative signal' },
+      { to: '/sector-heatmap',   label: 'Sectors',       desc: 'Performance grid across 7 timeframes'   },
     ],
   },
   {
     label: 'Signals',
     items: [
-      { to: '/trade-decision',   label: 'Trade Intel', desc: '5-agent GO/NO-GO trade verdict'       },
-      { to: '/live-trading',     label: 'Live',        desc: 'Sector scatter & breakthrough signals' },
+      { to: '/live-trading',     label: 'Live',      desc: 'Sector scatter & breakthrough signals' },
+      { to: '/intraday-race',    label: 'Race',      desc: 'Bar race, ATR scatter & norm returns'  },
       { to: '/delivery',         label: 'Delivery',  desc: 'Accumulation & distribution signals'   },
       { to: '/short',            label: 'Short',     desc: 'Short candidates & squeeze watch'       },
       { to: '/breakout-scanner', label: 'Breakout',  desc: 'Live breakout scanner'                  },

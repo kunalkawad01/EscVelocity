@@ -14,6 +14,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5175",
         "http://127.0.0.1:3000",
     ]
+    redis_host: str = "localhost"
+    redis_port: int = 6379
 
     model_config = {"env_prefix": "MARKETDNA_"}
 

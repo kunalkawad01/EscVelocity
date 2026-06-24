@@ -17,13 +17,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, trade_decision
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
 from app.services import indicators_service, indicator_edge_service
 from app.services import regime_service
 from app.services import delivery_service
+from app.services import pattern_service
+from app.services.pattern_service import start_screener_prewarm
+from app.services import breakout_service
 from app.services import live_trading_service
 
 app = FastAPI(
@@ -58,7 +61,10 @@ app.include_router(randomness.router)
 app.include_router(options.router)
 app.include_router(breakout.router)
 app.include_router(live_trading.router)
-app.include_router(trade_decision.router)
+app.include_router(intraday_race.router)
+app.include_router(druckenmiller_roc.router)
+app.include_router(sector_heatmap.router)
+app.include_router(intelligence.router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -80,6 +86,7 @@ def _background_prewarm() -> None:
     for name, fn in [
         ("kite ticker",      live_trading_service.start_ticker),   # WebSocket OI accumulator
         ("cointegration",    start_preload),              # ~3s, user-visible page
+        ("screener prewarm", start_screener_prewarm),    # ~3min, all 9 pattern tabs
         ("health scan",      stock_health_service.start_scan_warmup),
         ("indicator edge",   indicator_edge_service.get_edge_summary),
         ("validation suite", validation_service.run_full_validation),
@@ -105,6 +112,9 @@ async def startup():
         ("delivery reports",     delivery_service.preload_all_reports),
         ("regime snapshot",      regime_service.get_snapshot),
         ("indicators scan",      indicators_service.get_scan),
+        ("pattern scanner",      pattern_service.get_scanner),
+        ("breakout levels",      breakout_service._get_historical_levels),
+        ("live trading hist",    live_trading_service._get_hist),
     ]:
         _run_task(name, fn)
     threading.Thread(target=_background_prewarm, daemon=True).start()

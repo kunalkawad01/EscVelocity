@@ -1201,13 +1201,16 @@ def detect_current_patterns(symbol: str, timeframe: str = 'daily') -> list[Patte
 
 def _scan_double_bottom(closes: np.ndarray, lows: np.ndarray, vols: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_mins = _local_mins(lows, order=5)  # compute once on full series
     out: list[tuple[float, float, int]] = []
     for end in range(80, n - 64, 5):
-        lo = lows[max(0, end - 150):end]
-        p  = closes[max(0, end - 150):end]
-        v  = vols[max(0, end - 150):end]
+        window_start = max(0, end - 150)
+        lo = lows[window_start:end]
+        p  = closes[window_start:end]
+        v  = vols[window_start:end]
         wl = len(lo)
-        mins = _local_mins(lo, order=5)
+        mask = (all_mins >= window_start) & (all_mins < end)
+        mins = all_mins[mask] - window_start
         if len(mins) < 2:
             continue
         m2i = int(mins[-1])
@@ -1242,13 +1245,16 @@ def _scan_double_bottom(closes: np.ndarray, lows: np.ndarray, vols: np.ndarray) 
 
 def _scan_double_top(closes: np.ndarray, highs: np.ndarray, vols: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_maxs = _local_maxs(highs, order=5)  # compute once on full series
     out: list[tuple[float, float, int]] = []
     for end in range(80, n - 64, 5):
-        hi = highs[max(0, end - 150):end]
-        p  = closes[max(0, end - 150):end]
-        v  = vols[max(0, end - 150):end]
+        window_start = max(0, end - 150)
+        hi = highs[window_start:end]
+        p  = closes[window_start:end]
+        v  = vols[window_start:end]
         wl = len(hi)
-        maxs = _local_maxs(hi, order=5)
+        mask = (all_maxs >= window_start) & (all_maxs < end)
+        maxs = all_maxs[mask] - window_start
         if len(maxs) < 2:
             continue
         m2i = int(maxs[-1])
@@ -1338,13 +1344,16 @@ def _scan_bear_flag(closes: np.ndarray, vols: np.ndarray) -> list[tuple[float, f
 
 def _scan_head_shoulders(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_maxs = _local_maxs(highs, order=8)  # compute once on full series
     out: list[tuple[float, float, int]] = []
     for end in range(120, n - 64, 5):
-        hi = highs[max(0, end - 220):end]
-        lo = lows[max(0, end - 220):end]
-        p  = closes[max(0, end - 220):end]
+        window_start = max(0, end - 220)
+        hi = highs[window_start:end]
+        lo = lows[window_start:end]
+        p  = closes[window_start:end]
         wl = len(hi)
-        maxs = _local_maxs(hi, order=8)
+        mask = (all_maxs >= window_start) & (all_maxs < end)
+        maxs = all_maxs[mask] - window_start
         if len(maxs) < 3:
             continue
         rs_i = int(maxs[-1])
@@ -1369,13 +1378,16 @@ def _scan_head_shoulders(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray
 
 def _scan_inv_head_shoulders(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_mins = _local_mins(lows, order=8)  # compute once on full series
     out: list[tuple[float, float, int]] = []
     for end in range(120, n - 64, 5):
-        hi = highs[max(0, end - 220):end]
-        lo = lows[max(0, end - 220):end]
-        p  = closes[max(0, end - 220):end]
+        window_start = max(0, end - 220)
+        hi = highs[window_start:end]
+        lo = lows[window_start:end]
+        p  = closes[window_start:end]
         wl = len(lo)
-        mins = _local_mins(lo, order=8)
+        mask = (all_mins >= window_start) & (all_mins < end)
+        mins = all_mins[mask] - window_start
         if len(mins) < 3:
             continue
         rs_i = int(mins[-1])
@@ -1400,13 +1412,18 @@ def _scan_inv_head_shoulders(closes: np.ndarray, highs: np.ndarray, lows: np.nda
 
 def _scan_ascending_triangle(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_maxs = _local_maxs(highs, order=4)  # compute once on full series
+    all_mins = _local_mins(lows, order=4)
     out: list[tuple[float, float, int]] = []
     for end in range(60, n - 64, 5):
-        hi = highs[max(0, end - 100):end]
-        lo = lows[max(0, end - 100):end]
+        window_start = max(0, end - 100)
+        hi = highs[window_start:end]
+        lo = lows[window_start:end]
         wl = len(hi)
-        maxs = _local_maxs(hi, order=4)
-        mins = _local_mins(lo, order=4)
+        mask_max = (all_maxs >= window_start) & (all_maxs < end)
+        mask_min = (all_mins >= window_start) & (all_mins < end)
+        maxs = all_maxs[mask_max] - window_start
+        mins = all_mins[mask_min] - window_start
         if len(maxs) < 3 or len(mins) < 3:
             continue
         top = hi[maxs[-4:]] if len(maxs) >= 4 else hi[maxs]
@@ -1425,13 +1442,18 @@ def _scan_ascending_triangle(closes: np.ndarray, highs: np.ndarray, lows: np.nda
 
 def _scan_descending_triangle(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_maxs = _local_maxs(highs, order=4)  # compute once on full series
+    all_mins = _local_mins(lows, order=4)
     out: list[tuple[float, float, int]] = []
     for end in range(60, n - 64, 5):
-        hi = highs[max(0, end - 100):end]
-        lo = lows[max(0, end - 100):end]
+        window_start = max(0, end - 100)
+        hi = highs[window_start:end]
+        lo = lows[window_start:end]
         wl = len(hi)
-        maxs = _local_maxs(hi, order=4)
-        mins = _local_mins(lo, order=4)
+        mask_max = (all_maxs >= window_start) & (all_maxs < end)
+        mask_min = (all_mins >= window_start) & (all_mins < end)
+        maxs = all_maxs[mask_max] - window_start
+        mins = all_mins[mask_min] - window_start
         if len(maxs) < 3 or len(mins) < 3:
             continue
         top = hi[maxs[-4:]] if len(maxs) >= 4 else hi[maxs]
@@ -1450,13 +1472,18 @@ def _scan_descending_triangle(closes: np.ndarray, highs: np.ndarray, lows: np.nd
 
 def _scan_rectangle(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray) -> list[tuple[float, float, int]]:
     n = len(closes)
+    all_maxs = _local_maxs(highs, order=4)  # compute once on full series
+    all_mins = _local_mins(lows, order=4)
     out: list[tuple[float, float]] = []
     for end in range(60, n - 64, 5):
-        hi = highs[max(0, end - 100):end]
-        lo = lows[max(0, end - 100):end]
+        window_start = max(0, end - 100)
+        hi = highs[window_start:end]
+        lo = lows[window_start:end]
         wl = len(hi)
-        maxs = _local_maxs(hi, order=4)
-        mins = _local_mins(lo, order=4)
+        mask_max = (all_maxs >= window_start) & (all_maxs < end)
+        mask_min = (all_mins >= window_start) & (all_mins < end)
+        maxs = all_maxs[mask_max] - window_start
+        mins = all_mins[mask_min] - window_start
         if len(maxs) < 2 or len(mins) < 2:
             continue
         top = hi[maxs[-4:]] if len(maxs) >= 4 else hi[maxs]
@@ -1750,6 +1777,28 @@ def get_screener(pattern_name: str) -> PatternScreenerResponse:
     result = PatternScreenerResponse(pattern=pattern_name, items=results)
     _screener_cache[cache_key] = result
     return result
+
+
+def start_screener_prewarm() -> None:
+    """Launch a daemon thread to pre-compute all 9 screener tabs.
+
+    Called from main.py _background_prewarm. Since _all_data_cache is already
+    populated by the synchronous get_scanner() prewarm, this is pure NumPy —
+    no DuckDB contention. Each screener takes ~20s; all 9 run sequentially.
+    """
+    import threading, time
+
+    def _worker() -> None:
+        for pattern in ALL_PATTERNS:
+            try:
+                t0 = time.time()
+                get_screener(pattern)
+                log.info("screener prewarm: %s done in %.1fs", pattern, time.time() - t0)
+            except Exception as exc:
+                log.warning("screener prewarm: %s failed — %s", pattern, exc)
+
+    threading.Thread(target=_worker, daemon=True, name="screener-prewarm").start()
+    log.info("screener prewarm: launched background thread for %d patterns", len(ALL_PATTERNS))
 
 
 def get_confirmed_forming(timeframe: str = 'daily') -> ConfirmedFormingResponse:
