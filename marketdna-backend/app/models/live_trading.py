@@ -160,6 +160,91 @@ class StockChartResponse(BaseModel):
     ranks_tf: dict[str, TFRank]
 
 
+class IntradayBar(BaseModel):
+    time: str   # "HH:MM"
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int = 0
+
+
+class StockIntradayResponse(BaseModel):
+    symbol: str
+    source: str   # "live" | "1min_kite"
+    ltp: float | None = None
+    bars: list[IntradayBar]
+    vwap: float | None = None
+    prev_high: float | None = None
+    prev_low: float | None = None
+    prev_close: float | None = None
+    volume_ratio: float | None = None   # today_vol / avg_vol20
+    pct_52w_high: float | None = None  # (ltp - 52w_high) / 52w_high * 100 (negative = below)
+
+
+class OptionStrikeRow(BaseModel):
+    strike: float
+    is_atm: bool
+    ce_ltp: float
+    ce_iv: float | None = None
+    ce_oi: int
+    pe_ltp: float
+    pe_iv: float | None = None
+    pe_oi: int
+    pcr: float | None = None    # pe_oi / ce_oi for this strike
+    oi_total: int = 0           # ce_oi + pe_oi (used for gamma wall)
+
+
+class StockOptionsResponse(BaseModel):
+    symbol: str
+    is_fo: bool
+    spot: float | None = None
+    expiry: str | None = None
+    lot_size: int | None = None
+    atm_strike: float | None = None
+    straddle: float | None = None
+    upper_be: float | None = None
+    lower_be: float | None = None
+    strikes: list[OptionStrikeRow] = []
+    total_pcr: float | None = None    # sum(pe_oi) / sum(ce_oi) across all strikes
+    gamma_wall: float | None = None   # strike with max(ce_oi + pe_oi)
+    error: str | None = None
+
+
+class LiveBreadthResponse(BaseModel):
+    as_of: str
+    advances: int
+    declines: int
+    unchanged: int
+    adv_dec_ratio: float | None = None   # advances / declines
+    total: int
+
+
+class StrikeBar(BaseModel):
+    time: str
+    close: float
+
+
+class OIPoint(BaseModel):
+    time: str
+    oi: int
+
+
+class StrikeChartResponse(BaseModel):
+    symbol: str
+    strike: float
+    expiry: str
+    futures: list[StrikeBar] = []
+    ce: list[StrikeBar] = []
+    pe: list[StrikeBar] = []
+    futures_oi: list[OIPoint] = []
+    ce_oi: list[OIPoint] = []
+    pe_oi: list[OIPoint] = []
+    futures_oi_now: int = 0
+    ce_oi_now: int = 0
+    pe_oi_now: int = 0
+
+
 class SectorProgressionsResponse(BaseModel):
     trade_date: str                                       # last trading day used as data source
     source: str                                           # "live" | "15min_kite" | "none"
