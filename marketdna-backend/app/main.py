@@ -17,13 +17,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, trade_decision
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
 from app.services import indicators_service, indicator_edge_service
 from app.services import regime_service
 from app.services import delivery_service
+from app.services import live_trading_service
 
 app = FastAPI(
     title="MarketDNA API",
@@ -57,6 +58,7 @@ app.include_router(randomness.router)
 app.include_router(options.router)
 app.include_router(breakout.router)
 app.include_router(live_trading.router)
+app.include_router(trade_decision.router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -76,6 +78,7 @@ def _background_prewarm() -> None:
     """Non-critical heavy tasks run in background after server is ready."""
     import time
     for name, fn in [
+        ("kite ticker",      live_trading_service.start_ticker),   # WebSocket OI accumulator
         ("cointegration",    start_preload),              # ~3s, user-visible page
         ("health scan",      stock_health_service.start_scan_warmup),
         ("indicator edge",   indicator_edge_service.get_edge_summary),

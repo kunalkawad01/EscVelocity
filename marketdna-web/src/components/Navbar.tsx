@@ -31,7 +31,8 @@ const NAV_GROUPS = [
   {
     label: 'Signals',
     items: [
-      { to: '/live-trading',     label: 'Live',      desc: 'Sector scatter & breakthrough signals' },
+      { to: '/trade-decision',   label: 'Trade Intel', desc: '5-agent GO/NO-GO trade verdict'       },
+      { to: '/live-trading',     label: 'Live',        desc: 'Sector scatter & breakthrough signals' },
       { to: '/delivery',         label: 'Delivery',  desc: 'Accumulation & distribution signals'   },
       { to: '/short',            label: 'Short',     desc: 'Short candidates & squeeze watch'       },
       { to: '/breakout-scanner', label: 'Breakout',  desc: 'Live breakout scanner'                  },

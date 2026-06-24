@@ -19,7 +19,8 @@ import RandomnessPage from './pages/RandomnessPage'
 import OptionsPage from './pages/OptionsPage'
 import ExpectedMovePage from './pages/ExpectedMovePage'
 import BreakoutScannerPage from './pages/BreakoutScannerPage'
-import LiveTradingPage from './pages/LiveTradingPage'
+import LiveTradingPage    from './pages/LiveTradingPage'
+import TradeDecisionPage from './pages/TradeDecisionPage'
 
 export default function App() {
   return (
@@ -47,7 +48,8 @@ export default function App() {
           <Route path="/options"               element={<OptionsPage />} />
           <Route path="/expected-move"         element={<ExpectedMovePage />} />
           <Route path="/breakout-scanner"      element={<BreakoutScannerPage />} />
-          <Route path="/live-trading"          element={<LiveTradingPage />} />
+          <Route path="/live-trading"            element={<LiveTradingPage />} />
+          <Route path="/trade-decision"         element={<TradeDecisionPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
