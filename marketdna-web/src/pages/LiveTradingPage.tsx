@@ -1341,8 +1341,11 @@ function StockSessionDrawer({ symbol, onClose }: { symbol: string | null; onClos
               highcharts={Highcharts} options={intradayOpts}
             />
           ) : (
-            <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ height: 340, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
               <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>No intraday data yet</Typography>
+              <Typography sx={{ ...SANS, fontSize: '0.65rem', color: INK3, opacity: 0.6 }}>
+                {isMarketOpen() ? 'Accumulating 15-min bars…' : 'Kite offline — switch to 5D–1Y for historical view'}
+              </Typography>
             </Box>
           )
         ) : (
@@ -1693,7 +1696,7 @@ function StrikeChartPanel({
             {symbol} · ₹{strike.toLocaleString('en-IN')}
           </Typography>
           <Typography sx={{ ...MONO, fontSize: '0.58rem', color: INK3 }}>
-            {expiry} · 1-MIN · OI via WebSocket
+            {expiry} · 1-MIN · OI via Kite
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: INK3 }}>
