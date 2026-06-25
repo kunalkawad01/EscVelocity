@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, Grid, Typography } from '@mui/material'
+import { Box, Drawer, Grid, IconButton, Typography } from '@mui/material'
 import Highcharts from 'highcharts/highstock'
 import HighchartsReact from 'highcharts-react-official'
 import Navbar from '../components/Navbar'
@@ -290,17 +290,26 @@ function SectorScatterMap({
 
 // ── All-Sectors Return Progression (Layer 1, right panel) ────────────────────
 const SECTOR_COLORS: Record<string, string> = {
-  Banking:        '#3b82f6',
-  Finance:        '#6366f1',
-  IT:             '#22c55e',
-  Energy:         '#f97316',
-  Auto:           '#ef4444',
-  Pharma:         '#8b5cf6',
-  FMCG:           '#ec4899',
-  Metals:         '#64748b',
-  Infrastructure: '#f59e0b',
-  Telecom:        '#14b8a6',
-  Consumer:       '#84cc16',
+  'Financial Services':               '#3b82f6',
+  'Information Technology':           '#22c55e',
+  'Healthcare':                       '#8b5cf6',
+  'Capital Goods':                    '#f59e0b',
+  'Automobile and Auto Components':   '#ef4444',
+  'Fast Moving Consumer Goods':       '#ec4899',
+  'Oil Gas & Consumable Fuels':       '#f97316',
+  'Metals & Mining':                  '#64748b',
+  'Consumer Services':                '#84cc16',
+  'Consumer Durables':                '#06b6d4',
+  'Construction':                     '#a78bfa',
+  'Construction Materials':           '#d97706',
+  'Chemicals':                        '#10b981',
+  'Power':                            '#fbbf24',
+  'Realty':                           '#f43f5e',
+  'Telecommunication':                '#14b8a6',
+  'Services':                         '#60a5fa',
+  'Textiles':                         '#c084fc',
+  'Media Entertainment & Publication':'#fb7185',
+  'Diversified':                      '#94a3b8',
 }
 
 function AllSectorsProgressionChart({
@@ -331,6 +340,12 @@ function AllSectorsProgressionChart({
     return (progressions[longest] ?? []).map(p => p.time)
   }, [progressions, sectors])
 
+  const yMin = useMemo(() => {
+    let m = 0
+    sectors.forEach(s => progressions[s]?.forEach(p => { if (p.return_pct < m) m = p.return_pct }))
+    return Math.floor(Math.min(m - 0.5, -1))
+  }, [progressions, sectors])
+
   const options = useMemo((): Highcharts.Options => {
     const series: Highcharts.SeriesOptionsType[] = sectors.map(sector => {
       const color = SECTOR_COLORS[sector] ?? '#94a3b8'
@@ -355,7 +370,7 @@ function AllSectorsProgressionChart({
       chart: {
         backgroundColor: 'transparent',
         animation: false,
-        height: 310,
+        height: 420,
         style: { fontFamily: "'IBM Plex Sans', sans-serif" },
         events: {
           click: function (this: Highcharts.Chart, e: Highcharts.PointerEventObject) {
@@ -378,6 +393,7 @@ function AllSectorsProgressionChart({
       },
       yAxis: {
         title: { text: '' },
+        min: yMin,
         gridLineColor: BORDER,
         labels: { style: { color: INK3, fontSize: '0.58rem' }, format: '{value:.1f}%' },
         plotLines: [{
@@ -420,11 +436,11 @@ function AllSectorsProgressionChart({
       },
       series,
     }
-  }, [progressions, timeAxis, selectedSector, sectors, INK, INK3, BORDER, mode, onSectorClick])
+  }, [progressions, timeAxis, selectedSector, sectors, yMin, INK, INK3, BORDER, mode, onSectorClick])
 
   if (source === 'none' || sectors.length === 0) {
     return (
-      <Box sx={{ height: 310, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+      <Box sx={{ height: 420, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
         <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>Loading sector data…</Typography>
         <Typography sx={{ ...SANS, fontSize: '0.68rem', color: INK3, opacity: 0.6 }}>
           {isMarketOpen() ? 'Accumulating live ticks…' : 'Fetching 15-min Kite history…'}
@@ -456,7 +472,7 @@ function AllSectorsProgressionChart({
           Click line or legend to drill down
         </Typography>
       </Box>
-      <HighchartsReact highcharts={Highcharts} options={options} />
+      <HighchartsReact key={timeAxis.length} highcharts={Highcharts} options={options} />
     </Box>
   )
 }
@@ -493,6 +509,12 @@ function StocksProgressionChart({
     return (progressions[longest] ?? []).map(p => p.time)
   }, [progressions, symbols])
 
+  const yMin = useMemo(() => {
+    let m = 0
+    symbols.forEach(s => progressions[s]?.forEach(p => { if (p.return_pct < m) m = p.return_pct }))
+    return Math.floor(Math.min(m - 0.5, -1))
+  }, [progressions, symbols])
+
   const options = useMemo((): Highcharts.Options => {
     const series: Highcharts.SeriesOptionsType[] = symbols.map((sym, idx) => {
       const color = STOCK_LINE_COLORS[idx % STOCK_LINE_COLORS.length]
@@ -514,7 +536,7 @@ function StocksProgressionChart({
       chart: {
         backgroundColor: 'transparent',
         animation: false,
-        height: 260,
+        height: 360,
         style: { fontFamily: "'IBM Plex Sans', sans-serif" },
       },
       title: { text: '' },
@@ -531,6 +553,7 @@ function StocksProgressionChart({
       },
       yAxis: {
         title: { text: '' },
+        min: yMin,
         gridLineColor: BORDER,
         labels: { style: { color: INK3, fontSize: '0.58rem' }, format: '{value:.1f}%' },
         plotLines: [{
@@ -571,11 +594,11 @@ function StocksProgressionChart({
       },
       series,
     }
-  }, [progressions, timeAxis, selectedStock, symbols, INK, INK3, BORDER, mode, onStockClick])
+  }, [progressions, timeAxis, selectedStock, symbols, yMin, INK, INK3, BORDER, mode, onStockClick])
 
   if (!symbols.length) {
     return (
-      <Box sx={{ height: 260, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+      <Box sx={{ height: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
         <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>No stock data yet</Typography>
         <Typography sx={{ ...SANS, fontSize: '0.68rem', color: INK3, opacity: 0.6 }}>
           {isMarketOpen() ? 'Accumulating live ticks…' : 'Fetching 15-min Kite history…'}
@@ -606,7 +629,7 @@ function StocksProgressionChart({
           Click line to select stock
         </Typography>
       </Box>
-      <HighchartsReact highcharts={Highcharts} options={options} />
+      <HighchartsReact key={timeAxis.length} highcharts={Highcharts} options={options} />
     </Box>
   )
 }
@@ -627,7 +650,7 @@ function ConstituentScatter({
       type: 'scatter',
       backgroundColor: 'transparent',
       animation: false,
-      height: 220,
+      height: 360,
     },
     title: { text: '' },
     credits: { enabled: false },
@@ -846,6 +869,858 @@ function CorrelationChart({
   return <HighchartsReact highcharts={Highcharts} options={opts} />
 }
 
+// ── Stock Session Drawer (slides from left, 50vw) ────────────────────────────
+interface IntradayBar {
+  time: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+interface IntradayResp {
+  bars: IntradayBar[]
+  ltp: number | null
+  source: string
+  vwap: number | null
+  prev_high: number | null
+  prev_low: number | null
+  prev_close: number | null
+  volume_ratio: number | null
+  pct_52w_high: number | null
+}
+interface StrikeRowFull {
+  strike: number; is_atm: boolean
+  ce_ltp: number; ce_iv?: number; ce_oi: number
+  pe_ltp: number; pe_iv?: number; pe_oi: number
+  pcr?: number; oi_total: number
+}
+
+type TfTab = 'Daily' | '5D' | '20D' | '3M' | '6M' | '1Y'
+const TF_TABS: TfTab[] = ['Daily', '5D', '20D', '3M', '6M', '1Y']
+const TF_BARS: Record<TfTab, number> = { Daily: 0, '5D': 5, '20D': 20, '3M': 63, '6M': 126, '1Y': 252 }
+
+function BreadthStrip({ breadth, INK3 }: {
+  breadth: { advances: number; declines: number; unchanged: number; adv_dec_ratio: number | null; total: number } | null
+  INK3: string
+}) {
+  if (!breadth || breadth.total === 0) return null
+  const advPct = (breadth.advances / breadth.total) * 100
+  const decPct = (breadth.declines / breadth.total) * 100
+  const mood   = advPct > 60 ? { label: 'BULLISH BREADTH', color: '#22c55e' }
+               : decPct > 60 ? { label: 'BEARISH BREADTH', color: '#ef4444' }
+               : { label: 'MIXED BREADTH', color: '#f59e0b' }
+  return (
+    <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, bgcolor: `${mood.color}08`, border: `1px solid ${mood.color}25` }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
+        <Typography sx={{ ...MONO, fontSize: '0.58rem', color: mood.color, fontWeight: 700 }}>{mood.label}</Typography>
+        <Typography sx={{ ...MONO, fontSize: '0.55rem', color: INK3 }}>
+          A/D {breadth.adv_dec_ratio != null ? breadth.adv_dec_ratio.toFixed(2) : '–'} · {breadth.total} stocks
+        </Typography>
+      </Box>
+      <Box sx={{ height: 6, borderRadius: 3, bgcolor: `${mood.color}18`, overflow: 'hidden', display: 'flex' }}>
+        <Box sx={{ width: `${advPct}%`, bgcolor: '#22c55e', transition: 'width 0.5s' }} />
+        <Box sx={{ width: `${Math.min(100 - advPct - decPct, 100)}%`, bgcolor: '#f59e0b50' }} />
+        <Box sx={{ width: `${decPct}%`, bgcolor: '#ef444470' }} />
+      </Box>
+      <Box sx={{ display: 'flex', gap: 2, mt: 0.75 }}>
+        <Typography sx={{ ...MONO, fontSize: '0.58rem', color: '#22c55e' }}>▲ {breadth.advances}</Typography>
+        <Typography sx={{ ...MONO, fontSize: '0.58rem', color: '#94a3b8' }}>— {breadth.unchanged}</Typography>
+        <Typography sx={{ ...MONO, fontSize: '0.58rem', color: '#ef4444' }}>▼ {breadth.declines}</Typography>
+      </Box>
+    </Box>
+  )
+}
+
+function Chip({ label, color, value }: { label: string; color: string; value: string }) {
+  return (
+    <Box sx={{ px: 1, py: 0.3, borderRadius: 1, bgcolor: `${color}14`, border: `1px solid ${color}30`,
+      display: 'inline-flex', flexDirection: 'column', alignItems: 'center', minWidth: 56 }}>
+      <Typography sx={{ ...MONO, fontSize: '0.5rem', color, opacity: 0.7, lineHeight: 1.2 }}>{label}</Typography>
+      <Typography sx={{ ...MONO, fontSize: '0.7rem', fontWeight: 700, color, lineHeight: 1.4 }}>{value}</Typography>
+    </Box>
+  )
+}
+
+function StockSessionDrawer({ symbol, onClose }: { symbol: string | null; onClose: () => void }) {
+  const { INK, INK3, BORDER, PAPER, CYAN } = usePalette()
+  const { CARD } = useTokens()
+  const { mode } = useThemeMode()
+
+  // Chart tab
+  const [tfTab, setTfTab] = useState<TfTab>('Daily')
+
+  // Intraday data (Daily tab)
+  const [intraday, setIntraday]   = useState<IntradayResp | null>(null)
+  const [intLoading, setIntLoading] = useState(false)
+
+  // Historical chart data (5D–1Y tabs)
+  const [chartBars, setChartBars] = useState<StockChartResponse['bars'] | null>(null)
+
+  // Options chain state
+  const [optData, setOptData]         = useState<Record<string, unknown> | null>(null)
+  const [optLoading, setOptLoading]   = useState(false)
+  const [strikePanel, setStrikePanel] = useState<number | null>(null)
+  const prevOptDataRef                = useRef<Record<string, unknown> | null>(null)
+
+  // Breadth
+  const [breadth, setBreadth] = useState<{ advances: number; declines: number; unchanged: number; adv_dec_ratio: number | null; total: number } | null>(null)
+
+  // Chart type toggle (Daily tab only)
+  const [chartType, setChartType] = useState<'candlestick' | 'line'>('candlestick')
+
+  // Reset on symbol change
+  useEffect(() => {
+    setIntraday(null)
+    setChartBars(null)
+    setOptData(null)
+    setTfTab('Daily')
+    prevOptDataRef.current = null
+  }, [symbol])
+
+  // Intraday fetch (Daily tab) — poll every 5s
+  useEffect(() => {
+    if (!symbol) return
+    let cancelled = false
+    const load = async () => {
+      setIntLoading(true)
+      try {
+        const res = await fetch(`/api/live/stock/${symbol}/intraday`)
+        if (!res.ok) return
+        const d = await res.json()
+        if (!cancelled) setIntraday(d)
+      } catch { /* silent */ } finally { if (!cancelled) setIntLoading(false) }
+    }
+    load()
+    const id = setInterval(load, 5000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [symbol])
+
+  // Historical chart fetch — once per symbol (used by 5D–1Y tabs)
+  useEffect(() => {
+    if (!symbol) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/live/stock/${symbol}/chart`)
+        if (!res.ok || cancelled) return
+        const d = await res.json()
+        if (!cancelled) setChartBars(d.bars ?? [])
+      } catch { /* silent */ }
+    })()
+    return () => { cancelled = true }
+  }, [symbol])
+
+  // Options chain fetch — poll every 10s
+  useEffect(() => {
+    if (!symbol) { setOptData(null); return }
+    let cancelled = false
+    const load = async () => {
+      setOptLoading(true)
+      try {
+        const res = await fetch(`/api/live/stock/${symbol}/options`)
+        if (!res.ok) return
+        const d = await res.json()
+        if (!cancelled) {
+          setOptData(prev => { prevOptDataRef.current = prev; return d })
+        }
+      } catch { /* silent */ } finally { if (!cancelled) setOptLoading(false) }
+    }
+    load()
+    const id = setInterval(load, 10000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [symbol]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Breadth fetch — poll every 30s
+  useEffect(() => {
+    if (!symbol) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/live/breadth')
+        if (!res.ok || cancelled) return
+        const d = await res.json()
+        if (!cancelled) setBreadth(d)
+      } catch { /* silent */ }
+    }
+    load()
+    const id = setInterval(load, 30000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [symbol])
+
+  // ── Derived values ──────────────────────────────────────────────────────────
+  const bars     = intraday?.bars ?? []
+  const ltp      = intraday?.ltp ?? null
+  const source   = intraday?.source ?? '1min_kite'
+  const vwap     = intraday?.vwap ?? null
+  const prevHigh = intraday?.prev_high ?? null
+  const prevLow  = intraday?.prev_low ?? null
+  const prevClose = intraday?.prev_close ?? null
+  const volRatio = intraday?.volume_ratio ?? null
+  const pct52w   = intraday?.pct_52w_high ?? null
+
+  const open1  = bars.length ? bars[0].open : null
+  const color  = ltp != null && open1 != null ? (ltp >= open1 ? '#22c55e' : '#ef4444') : '#94a3b8'
+  const retPct = ltp != null && open1 != null && open1 > 0 ? (ltp - open1) / open1 * 100 : null
+  const isLive = source === 'live'
+
+  // ── Intraday (Daily) chart options ─────────────────────────────────────────
+  const intradayOpts = useMemo((): Highcharts.Options => {
+    const plotLines: Highcharts.YAxisPlotLinesOptions[] = []
+    if (open1 != null) plotLines.push({
+      value: open1, color: mode === 'dark' ? '#ffffff30' : '#00000025', width: 1,
+      dashStyle: 'Dash', zIndex: 3,
+      label: { text: 'Open', style: { color: INK3, fontSize: '0.55rem' }, align: 'right', x: -4 },
+    })
+    if (vwap != null) plotLines.push({
+      value: vwap, color: CYAN, width: 1.5, dashStyle: 'ShortDash', zIndex: 4,
+      label: { text: 'VWAP', style: { color: CYAN, fontSize: '0.55rem', fontWeight: 'bold' }, align: 'right', x: -4 },
+    })
+    if (prevHigh != null) plotLines.push({
+      value: prevHigh, color: '#22c55e', width: 1, dashStyle: 'Dash', zIndex: 3,
+      label: { text: 'pH', style: { color: '#22c55e', fontSize: '0.5rem' }, align: 'right', x: -4 },
+    })
+    if (prevLow != null) plotLines.push({
+      value: prevLow, color: '#ef4444', width: 1, dashStyle: 'Dash', zIndex: 3,
+      label: { text: 'pL', style: { color: '#ef4444', fontSize: '0.5rem' }, align: 'right', x: -4 },
+    })
+    if (prevClose != null) plotLines.push({
+      value: prevClose, color: mode === 'dark' ? '#ffffff50' : '#00000040', width: 1.5, dashStyle: 'ShortDot', zIndex: 3,
+      label: { text: 'pC', style: { color: INK3, fontSize: '0.5rem' }, align: 'right', x: -4 },
+    })
+
+    const base: Highcharts.Options = {
+      chart: { backgroundColor: 'transparent', animation: false, height: 340, style: { fontFamily: "'IBM Plex Sans', sans-serif" } },
+      title: { text: '' }, credits: { enabled: false }, legend: { enabled: false },
+      xAxis: {
+        categories: bars.map(b => b.time),
+        labels: { style: { color: INK3, fontSize: '0.55rem', fontFamily: "'IBM Plex Mono', monospace" }, step: Math.max(1, Math.floor(bars.length / 8)) },
+        gridLineColor: BORDER, lineColor: BORDER, tickColor: BORDER,
+      },
+      yAxis: {
+        title: { text: '' }, gridLineColor: BORDER, plotLines,
+        labels: {
+          style: { color: INK3, fontSize: '0.6rem' },
+          formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
+            return `₹${(this.value as number).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+          },
+        },
+      },
+      plotOptions: { series: { animation: false } },
+      tooltip: {
+        backgroundColor: mode === 'dark' ? '#0B1020' : '#FAFAF7',
+        borderColor: BORDER,
+        style: { color: INK, fontSize: '0.72rem', fontFamily: "'IBM Plex Sans', sans-serif" },
+      },
+    }
+
+    if (chartType === 'candlestick') {
+      return {
+        ...base,
+        tooltip: {
+          ...base.tooltip,
+          formatter: function (this: Highcharts.TooltipFormatterContextObject) {
+            const pt = this.point as Highcharts.Point & { open?: number; high?: number; low?: number; close?: number }
+            const c = pt.close ?? (this.y as number); const o = pt.open ?? c
+            const col = c >= o ? '#22c55e' : '#ef4444'
+            return `<span style="font-size:0.6rem;color:#94a3b8">${this.x}</span><br/>
+              O <b>₹${(pt.open ?? 0).toFixed(2)}</b>  H <b>₹${(pt.high ?? 0).toFixed(2)}</b><br/>
+              L <b>₹${(pt.low ?? 0).toFixed(2)}</b>  C <b style="color:${col}">₹${(pt.close ?? 0).toFixed(2)}</b>`
+          },
+        },
+        plotOptions: { ...base.plotOptions, candlestick: { upColor: '#22c55e', upLineColor: '#22c55e', color: '#ef4444', lineColor: '#ef4444', lineWidth: 1 } },
+        series: [{ type: 'candlestick', data: bars.map(b => [b.open, b.high, b.low, b.close]) }],
+      }
+    }
+    return {
+      ...base,
+      tooltip: {
+        ...base.tooltip,
+        formatter: function (this: Highcharts.TooltipFormatterContextObject) {
+          const col = (this.y as number) >= (open1 ?? 0) ? '#22c55e' : '#ef4444'
+          return `<span style="font-size:0.6rem;color:#94a3b8">${this.x}</span><br/><b style="color:${col}">₹${(this.y as number).toFixed(2)}</b>`
+        },
+      },
+      series: [{ type: 'area', data: bars.map(b => b.close), color, lineWidth: 2, fillColor: `${color}18`,
+        marker: { enabled: false }, threshold: open1 ?? undefined, negativeColor: '#ef4444', negativeFillColor: '#ef444418' }],
+    }
+  }, [bars, chartType, open1, color, vwap, prevHigh, prevLow, prevClose, CYAN, INK, INK3, BORDER, mode])
+
+  // ── Multi-day chart options (5D–1Y tabs) ────────────────────────────────────
+  const multiDayOpts = useMemo((): Highcharts.Options | null => {
+    if (!chartBars || tfTab === 'Daily') return null
+    const n = TF_BARS[tfTab]
+    const sliced = chartBars.slice(-n)
+    if (!sliced.length) return null
+    return {
+      chart: { backgroundColor: 'transparent', animation: false, height: 340, style: { fontFamily: "'IBM Plex Sans', sans-serif" } },
+      title: { text: '' }, credits: { enabled: false },
+      xAxis: {
+        categories: sliced.map(b => b.t),
+        labels: { style: { color: INK3, fontSize: '0.55rem', fontFamily: "'IBM Plex Mono', monospace" }, step: Math.max(1, Math.floor(sliced.length / 8)) },
+        gridLineColor: BORDER, lineColor: BORDER, tickColor: BORDER,
+      },
+      yAxis: [
+        {
+          title: { text: '' }, gridLineColor: BORDER,
+          labels: { style: { color: INK3, fontSize: '0.6rem' },
+            formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
+              return `₹${(this.value as number).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+            },
+          },
+        },
+      ],
+      legend: { enabled: true, itemStyle: { color: INK3, fontSize: '0.6rem' } },
+      plotOptions: { series: { animation: false } },
+      tooltip: {
+        backgroundColor: mode === 'dark' ? '#0B1020' : '#FAFAF7',
+        borderColor: BORDER,
+        style: { color: INK, fontSize: '0.72rem', fontFamily: "'IBM Plex Sans', sans-serif" },
+        formatter: function (this: Highcharts.TooltipFormatterContextObject) {
+          const pt = this.point as Highcharts.Point & { open?: number; high?: number; low?: number; close?: number }
+          if (pt.open != null) {
+            const c = pt.close ?? 0; const col = c >= (pt.open ?? 0) ? '#22c55e' : '#ef4444'
+            return `<span style="font-size:0.6rem;color:#94a3b8">${this.x}</span><br/>O ₹${(pt.open ?? 0).toFixed(2)}  H ₹${(pt.high ?? 0).toFixed(2)}<br/>L ₹${(pt.low ?? 0).toFixed(2)}  C <b style="color:${col}">₹${c.toFixed(2)}</b>`
+          }
+          return `<span style="font-size:0.6rem;color:#94a3b8">${this.x}</span><br/><b>₹${(this.y as number).toFixed(2)}</b>`
+        },
+      },
+      series: ([
+        {
+          type: 'candlestick',
+          name: 'Price',
+          data: sliced.map(b => [b.o, b.h, b.l, b.c]),
+          upColor: '#22c55e', upLineColor: '#22c55e', color: '#ef4444', lineColor: '#ef4444', lineWidth: 1,
+        },
+        ...(n >= 20 ? [{
+          type: 'line', name: 'SMA20',
+          data: sliced.map(b => b.sma20 ?? undefined), color: '#60a5fa', lineWidth: 1, marker: { enabled: false },
+          enableMouseTracking: false,
+        }] : []),
+        ...(n >= 50 ? [{
+          type: 'line', name: 'SMA50',
+          data: sliced.map(b => b.sma50 ?? undefined), color: '#f59e0b', lineWidth: 1, marker: { enabled: false },
+          enableMouseTracking: false,
+        }] : []),
+        ...(n >= 200 ? [{
+          type: 'line', name: 'SMA200',
+          data: sliced.map(b => b.sma200 ?? undefined), color: '#a78bfa', lineWidth: 1.5, marker: { enabled: false },
+          enableMouseTracking: false,
+        }] : []),
+      ] as Highcharts.SeriesOptionsType[]),
+    }
+  }, [chartBars, tfTab, INK, INK3, BORDER, mode])
+
+  // ── OI delta (compare current vs prev options poll) ──────────────────────
+  const oiDeltaMap = useMemo((): Record<number, { ceDelta: number; peDelta: number }> => {
+    if (!optData || !prevOptDataRef.current) return {}
+    const curr = (optData.strikes ?? []) as StrikeRowFull[]
+    const prev = (prevOptDataRef.current.strikes ?? []) as StrikeRowFull[]
+    const prevMap: Record<number, StrikeRowFull> = {}
+    for (const r of prev) prevMap[r.strike] = r
+    const out: Record<number, { ceDelta: number; peDelta: number }> = {}
+    for (const r of curr) {
+      const p = prevMap[r.strike]
+      if (p) out[r.strike] = { ceDelta: r.ce_oi - p.ce_oi, peDelta: r.pe_oi - p.pe_oi }
+    }
+    return out
+  }, [optData])
+
+  return (
+    <Drawer
+      anchor="left"
+      open={!!symbol}
+      onClose={onClose}
+      PaperProps={{
+        sx: { width: '50vw', bgcolor: PAPER, borderRight: `1px solid ${BORDER}`, p: 3, overflow: 'auto' },
+      }}
+    >
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+        <Box>
+          <Typography sx={{ ...MONO, fontSize: '1.3rem', fontWeight: 800, color: INK, letterSpacing: '-0.02em' }}>
+            {symbol}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5, flexWrap: 'wrap' }}>
+            {ltp != null && (
+              <Typography sx={{ ...MONO, fontSize: '1rem', fontWeight: 700, color }}>
+                ₹{ltp.toFixed(2)}
+              </Typography>
+            )}
+            {retPct != null && (
+              <Typography sx={{ ...MONO, fontSize: '0.85rem', fontWeight: 700, color }}>
+                {retPct >= 0 ? '+' : ''}{retPct.toFixed(2)}%
+              </Typography>
+            )}
+            {/* Volume ratio chip */}
+            {volRatio != null && (
+              <Chip label="VOL RATIO" color={volRatio >= 2 ? '#f59e0b' : volRatio >= 1 ? '#22c55e' : '#94a3b8'} value={`${volRatio.toFixed(1)}×`} />
+            )}
+            {/* 52W high proximity chip */}
+            {pct52w != null && (
+              <Chip
+                label="vs 52W H"
+                color={pct52w >= -2 ? '#22c55e' : pct52w >= -10 ? '#f59e0b' : '#94a3b8'}
+                value={`${pct52w >= 0 ? '+' : ''}${pct52w.toFixed(1)}%`}
+              />
+            )}
+            {/* Live/kite badge */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+              {isLive ? (
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e',
+                  animation: 'pulse 1.6s ease-in-out infinite',
+                  '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.25 } } }} />
+              ) : (
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#f59e0b' }} />
+              )}
+              <Typography sx={{ ...MONO, fontSize: '0.58rem', color: isLive ? '#22c55e' : '#f59e0b' }}>
+                {isLive ? 'LIVE · 1-MIN' : '1-MIN KITE'}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+        <IconButton onClick={onClose} size="small" sx={{ color: INK3 }}>
+          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>✕</span>
+        </IconButton>
+      </Box>
+
+      {/* ── A/D Breadth strip ──────────────────────────────────────────────── */}
+      <BreadthStrip breadth={breadth} INK3={INK3} />
+
+      {/* ── Chart Card ─────────────────────────────────────────────────────── */}
+      <Box sx={{ ...CARD, p: 2, mb: 2 }}>
+        {/* Tab bar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
+          {TF_TABS.map(tab => (
+            <Box key={tab} onClick={() => setTfTab(tab)} sx={{
+              px: 1.2, py: 0.4, borderRadius: 1, cursor: 'pointer',
+              fontSize: '0.62rem', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700,
+              bgcolor: tfTab === tab ? `${CYAN}20` : 'transparent',
+              color: tfTab === tab ? CYAN : INK3,
+              border: `1px solid ${tfTab === tab ? CYAN : BORDER}`,
+              transition: 'all 0.15s', userSelect: 'none',
+            }}>{tab}</Box>
+          ))}
+          {/* Chart type toggle — only for Daily */}
+          {tfTab === 'Daily' && (
+            <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
+              {(['candlestick', 'line'] as const).map(t => (
+                <Box key={t} onClick={() => setChartType(t)} sx={{
+                  px: 1, py: 0.3, borderRadius: 1, cursor: 'pointer',
+                  fontSize: '0.6rem', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700,
+                  bgcolor: chartType === t ? `${CYAN}20` : 'transparent',
+                  color: chartType === t ? CYAN : INK3,
+                  border: `1px solid ${chartType === t ? CYAN : BORDER}`,
+                  transition: 'all 0.15s', userSelect: 'none',
+                }}>{t === 'candlestick' ? '🕯' : '📈'}</Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+
+        {/* VWAP / prev levels legend (Daily tab) */}
+        {tfTab === 'Daily' && (vwap != null || prevHigh != null) && (
+          <Box sx={{ display: 'flex', gap: 1.5, mb: 1, flexWrap: 'wrap' }}>
+            {vwap != null && <Typography sx={{ ...MONO, fontSize: '0.55rem', color: CYAN }}>VWAP ₹{vwap.toFixed(2)}</Typography>}
+            {prevHigh != null && <Typography sx={{ ...MONO, fontSize: '0.55rem', color: '#22c55e' }}>pH ₹{prevHigh.toFixed(2)}</Typography>}
+            {prevLow  != null && <Typography sx={{ ...MONO, fontSize: '0.55rem', color: '#ef4444' }}>pL ₹{prevLow.toFixed(2)}</Typography>}
+            {prevClose != null && <Typography sx={{ ...MONO, fontSize: '0.55rem', color: INK3 }}>pC ₹{prevClose.toFixed(2)}</Typography>}
+            <Typography sx={{ ...MONO, fontSize: '0.55rem', color: INK3, ml: 'auto' }}>{bars.length} bars</Typography>
+          </Box>
+        )}
+
+        {/* Chart */}
+        {tfTab === 'Daily' ? (
+          intLoading && !bars.length ? (
+            <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>Loading…</Typography>
+            </Box>
+          ) : bars.length ? (
+            <HighchartsReact
+              key={`d-${chartType}-${bars.length}-${bars[bars.length - 1]?.close ?? 0}-${vwap ?? 0}`}
+              highcharts={Highcharts} options={intradayOpts}
+            />
+          ) : (
+            <Box sx={{ height: 340, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+              <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>No intraday data yet</Typography>
+              <Typography sx={{ ...SANS, fontSize: '0.65rem', color: INK3, opacity: 0.6 }}>
+                {isMarketOpen() ? 'Accumulating 15-min bars…' : 'Kite offline — switch to 5D–1Y for historical view'}
+              </Typography>
+            </Box>
+          )
+        ) : (
+          !chartBars ? (
+            <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>Loading…</Typography>
+            </Box>
+          ) : multiDayOpts ? (
+            <HighchartsReact key={`md-${tfTab}`} highcharts={Highcharts} options={multiDayOpts} />
+          ) : (
+            <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography sx={{ ...SANS, fontSize: '0.78rem', color: INK3 }}>No data</Typography>
+            </Box>
+          )
+        )}
+      </Box>
+
+      {/* ── Options Chain ───────────────────────────────────────────────────── */}
+      {optData && (optData.is_fo as boolean) && (() => {
+        const strikes    = (optData.strikes as StrikeRowFull[]) ?? []
+        const straddle   = optData.straddle as number
+        const upperBe    = optData.upper_be as number
+        const lowerBe    = optData.lower_be as number
+        const lotSize    = optData.lot_size as number
+        const expiry     = optData.expiry as string
+        const spot       = optData.spot as number
+        const atm        = optData.atm_strike as number
+        const totalPcr   = optData.total_pcr as number | null
+        const gammaWall  = optData.gamma_wall as number | null
+
+        const pcrColor = totalPcr != null
+          ? (totalPcr > 1.2 ? '#22c55e' : totalPcr < 0.8 ? '#ef4444' : '#f59e0b')
+          : '#94a3b8'
+
+        return (
+          <Box sx={{ ...CARD, p: 2 }}>
+            {/* Header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+              <Box sx={{ width: 3, height: 18, borderRadius: 2, bgcolor: '#f59e0b' }} />
+              <Typography sx={{ ...SANS, fontSize: '0.78rem', fontWeight: 800, color: INK }}>Option Chain</Typography>
+              <Typography sx={{ ...MONO, fontSize: '0.58rem', color: INK3 }}>Expiry {expiry} · Lot {lotSize}</Typography>
+              {totalPcr != null && (
+                <Box sx={{ ml: 'auto', px: 1, py: 0.3, borderRadius: 1, bgcolor: `${pcrColor}14`, border: `1px solid ${pcrColor}30` }}>
+                  <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 700, color: pcrColor }}>
+                    PCR {totalPcr.toFixed(2)}
+                  </Typography>
+                </Box>
+              )}
+              {gammaWall != null && (
+                <Box sx={{ px: 1, py: 0.3, borderRadius: 1, bgcolor: '#a78bfa14', border: '1px solid #a78bfa30' }}>
+                  <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 700, color: '#a78bfa' }}>
+                    γ-Wall {gammaWall.toLocaleString('en-IN')}
+                  </Typography>
+                </Box>
+              )}
+              {optLoading && (
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#f59e0b',
+                  animation: 'pulse 1.2s ease-in-out infinite',
+                  '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.2 } } }} />
+              )}
+            </Box>
+
+            {/* Straddle metrics */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mb: 2 }}>
+              {[
+                { label: 'ATM STRIKE', val: `₹${atm.toLocaleString('en-IN')}`, color: '#f59e0b' },
+                { label: 'STRADDLE',   val: `₹${straddle?.toFixed(2) ?? '–'}`,  color: CYAN },
+                { label: 'UPPER B/E',  val: `₹${upperBe?.toFixed(0) ?? '–'}`,   color: '#22c55e' },
+                { label: 'LOWER B/E',  val: `₹${lowerBe?.toFixed(0) ?? '–'}`,   color: '#ef4444' },
+              ].map(m => (
+                <Box key={m.label} sx={{ bgcolor: `${m.color}10`, border: `1px solid ${m.color}30`, borderRadius: 1.5, p: 1, textAlign: 'center' }}>
+                  <Typography sx={{ ...MONO, fontSize: '0.52rem', color: INK3, mb: 0.25 }}>{m.label}</Typography>
+                  <Typography sx={{ ...MONO, fontSize: '0.78rem', fontWeight: 700, color: m.color }}>{m.val}</Typography>
+                </Box>
+              ))}
+            </Box>
+
+            {/* Chain table */}
+            <Box sx={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem', fontFamily: "'IBM Plex Mono', monospace" }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    {['CE LTP', 'CE IV', 'CE OI', 'STRIKE', 'PCR', 'PE OI', 'PE IV', 'PE LTP'].map(h => (
+                      <th key={h} style={{ padding: '4px 5px', color: INK3, fontWeight: 700, fontSize: '0.56rem',
+                        textAlign: h === 'STRIKE' || h === 'PCR' ? 'center' : h.startsWith('CE') ? 'right' : 'left' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {strikes.map((row: StrikeRowFull) => {
+                    const isAtm     = row.is_atm
+                    const isGammaW  = gammaWall != null && row.strike === gammaWall
+                    const delta     = oiDeltaMap[row.strike]
+                    const rowBg     = isGammaW ? '#a78bfa14' : isAtm ? `${CYAN}12` : 'transparent'
+                    return (
+                      <tr key={row.strike} onClick={() => setStrikePanel(row.strike)}
+                        style={{ background: strikePanel === row.strike ? `${CYAN}18` : rowBg,
+                          borderBottom: `1px solid ${BORDER}40`, cursor: 'pointer',
+                          borderLeft: isGammaW ? '2px solid #a78bfa' : undefined }}>
+                        <td style={{ padding: '4px 5px', textAlign: 'right', color: '#22c55e', fontWeight: row.ce_ltp > 0 ? 700 : 400 }}>
+                          ₹{row.ce_ltp.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'right', color: INK3 }}>
+                          {row.ce_iv != null ? `${row.ce_iv.toFixed(1)}%` : '–'}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'right', color: INK3 }}>
+                          <span>{row.ce_oi > 0 ? (row.ce_oi / 1000).toFixed(0) + 'K' : '–'}</span>
+                          {delta && delta.ceDelta !== 0 && (
+                            <span style={{ fontSize: '0.5rem', color: delta.ceDelta > 0 ? '#22c55e' : '#ef4444', marginLeft: 3 }}>
+                              {delta.ceDelta > 0 ? '▲' : '▼'}{Math.abs(delta.ceDelta / 1000).toFixed(0)}K
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'center', fontWeight: 800,
+                          color: isAtm ? CYAN : isGammaW ? '#a78bfa' : spot > row.strike ? '#22c55e' : '#ef4444',
+                          background: isAtm ? `${CYAN}20` : 'transparent' }}>
+                          {row.strike.toLocaleString('en-IN')}
+                          {isAtm    && <span style={{ marginLeft: 4, fontSize: '0.48rem', color: CYAN }}>ATM</span>}
+                          {isGammaW && <span style={{ marginLeft: 4, fontSize: '0.48rem', color: '#a78bfa' }}>γ</span>}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'center',
+                          color: row.pcr != null ? (row.pcr > 1.2 ? '#22c55e' : row.pcr < 0.8 ? '#ef4444' : INK3) : INK3 }}>
+                          {row.pcr != null ? row.pcr.toFixed(2) : '–'}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'left', color: INK3 }}>
+                          <span>{row.pe_oi > 0 ? (row.pe_oi / 1000).toFixed(0) + 'K' : '–'}</span>
+                          {delta && delta.peDelta !== 0 && (
+                            <span style={{ fontSize: '0.5rem', color: delta.peDelta > 0 ? '#22c55e' : '#ef4444', marginLeft: 3 }}>
+                              {delta.peDelta > 0 ? '▲' : '▼'}{Math.abs(delta.peDelta / 1000).toFixed(0)}K
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'left', color: INK3 }}>
+                          {row.pe_iv != null ? `${row.pe_iv.toFixed(1)}%` : '–'}
+                        </td>
+                        <td style={{ padding: '4px 5px', textAlign: 'left', color: '#ef4444', fontWeight: row.pe_ltp > 0 ? 700 : 400 }}>
+                          ₹{row.pe_ltp.toFixed(2)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </Box>
+          </Box>
+        )
+      })()}
+
+      {/* ── Strike chart panel — slides from right, 30vw ──────────────────── */}
+      {strikePanel != null && typeof optData?.expiry === 'string' && (
+        <StrikeChartPanel
+          symbol={symbol!}
+          strike={strikePanel}
+          expiry={optData.expiry as string}
+          onClose={() => setStrikePanel(null)}
+        />
+      )}
+    </Drawer>
+  )
+}
+
+// ── Strike chart panel (right-side, 30vw) ─────────────────────────────────────
+interface StrikeBar { time: string; close: number }
+interface OIPoint   { time: string; oi: number }
+interface StrikeChartData {
+  futures: StrikeBar[]; ce: StrikeBar[]; pe: StrikeBar[]
+  futures_oi: OIPoint[]; ce_oi: OIPoint[]; pe_oi: OIPoint[]
+  futures_oi_now: number; ce_oi_now: number; pe_oi_now: number
+}
+
+function fmtOI(v: number): string {
+  if (v >= 1e7) return `${(v / 1e7).toFixed(2)}Cr`
+  if (v >= 1e5) return `${(v / 1e5).toFixed(1)}L`
+  if (v >= 1000) return `${(v / 1000).toFixed(0)}K`
+  return `${v}`
+}
+
+function PriceOIChart({
+  title, bars, oiSeries, oiNow, priceColor, accent,
+}: {
+  title: string
+  bars: StrikeBar[]
+  oiSeries: OIPoint[]
+  oiNow: number
+  priceColor: string
+  accent: string
+}) {
+  const { INK, INK3, BORDER } = usePalette()
+  const { mode } = useThemeMode()
+
+  // Align OI series to price bar times (null for minutes with no OI tick yet)
+  const oiAligned = useMemo(() => {
+    if (!oiSeries.length) return null
+    const oiMap = new Map(oiSeries.map(p => [p.time, p.oi]))
+    return bars.map(b => oiMap.get(b.time) ?? null)
+  }, [bars, oiSeries])
+
+  const hasOI = oiAligned !== null && oiAligned.some(v => v !== null)
+
+  const opts = useMemo((): Highcharts.Options => {
+    const yAxes: Highcharts.YAxisOptions[] = [
+      {
+        title: { text: '' },
+        labels: {
+          style: { color: priceColor, fontSize: '0.55rem' },
+          formatter: function(this: Highcharts.AxisLabelsFormatterContextObject) {
+            return `₹${(this.value as number).toFixed(0)}`
+          },
+        },
+        gridLineColor: BORDER,
+      },
+    ]
+    if (hasOI) {
+      yAxes.push({
+        title: { text: '' }, opposite: true,
+        labels: {
+          style: { color: `${accent}cc`, fontSize: '0.5rem' },
+          formatter: function(this: Highcharts.AxisLabelsFormatterContextObject) {
+            return fmtOI(this.value as number)
+          },
+        },
+        gridLineWidth: 0,
+      })
+    }
+
+    const series: Highcharts.SeriesOptionsType[] = [
+      {
+        type: 'area', yAxis: 0, name: 'Price',
+        data: bars.map(b => b.close),
+        color: priceColor, lineWidth: 1.5,
+        fillColor: `${priceColor}18`,
+        marker: { enabled: false },
+        threshold: bars.length ? bars[0].close : undefined,
+        negativeColor: accent,
+        negativeFillColor: `${accent}12`,
+      } as Highcharts.SeriesAreaOptions,
+    ]
+    if (hasOI && oiAligned) {
+      series.push({
+        type: 'column', yAxis: 1, name: 'OI',
+        data: oiAligned,
+        color: `${accent}55`,
+        borderColor: `${accent}80`,
+        borderWidth: 0,
+        groupPadding: 0, pointPadding: 0,
+      } as Highcharts.SeriesColumnOptions)
+    }
+
+    return {
+      chart: { backgroundColor: 'transparent', animation: false, height: 200,
+        style: { fontFamily: "'IBM Plex Sans', sans-serif" } },
+      title: { text: '' },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        categories: bars.map(b => b.time),
+        labels: { style: { color: INK3, fontSize: '0.5rem', fontFamily: "'IBM Plex Mono', monospace" },
+          step: Math.max(1, Math.floor(bars.length / 6)) },
+        gridLineColor: BORDER, lineColor: BORDER, tickColor: BORDER,
+      },
+      yAxis: yAxes,
+      tooltip: {
+        shared: true,
+        backgroundColor: mode === 'dark' ? '#0B1020' : '#FAFAF7',
+        borderColor: BORDER,
+        style: { color: INK, fontSize: '0.65rem', fontFamily: "'IBM Plex Sans', sans-serif" },
+      },
+      plotOptions: { series: { animation: false } },
+      series,
+    }
+  }, [bars, oiAligned, hasOI, priceColor, accent, INK, INK3, BORDER, mode])
+
+  const latestOI = hasOI ? oiSeries[oiSeries.length - 1].oi : oiNow
+
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography sx={{ ...MONO, fontSize: '0.6rem', fontWeight: 700, color: INK3 }}>{title}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75,
+          bgcolor: `${accent}15`, border: `1px solid ${accent}40`, borderRadius: 1, px: 0.75, py: 0.25 }}>
+          <Typography sx={{ ...MONO, fontSize: '0.52rem', color: INK3 }}>
+            {hasOI ? 'OI live' : 'OI'}
+          </Typography>
+          <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 700, color: accent }}>
+            {latestOI > 0 ? fmtOI(latestOI) : '–'}
+          </Typography>
+        </Box>
+      </Box>
+      {bars.length ? (
+        <HighchartsReact
+          key={`${bars.length}-${oiSeries.length}-${bars[bars.length - 1]?.close}`}
+          highcharts={Highcharts}
+          options={opts}
+        />
+      ) : (
+        <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography sx={{ ...SANS, fontSize: '0.72rem', color: INK3 }}>No data</Typography>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+function StrikeChartPanel({
+  symbol, strike, expiry, onClose,
+}: {
+  symbol: string; strike: number; expiry: string; onClose: () => void
+}) {
+  const { INK, INK3, BORDER, PAPER, CYAN } = usePalette()
+  const [data, setData] = useState<StrikeChartData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/live/stock/${symbol}/strike-chart?strike=${strike}&expiry=${expiry}`)
+        if (res.ok) { const d = await res.json(); if (!cancelled) setData(d) }
+      } catch { /* silent */ } finally { if (!cancelled) setLoading(false) }
+    }
+    load()
+    const id = setInterval(load, 10000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [symbol, strike, expiry])
+
+  return (
+    <Drawer
+      anchor="right"
+      open
+      variant="persistent"
+      PaperProps={{
+        sx: {
+          width: '30vw',
+          bgcolor: PAPER,
+          borderLeft: `1px solid ${BORDER}`,
+          p: 2,
+          overflow: 'auto',
+          zIndex: 1300,
+        },
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box>
+          <Typography sx={{ ...MONO, fontSize: '0.75rem', fontWeight: 800, color: INK }}>
+            {symbol} · ₹{strike.toLocaleString('en-IN')}
+          </Typography>
+          <Typography sx={{ ...MONO, fontSize: '0.58rem', color: INK3 }}>
+            {expiry} · 1-MIN · OI via Kite
+          </Typography>
+        </Box>
+        <IconButton onClick={onClose} size="small" sx={{ color: INK3 }}>
+          <span style={{ fontSize: '1rem', lineHeight: 1 }}>✕</span>
+        </IconButton>
+      </Box>
+
+      {loading && !data ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+          <Typography sx={{ ...SANS, fontSize: '0.75rem', color: INK3 }}>Loading…</Typography>
+        </Box>
+      ) : data ? (
+        <>
+          <PriceOIChart title={`${symbol} FUTURES`} bars={data.futures} oiSeries={data.futures_oi} oiNow={data.futures_oi_now} priceColor={CYAN}     accent="#6366f1" />
+          <PriceOIChart title={`${strike} CE`}       bars={data.ce}      oiSeries={data.ce_oi}      oiNow={data.ce_oi_now}      priceColor="#22c55e" accent="#4ade80" />
+          <PriceOIChart title={`${strike} PE`}       bars={data.pe}      oiSeries={data.pe_oi}      oiNow={data.pe_oi_now}      priceColor="#ef4444" accent="#f87171" />
+        </>
+      ) : (
+        <Typography sx={{ ...SANS, fontSize: '0.75rem', color: INK3 }}>Failed to load</Typography>
+      )}
+    </Drawer>
+  )
+}
+
 // ── Layer 2 — Sector Drill-Down ───────────────────────────────────────────────
 function SectorDrillDown({
   data,
@@ -893,7 +1768,7 @@ function SectorDrillDown({
       <Grid container spacing={2}>
         {/* Panel 1 — Constituent scatter */}
         <Grid item xs={12} md={6}>
-          <Box sx={{ ...CARD, p: 2 }}>
+          <Box sx={{ ...CARD, p: 2, height: '100%' }}>
             <SectionHead title="Constituent Scatter" accent="#6366f1" />
             <ConstituentScatter data={data.constituents} onStockClick={onStockClick} />
           </Box>
@@ -2145,6 +3020,7 @@ export default function LiveTradingPage() {
   const [selectedStock, setSelectedStock]         = useState<string | null>(null)
   const [stockData, setStockData]                 = useState<StockIntelligenceResponse | null>(null)
   const [stockLoading, setStockLoading]           = useState(false)
+  const [drawerSymbol, setDrawerSymbol]           = useState<string | null>(null)
 
   // Layer 4 state
   const [signals, setSignals]     = useState<WhyNowCard[]>([])
@@ -2225,6 +3101,7 @@ export default function LiveTradingPage() {
   // ── Stock click handler ───────────────────────────────────────────────────
   const handleStockClick = useCallback((symbol: string) => {
     setSelectedStock(symbol)
+    setDrawerSymbol(symbol)
     fetchStock(symbol)
   }, [fetchStock])
 
@@ -2259,6 +3136,7 @@ export default function LiveTradingPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: BG, display: 'flex', flexDirection: 'column' }}>
+      <StockSessionDrawer symbol={drawerSymbol} onClose={() => setDrawerSymbol(null)} />
       <Navbar />
 
       {/* ── Hero ── */}

@@ -55,3 +55,30 @@ def stock_chart(symbol: str):
     if result is None:
         raise HTTPException(status_code=404, detail=f"No data for '{symbol}'")
     return result
+
+
+@router.get("/breadth")
+def market_breadth():
+    """StockSessionDrawer — live advance/decline breadth strip, polled every 30 s."""
+    return live_trading_service.get_market_breadth()
+
+
+@router.get("/stock/{symbol}/options")
+def stock_options(symbol: str):
+    """StockSessionDrawer — options chain from DuckDB parquet, polled every 10 s."""
+    return live_trading_service.get_stock_options(symbol.upper())
+
+
+@router.get("/stock/{symbol}/strike-chart")
+def strike_chart(symbol: str, strike: float = 0, expiry: str = ""):
+    """StrikeChartPanel — 1-min price + OI series for futures, CE, and PE of a strike."""
+    return live_trading_service.get_strike_chart_data(symbol.upper(), strike, expiry)
+
+
+@router.get("/stock/{symbol}/intraday")
+def stock_intraday(symbol: str):
+    """StockSessionDrawer — 1-min intraday bars + VWAP + context levels (prev high/low/close)."""
+    result = live_trading_service.get_stock_intraday(symbol.upper())
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No data for '{symbol}'")
+    return result

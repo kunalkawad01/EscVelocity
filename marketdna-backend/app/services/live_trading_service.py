@@ -1253,3 +1253,449 @@ def get_stock_chart(symbol: str) -> dict | None:
 
     log.info("Live chart: %s — %d bars, %d universe syms", symbol, len(bars), len(universe_rets))
     return {"symbol": symbol, "bars": bars, "ranks_tf": ranks_tf}
+
+
+# ── NFO instrument cache ──────────────────────────────────────────────────────
+# Maps (name, expiry_str, strike, opt_type) → (instrument_token, tradingsymbol)
+_nfo_cache: dict[tuple[str, str, float, str], tuple[int, str]] = {}
+_nfo_cache_date: str = ""
+_nfo_lock = threading.Lock()
+
+
+def _ensure_nfo_cache() -> None:
+    """Load NFO instruments from Kite (once per calendar day)."""
+    global _nfo_cache, _nfo_cache_date
+    today = date.today().isoformat()
+    if _nfo_cache_date == today and _nfo_cache:
+        return
+    with _nfo_lock:
+        if _nfo_cache_date == today and _nfo_cache:
+            return
+        try:
+            kite = get_kite()
+            instruments = kite.instruments("NFO")
+            cache: dict[tuple[str, str, float, str], tuple[int, str]] = {}
+            for inst in instruments:
+                k = (
+                    str(inst["name"]).upper(),
+                    str(inst["expiry"]),           # datetime.date → "YYYY-MM-DD"
+                    float(inst.get("strike") or 0),
+                    str(inst["instrument_type"]).upper(),
+                )
+                cache[k] = (int(inst["instrument_token"]), str(inst["tradingsymbol"]))
+            _nfo_cache = cache
+            _nfo_cache_date = today
+            log.info("NFO instruments loaded: %d entries", len(cache))
+        except Exception as exc:
+            log.warning("NFO instrument fetch failed: %s", exc)
+
+
+def _get_nfo_instrument(symbol: str, expiry: str, strike: float, opt_type: str) -> tuple[int, str] | None:
+    """Return (instrument_token, tradingsymbol) for an NFO contract.
+
+    opt_type: "CE", "PE", or "FUT" (strike=0 for futures).
+    expiry:   "YYYY-MM-DD" string as stored in DuckDB options_chain.
+    """
+    _ensure_nfo_cache()
+    key = (symbol.upper(), expiry[:10], float(strike), opt_type.upper())
+    return _nfo_cache.get(key)
+
+
+def get_strike_chart_data(symbol: str, strike: float, expiry: str) -> dict:
+    """1-min price + OI bars for futures, CE, and PE of a given strike.
+
+    Uses Kite historical_data() with oi=True.  Covers today's session from 9:15;
+    falls back to previous trading day when called outside market hours.
+    """
+    from datetime import timedelta
+
+    empty: list = []
+    null_result = {
+        "futures": empty, "ce": empty, "pe": empty,
+        "futures_oi": empty, "ce_oi": empty, "pe_oi": empty,
+        "futures_oi_now": 0, "ce_oi_now": 0, "pe_oi_now": 0,
+    }
+
+    try:
+        kite = get_kite()
+
+        ist_now    = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        trade_date = ist_now.date()
+        mins_ist   = ist_now.hour * 60 + ist_now.minute
+        if trade_date.weekday() >= 5 or mins_ist < 555:
+            trade_date -= timedelta(days=1)
+        while trade_date.weekday() >= 5:
+            trade_date -= timedelta(days=1)
+
+        from_dt = datetime(trade_date.year, trade_date.month, trade_date.day, 9, 0)
+        to_dt   = datetime(trade_date.year, trade_date.month, trade_date.day, 15, 35)
+
+        def _fetch(token: int) -> tuple[list[dict], list[dict], int]:
+            """Return (price_bars, oi_series, latest_oi)."""
+            raw = kite.historical_data(token, from_dt, to_dt, "minute", oi=True)
+            price_bars: list[dict] = []
+            oi_series:  list[dict] = []
+            for b in raw:
+                dt_obj = b["date"]
+                t = dt_obj.strftime("%H:%M") if hasattr(dt_obj, "strftime") else str(dt_obj)[11:16]
+                price_bars.append({"time": t, "close": round(float(b["close"]), 2)})
+                oi_val = int(b.get("oi") or 0)
+                if oi_val > 0:
+                    oi_series.append({"time": t, "oi": oi_val})
+            return price_bars, oi_series, (oi_series[-1]["oi"] if oi_series else 0)
+
+        result = dict(null_result)
+
+        fut_inst = _get_nfo_instrument(symbol, expiry, 0, "FUT")
+        if fut_inst:
+            result["futures"], result["futures_oi"], result["futures_oi_now"] = _fetch(fut_inst[0])
+        else:
+            log.debug("No futures instrument for %s expiry=%s", symbol, expiry)
+
+        ce_inst = _get_nfo_instrument(symbol, expiry, strike, "CE")
+        if ce_inst:
+            result["ce"], result["ce_oi"], result["ce_oi_now"] = _fetch(ce_inst[0])
+        else:
+            log.debug("No CE instrument for %s strike=%s expiry=%s", symbol, strike, expiry)
+
+        pe_inst = _get_nfo_instrument(symbol, expiry, strike, "PE")
+        if pe_inst:
+            result["pe"], result["pe_oi"], result["pe_oi_now"] = _fetch(pe_inst[0])
+        else:
+            log.debug("No PE instrument for %s strike=%s expiry=%s", symbol, strike, expiry)
+
+        return result
+
+    except Exception as exc:
+        log.warning("get_strike_chart_data %s %s %s: %s", symbol, strike, expiry, exc)
+        return null_result
+
+
+# ── NSE F&O lot sizes (display only — updated quarterly by NSE) ───────────────
+_LOT_SIZES: dict[str, int] = {
+    "NIFTY": 50, "BANKNIFTY": 15, "FINNIFTY": 40, "MIDCPNIFTY": 75,
+    "RELIANCE": 250, "HDFCBANK": 550, "ICICIBANK": 700, "INFY": 400,
+    "TCS": 150, "WIPRO": 3000, "HDFC": 300, "SBIN": 1500, "AXISBANK": 1200,
+    "KOTAKBANK": 400, "BHARTIARTL": 500, "ITC": 3200, "HINDUNILVR": 300,
+    "BAJFINANCE": 125, "BAJAJFINSV": 125, "MARUTI": 100, "TATAMOTORS": 2800,
+    "TATASTEEL": 5500, "M&M": 700, "SUNPHARMA": 700, "ADANIPORTS": 1250,
+    "ULTRACEMCO": 100, "NESTLEIND": 50, "LT": 300, "NTPC": 10500,
+    "POWERGRID": 4700, "ONGC": 7700, "COALINDIA": 4200, "BPCL": 4500,
+    "DIVISLAB": 150, "DRREDDY": 125, "CIPLA": 650, "EICHERMOT": 200,
+    "HEROMOTOCO": 300, "GRASIM": 475, "BRITANNIA": 100, "INDUSINDBK": 500,
+    "TITAN": 375, "TECHM": 600, "HCLTECH": 700, "JSWSTEEL": 2700,
+    "TATACONSUM": 1000, "APOLLOHOSP": 125, "ASIANPAINT": 400, "ADANIENT": 625,
+}
+
+
+def _lot_size(symbol: str) -> int:
+    return _LOT_SIZES.get(symbol.upper(), 1)
+
+
+# ── Options chain for StockSessionDrawer ──────────────────────────────────────
+def get_stock_options(symbol: str) -> dict:
+    """Options chain for left-panel drawer — sourced from DuckDB options_chain parquet.
+
+    Returns is_fo=False when symbol has no F&O data (equity-only stocks).
+    Cached by options_service — no extra DuckDB cost.
+    """
+    from app.services.options_service import get_oi_analysis
+
+    symbol = symbol.upper()
+    oi = get_oi_analysis(symbol)
+
+    if oi is None:
+        return {"is_fo": False}
+
+    atm = oi.atm_strike
+    atm_data = next((s for s in oi.strikes if s.strike == atm), None)
+    straddle: float = 0.0
+    if atm_data:
+        straddle = round((atm_data.ce_ltp or 0) + (atm_data.pe_ltp or 0), 2)
+
+    spot     = oi.spot
+    upper_be = round(spot + straddle, 2)
+    lower_be = round(spot - straddle, 2)
+
+    # Gamma wall = strike with highest total (CE + PE) OI
+    gamma_wall: float | None = None
+    if oi.strikes:
+        gamma_wall = max(oi.strikes, key=lambda s: s.ce_oi + s.pe_oi).strike
+
+    # Build full strike list sorted by strike
+    all_strikes_sorted = sorted(oi.strikes, key=lambda s: s.strike)
+    atm_idx = next((i for i, s in enumerate(all_strikes_sorted) if s.strike == atm), None)
+
+    # Keep only 3 below ATM + ATM + 3 above ATM (7 rows total)
+    if atm_idx is not None:
+        lo = max(0, atm_idx - 3)
+        hi = min(len(all_strikes_sorted), atm_idx + 4)
+        visible_strikes = all_strikes_sorted[lo:hi]
+    else:
+        visible_strikes = all_strikes_sorted
+
+    # Refresh CE/PE LTPs from Kite live quotes if market is open
+    live_option_prices: dict[tuple[float, str], float] = {}
+    if _market_is_open():
+        try:
+            kite = get_kite()
+            # Build {tradingsymbol → (strike, opt_type)} so we can reverse-map the quote response
+            tsym_map: dict[str, tuple[float, str]] = {}
+            quote_keys: list[str] = []
+            for s in visible_strikes:
+                for opt in ("CE", "PE"):
+                    inst = _get_nfo_instrument(symbol, oi.expiry, s.strike, opt)
+                    if inst:
+                        _, tsym = inst
+                        qk = f"NFO:{tsym}"
+                        quote_keys.append(qk)
+                        tsym_map[qk] = (s.strike, opt)
+            if quote_keys:
+                q_resp = kite.quote(quote_keys)
+                for qk, val in q_resp.items():
+                    mapping = tsym_map.get(qk)
+                    if mapping:
+                        live_option_prices[mapping] = round(float(val["last_price"]), 2)
+        except Exception as exc:
+            log.debug("Live option price refresh failed for %s: %s", symbol, exc)
+
+    strikes_out = []
+    for s in visible_strikes:
+        oi_total = s.ce_oi + s.pe_oi
+        ce_ltp = live_option_prices.get((s.strike, "CE"), s.ce_ltp)
+        pe_ltp = live_option_prices.get((s.strike, "PE"), s.pe_ltp)
+        strikes_out.append({
+            "strike":   s.strike,
+            "is_atm":  s.strike == atm,
+            "ce_ltp":  ce_ltp,
+            "ce_iv":   s.ce_iv,
+            "ce_oi":   s.ce_oi,
+            "pe_ltp":  pe_ltp,
+            "pe_iv":   s.pe_iv,
+            "pe_oi":   s.pe_oi,
+            "pcr":     s.pcr,
+            "oi_total": oi_total,
+        })
+
+    return {
+        "is_fo":       True,
+        "strikes":     strikes_out,
+        "straddle":    straddle,
+        "upper_be":    upper_be,
+        "lower_be":    lower_be,
+        "lot_size":    _lot_size(symbol),
+        "expiry":      oi.expiry,
+        "spot":        spot,
+        "atm_strike":  atm,
+        "total_pcr":   oi.pcr if oi.pcr else None,
+        "gamma_wall":  gamma_wall,
+    }
+
+
+# ── Market breadth (StockSessionDrawer — advance/decline strip) ───────────────
+def get_market_breadth() -> dict:
+    """Advance/decline counts across the live universe, polled every 30 seconds.
+
+    Primary source: _iday accumulator (latest LTP vs prev_close from DuckDB hist).
+    Fallback: Kite quote() when accumulator is empty (cold-start / pre-market).
+    """
+    hist   = _get_hist()
+    advances = declines = unchanged = 0
+
+    with _iday_lock:
+        iday_snapshot = {sym: buf[-1][1] for sym, buf in _iday.items() if buf}
+
+    if iday_snapshot:
+        for sym, ltp in iday_snapshot.items():
+            h = hist.get(sym)
+            if not h or not h.get("prev_close"):
+                continue
+            pc = float(h["prev_close"])
+            if ltp > pc:
+                advances += 1
+            elif ltp < pc:
+                declines += 1
+            else:
+                unchanged += 1
+    else:
+        # Kite quote fallback — only when accumulator is empty
+        try:
+            live, _ = _get_quotes(hist)
+            for sym, q in live.items():
+                h = hist.get(sym)
+                if not h or not h.get("prev_close"):
+                    continue
+                ltp = float(q["ltp"])
+                pc  = float(h["prev_close"])
+                if ltp > pc:
+                    advances += 1
+                elif ltp < pc:
+                    declines += 1
+                else:
+                    unchanged += 1
+        except Exception:
+            pass
+
+    total = advances + declines + unchanged
+    return {
+        "advances":      advances,
+        "declines":      declines,
+        "unchanged":     unchanged,
+        "adv_dec_ratio": round(advances / declines, 2) if declines > 0 else None,
+        "total":         total,
+    }
+
+
+# ── Intraday chart data (StockSessionDrawer — left panel) ─────────────────────
+def get_stock_intraday(symbol: str) -> dict | None:
+    """Live intraday chart data, polled every 5 seconds by the frontend.
+
+    Source priority:
+      1. _iday accumulator  — real-time LTP ticks collapsed to 1-min OHLC bars.
+                              Available whenever the server has been running during
+                              market hours. Updates on every 5-second frontend poll.
+      2. Kite 15-min bars   — used when accumulator is empty (server cold-start or
+                              market closed). Fetched once; Kite charges per call.
+      3. EOD fallback       — Kite offline; bars=[]; ltp=prev_close.
+    """
+    from collections import defaultdict
+    from datetime import timedelta
+
+    symbol = symbol.upper()
+
+    # Historical context (cached daily, no extra DuckDB query)
+    hist = _get_hist()
+    h = hist.get(symbol)
+    if not h:
+        return None
+
+    prev_close = float(h["prev_close"]) if h.get("prev_close") else None
+    prev_high  = float(h["prev_high"])  if h.get("prev_high")  else None
+    prev_low   = float(h["prev_low"])   if h.get("prev_low")   else None
+    avg_vol20  = float(h["avg_vol20"])  if h.get("avg_vol20")  else 0.0
+    high_52w   = float(h["high_52w"])   if h.get("high_52w")   else None
+
+    bars: list[dict] = []
+    ltp:  float | None = None
+    vwap: float | None = None
+    volume_ratio: float | None = None
+    source = "eod"
+
+    # ── Priority 1: live Kite quote → push into _iday → build 1-min bars ────────
+    # During market hours every 5-second poll fetches a fresh LTP and pushes it
+    # into the accumulator so the chart advances in real-time even if no other
+    # page is open to trigger bulk quote fetches.
+    today_str = date.today().isoformat()
+
+    if _market_is_open():
+        try:
+            kite   = get_kite()
+            q_resp = kite.quote([f"NSE:{symbol}"])
+            inst_q = q_resp.get(f"NSE:{symbol}")
+            if inst_q:
+                fresh_ltp = round(float(inst_q["last_price"]), 2)
+                _push_intraday({symbol: {"ltp": fresh_ltp}})
+                ltp = fresh_ltp
+                vwap_raw = inst_q.get("average_price")
+                if vwap_raw:
+                    vwap = round(float(vwap_raw), 2)
+                vol_today = int(inst_q.get("volume_traded") or 0)
+                if vol_today > 0 and avg_vol20 > 0:
+                    volume_ratio = round(vol_today / avg_vol20, 2)
+                source = "live"
+        except Exception as exc:
+            log.debug("get_stock_intraday live quote failed for %s: %s", symbol, exc)
+
+    with _iday_lock:
+        iday_for_today = (_iday_date == today_str)
+        iday_buf = list(_iday.get(symbol, []))
+
+    log.debug(
+        "get_stock_intraday %s — iday_ticks=%d iday_for_today=%s market_open=%s",
+        symbol, len(iday_buf), iday_for_today, _market_is_open(),
+    )
+
+    if iday_buf and iday_for_today:
+        # Collapse 5-sec ticks into 1-minute OHLC bars
+        by_minute: dict[str, list[float]] = defaultdict(list)
+        for t, price in iday_buf:
+            by_minute[t].append(price)
+
+        for t in sorted(by_minute.keys()):
+            prices = by_minute[t]
+            bars.append({
+                "time":   t,
+                "open":   prices[0],
+                "high":   max(prices),
+                "low":    min(prices),
+                "close":  prices[-1],
+                "volume": 0,
+            })
+
+        if ltp is None:
+            ltp = iday_buf[-1][1]
+        if source == "eod":
+            source = "live"
+
+    # ── Priority 2: Kite 15-min historical (cold-start or market closed) ─────
+    if not bars:
+        try:
+            kite     = get_kite()
+            ltp_resp = kite.ltp([f"NSE:{symbol}"])
+            inst     = ltp_resp.get(f"NSE:{symbol}")
+            if not inst:
+                raise ValueError(f"No Kite instrument for {symbol}")
+
+            token = int(inst["instrument_token"])
+            ltp   = round(float(inst["last_price"]), 2)
+
+            ist_now    = datetime.utcnow() + timedelta(hours=5, minutes=30)
+            trade_date = ist_now.date()
+            mins_ist   = ist_now.hour * 60 + ist_now.minute
+            if trade_date.weekday() >= 5 or mins_ist < 555:
+                trade_date -= timedelta(days=1)
+            while trade_date.weekday() >= 5:
+                trade_date -= timedelta(days=1)
+
+            from_dt  = datetime(trade_date.year, trade_date.month, trade_date.day, 9, 0)
+            to_dt    = datetime(trade_date.year, trade_date.month, trade_date.day, 15, 35)
+            raw_bars = kite.historical_data(token, from_dt, to_dt, "minute")
+            source   = "1min_kite"
+
+            total_vol = 0
+            vwap_num  = 0.0
+            for b in raw_bars:
+                dt_obj   = b["date"]
+                time_str = dt_obj.strftime("%H:%M") if hasattr(dt_obj, "strftime") else str(dt_obj)[11:16]
+                vol = int(b.get("volume", 0) or 0)
+                o   = round(float(b["open"]),  2)
+                hi  = round(float(b["high"]),  2)
+                lo  = round(float(b["low"]),   2)
+                c   = round(float(b["close"]), 2)
+                bars.append({"time": time_str, "open": o, "high": hi, "low": lo, "close": c, "volume": vol})
+                total_vol += vol
+                vwap_num  += (hi + lo + c) / 3 * vol
+
+            if total_vol > 0:
+                vwap         = round(vwap_num / total_vol, 2)
+                volume_ratio = round(total_vol / avg_vol20, 2) if avg_vol20 > 0 else None
+
+        except Exception as exc:
+            log.debug("get_stock_intraday Kite failed for %s: %s", symbol, exc)
+            ltp = prev_close   # EOD fallback — bars stay []
+
+    pct_52w_high = None
+    if ltp and high_52w and high_52w > 0:
+        pct_52w_high = round((ltp - high_52w) / high_52w * 100, 2)
+
+    return {
+        "bars":         bars,
+        "ltp":          ltp,
+        "source":       source,
+        "vwap":         vwap,
+        "prev_high":    prev_high,
+        "prev_low":     prev_low,
+        "prev_close":   prev_close,
+        "volume_ratio": volume_ratio,
+        "pct_52w_high": pct_52w_high,
+    }
