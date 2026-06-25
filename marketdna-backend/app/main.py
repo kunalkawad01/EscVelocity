@@ -84,6 +84,7 @@ def _background_prewarm() -> None:
     """Non-critical heavy tasks run in background after server is ready."""
     import time
     for name, fn in [
+        ("kite ticker",      live_trading_service.start_ticker),   # WebSocket OI accumulator
         ("cointegration",    start_preload),              # ~3s, user-visible page
         ("screener prewarm", start_screener_prewarm),    # ~3min, all 9 pattern tabs
         ("health scan",      stock_health_service.start_scan_warmup),
