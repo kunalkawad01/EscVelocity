@@ -55,7 +55,7 @@ def breakthrough_signals(universe: str = Query("nifty500", pattern="^(nifty500|n
 @router.get("/stock/{symbol}/strike-chart", response_model=StrikeChartResponse, response_model_exclude_none=True)
 def strike_chart(symbol: str, strike: float, expiry: str):
     """Today's 1-min price + OI for futures / CE / PE at the given strike."""
-    result = live_trading_service.get_strike_chart(symbol.upper(), strike, expiry)
+    result = live_trading_service.get_strike_chart_data(symbol.upper(), strike, expiry)
     if result is None:
         raise HTTPException(status_code=404, detail=f"No data for {symbol} strike {strike}")
     return result
@@ -91,22 +91,3 @@ def market_breadth():
     return live_trading_service.get_market_breadth()
 
 
-@router.get("/stock/{symbol}/options")
-def stock_options(symbol: str):
-    """StockSessionDrawer — options chain from DuckDB parquet, polled every 10 s."""
-    return live_trading_service.get_stock_options(symbol.upper())
-
-
-@router.get("/stock/{symbol}/strike-chart")
-def strike_chart(symbol: str, strike: float = 0, expiry: str = ""):
-    """StrikeChartPanel — 1-min price + OI series for futures, CE, and PE of a strike."""
-    return live_trading_service.get_strike_chart_data(symbol.upper(), strike, expiry)
-
-
-@router.get("/stock/{symbol}/intraday")
-def stock_intraday(symbol: str):
-    """StockSessionDrawer — 1-min intraday bars + VWAP + context levels (prev high/low/close)."""
-    result = live_trading_service.get_stock_intraday(symbol.upper())
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"No data for '{symbol}'")
-    return result
