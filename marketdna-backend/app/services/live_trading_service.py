@@ -37,6 +37,15 @@ def _load_sector_map() -> dict[str, list[str]]:
             for row in csv.DictReader(f):
                 if row.get("Series", "").strip() == "EQ":
                     sectors[row["Industry"].strip()].append(row["Symbol"].strip())
+        # Split large sectors so each drill-down stays under ~55 symbols
+        for sector in list(sectors):
+            syms = sectors[sector]
+            if len(syms) > 55:
+                mid = len(syms) // 2
+                sectors[f"{sector} 1"] = syms[:mid]
+                sectors[f"{sector} 2"] = syms[mid:]
+                del sectors[sector]
+
         log.info("Loaded SECTOR_MAP: %d sectors, %d symbols",
                  len(sectors), sum(len(v) for v in sectors.values()))
     except Exception as exc:
@@ -45,6 +54,7 @@ def _load_sector_map() -> dict[str, list[str]]:
 
 
 SECTOR_MAP: dict[str, list[str]] = _load_sector_map()
+_SECTOR_MAPS: dict[str, dict[str, list[str]]] = {"nifty500": SECTOR_MAP, "nifty200": SECTOR_MAP}
 
 
 
@@ -342,6 +352,24 @@ _all_prog_cache: dict[str, dict[str, list[dict]]] = {}  # universe → {sector �
 _all_prog_trade_date: dict[str, str] = {}               # universe → trade_date
 _all_prog_lock = threading.Lock()
 
+# ── Per-sector 3-min Kite historical cache (all constituents) ────────────────
+# First call per sector per trade date fetches N historical bars from Kite (~30-60s).
+# All subsequent calls for the same sector on the same trade date return instantly.
+# keyed by sector_hash → (trade_date_str, (sector_prog, stock_prog, sparklines, sym_base))
+_sector_3min_cache: dict[str, tuple[str, tuple]] = {}
+_sector_3min_lock = threading.Lock()
+
+# ── Per-symbol 1-min intraday Kite historical cache ──────────────────────────
+# Refreshed at most once per minute — prevents Kite call on every 5-second poll.
+# tuple: (date_str, minute_key "HHMM", bars, vwap, volume_ratio)
+_intra_kite_cache: dict[str, tuple[str, str, list[dict], float | None, float | None]] = {}
+_intra_kite_lock = threading.Lock()
+
+# ── Per-strike Kite historical cache (FUT+CE+PE) ─────────────────────────────
+# key: "symbol:strike:expiry" → (minute_key "HHMM", result_dict)
+_strike_chart_cache: dict[str, tuple[str, dict]] = {}
+_strike_chart_lock = threading.Lock()
+
 # ── Today's intraday historical backfill (refreshed every 15 min during market) ──
 _sess_hist: dict[str, list[dict]] = {}   # sector → [{time, return_pct}]
 _sess_opens: dict[str, float] = {}       # symbol → true 9:15 open from Kite bars
@@ -533,7 +561,7 @@ def _get_all_sectors_live_progression() -> dict[str, list[dict]]:
     return result
 
 
-def _get_all_sectors_3min_progression() -> dict[str, list[dict]]:
+def _get_all_sectors_3min_progression(universe: str = "nifty500") -> dict[str, list[dict]]:
     """Fetch 15-min Kite bars for 2 rep symbols per sector, normalised to 0% at 9:15 AM.
 
     Result is cached per (universe, trade_date) so Kite is only hit once per day per universe.
@@ -547,8 +575,8 @@ def _get_all_sectors_3min_progression() -> dict[str, list[dict]]:
             return _all_prog_cache[universe]
 
         data = _fetch_all_sectors_3min(trade_date)
-        _all_prog_cache = data
-        _all_prog_trade_date = trade_date
+        _all_prog_cache[universe] = data
+        _all_prog_trade_date[universe] = trade_date
 
     return _all_prog_cache[universe]
 
@@ -559,7 +587,7 @@ def _fetch_all_sectors_3min(trade_date: str) -> dict[str, list[dict]]:
 
     # 2 representative symbols per sector
     rep_map: dict[str, list[str]] = {
-        sector: syms[:2] for sector, syms in sector_map.items() if syms
+        sector: syms[:2] for sector, syms in SECTOR_MAP.items() if syms
     }
     all_rep = list({s for syms in rep_map.values() for s in syms})
 
@@ -629,10 +657,10 @@ def get_sector_progressions(universe: str = "nifty500") -> dict:
     trade_date = _last_trade_date_str()
 
     if _market_is_open():
-        prog = _get_all_sectors_live_progression(sector_map)
+        prog = _get_all_sectors_live_progression()
         source = "live" if prog else "none"
     else:
-        prog = _get_all_sectors_3min_progression()
+        prog = _get_all_sectors_3min_progression(universe)
         source = "3min_kite" if prog else "none"
 
     return {
@@ -693,11 +721,41 @@ def get_sector_scatter(universe: str = "nifty500") -> dict:
 # ── 15-min Kite historical fallback for sector progression ───────────────────
 def _get_sector_3min_data(syms: list[str]) -> tuple[list[dict], dict[str, list[dict]], dict[str, list[float]]]:
     """Fetch last trading session's 15-min OHLCV from Kite for sector symbols.
-    Returns (sector_avg_progression, stock_progressions, sparklines):
-      sector_avg_progression: [{time, sector_return, nifty_return}]
-      stock_progressions:     {symbol: [{time, return_pct}]}
-      sparklines:             {symbol: [close, close, ...]}  raw prices for mini-chart display
+    Returns (sector_avg_progression, stock_progressions, sparklines, sym_base).
+    Cached per (sector-symbol-set, trade_date) — Kite called at most once per day per sector.
     """
+    from datetime import timedelta
+
+    sector_hash = hashlib.md5(",".join(sorted(syms)).encode()).hexdigest()[:12]
+
+    # Determine today's trade date up-front (needed for cache key)
+    ist_now   = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    _td       = ist_now.date()
+    _mins_ist = ist_now.hour * 60 + ist_now.minute
+    if _td.weekday() >= 5 or _mins_ist < 555:
+        _td -= timedelta(days=1)
+    while _td.weekday() >= 5:
+        _td -= timedelta(days=1)
+    trade_date_str = _td.isoformat()
+
+    # Cache hit — return immediately without any Kite call
+    cached = _sector_3min_cache.get(sector_hash)
+    if cached and cached[0] == trade_date_str:
+        return cached[1]
+
+    with _sector_3min_lock:
+        cached = _sector_3min_cache.get(sector_hash)
+        if cached and cached[0] == trade_date_str:
+            return cached[1]
+
+        result = _fetch_sector_3min_data(syms, _td)
+        _sector_3min_cache[sector_hash] = (trade_date_str, result)
+        return result
+
+
+def _fetch_sector_3min_data(syms: list[str], trade_date) -> tuple:
+    """Inner: calls Kite in parallel (8 workers). Called at most once per sector per trade date."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import timedelta
 
     try:
@@ -710,30 +768,29 @@ def _get_sector_3min_data(syms: list[str]) -> tuple[list[dict], dict[str, list[d
             for key, val in ltp_resp.items()
         }
         if not tokens:
-            return [], {}
-
-        ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-        trade_date = ist_now.date()
-        mins_ist = ist_now.hour * 60 + ist_now.minute
-        if trade_date.weekday() >= 5 or mins_ist < 555:
-            trade_date -= timedelta(days=1)
-        while trade_date.weekday() >= 5:
-            trade_date -= timedelta(days=1)
+            return [], {}, {}, {}
 
         from_dt = datetime(trade_date.year, trade_date.month, trade_date.day, 9, 0)
         to_dt   = datetime(trade_date.year, trade_date.month, trade_date.day, 15, 35)
 
-        all_bars: dict[str, list] = {}
-        for sym, token in tokens.items():
+        def _fetch_one(sym: str, token: int) -> tuple[str, list]:
             try:
                 bars = kite.historical_data(token, from_dt, to_dt, "3minute")
-                if bars:
-                    all_bars[sym] = bars
+                return sym, bars or []
             except Exception as exc:
                 log.debug("15-min fetch failed for %s: %s", sym, exc)
+                return sym, []
+
+        all_bars: dict[str, list] = {}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futs = {pool.submit(_fetch_one, sym, tok): sym for sym, tok in tokens.items()}
+            for fut in as_completed(futs):
+                sym, bars = fut.result()
+                if bars:
+                    all_bars[sym] = bars
 
         if not all_bars:
-            return [], {}, {}
+            return [], {}, {}, {}
 
         sym_base: dict[str, float] = {
             sym: float(bars[0]["open"])
@@ -741,7 +798,7 @@ def _get_sector_3min_data(syms: list[str]) -> tuple[list[dict], dict[str, list[d
             if bars and bars[0].get("open")
         }
 
-        ref_sym  = next(iter(all_bars))
+        ref_sym  = max(all_bars, key=lambda s: len(all_bars[s]))
         ref_bars = all_bars[ref_sym]
 
         # Synthetic zero-anchor at 09:15 for both sector avg and per-stock
@@ -930,23 +987,28 @@ def get_sector_detail(sector_name: str, universe: str = "nifty500") -> dict | No
         progression       = hist_sector_prog
         stock_progressions = hist_stock_prog
 
-    # Mini charts — live 5-sec ticks when open, last trading day's 15-min closes when closed
+    # Mini charts — 3-min Kite historical bars from 9:15 (already fetched above) +
+    # latest _iday live tick appended so the sparkline is current to the second.
+    # hist_sparklines covers from market open (9:15) regardless of when the server started.
     mini_charts = []
     for c in constituents:
+        sym = c["symbol"]
+        sparkline = list(hist_sparklines.get(sym, []))
+        # Extend with live tick so the right-most point reflects the current price
         if _market_is_open():
-            intraday = _ltps(c["symbol"], max_pts=78)
-        else:
-            intraday = hist_sparklines.get(c["symbol"], [])
-        if not intraday:
-            # Final fallback: EOD closes (stored most-recent-first → reverse to chronological)
-            raw = hist.get(c["symbol"], {}).get("closes_60d", [])
-            intraday = list(reversed(raw[:20]))
+            buf = _iday.get(sym, [])
+            if buf:
+                sparkline.append(float(buf[-1][1]))
+        if not sparkline:
+            # Final fallback: EOD closes (most-recent-first → reverse to chronological)
+            raw = hist.get(sym, {}).get("closes_60d", [])
+            sparkline = list(reversed(raw[:20]))
         mini_charts.append({
-            "symbol":     c["symbol"],
+            "symbol":     sym,
             "return_pct": c["return_pct"],
             "ltp":        c["ltp"],
             "direction":  c["direction"],
-            "sparkline":  intraday,
+            "sparkline":  sparkline,
         })
 
     corr_times, corr_vals = _corr_history(syms, n_snaps=20)
@@ -1472,13 +1534,35 @@ def _get_nfo_instrument(symbol: str, expiry: str, strike: float, opt_type: str) 
 def get_strike_chart_data(symbol: str, strike: float, expiry: str) -> dict:
     """1-min price + OI bars for futures, CE, and PE of a given strike.
 
-    Uses Kite historical_data() with oi=True.  Covers today's session from 9:15;
-    falls back to previous trading day when called outside market hours.
+    Uses Kite historical_data() with oi=True. Covers today's session from 9:15.
+    Result is cached per minute — at most 3 Kite calls per minute per strike.
     """
+    from datetime import timedelta
+
+    cache_key  = f"{symbol}:{strike}:{expiry}"
+    minute_key = datetime.now().strftime("%H%M")
+
+    cached = _strike_chart_cache.get(cache_key)
+    if cached and cached[0] == minute_key:
+        return cached[1]
+
+    with _strike_chart_lock:
+        cached = _strike_chart_cache.get(cache_key)
+        if cached and cached[0] == minute_key:
+            return cached[1]
+
+        result = _fetch_strike_chart_data(symbol, strike, expiry)
+        _strike_chart_cache[cache_key] = (minute_key, result)
+        return result
+
+
+def _fetch_strike_chart_data(symbol: str, strike: float, expiry: str) -> dict:
+    """Inner: actually call Kite for strike chart data."""
     from datetime import timedelta
 
     empty: list = []
     null_result = {
+        "symbol": symbol, "strike": strike, "expiry": expiry,
         "futures": empty, "ce": empty, "pe": empty,
         "futures_oi": empty, "ce_oi": empty, "pe_oi": empty,
         "futures_oi_now": 0, "ce_oi_now": 0, "pe_oi_now": 0,
@@ -1573,15 +1657,31 @@ def get_stock_options(symbol: str) -> dict:
     oi = get_oi_analysis(symbol)
 
     if oi is None:
-        return {"is_fo": False}
+        return {"symbol": symbol, "is_fo": False}
 
-    atm = oi.atm_strike
+    # ── Live spot from Kite LTP (overrides stale parquet spot during market hours) ──
+    spot: float = oi.spot
+    try:
+        kite     = get_kite()
+        ltp_resp = kite.ltp([f"NSE:{symbol}"])
+        inst     = ltp_resp.get(f"NSE:{symbol}")
+        if inst:
+            spot = round(float(inst["last_price"]), 2)
+    except Exception as exc:
+        log.debug("get_stock_options live spot failed for %s: %s", symbol, exc)
+
+    # Snap to the closest available strike to determine live ATM
+    all_strikes_sorted = sorted(oi.strikes, key=lambda s: s.strike)
+    if all_strikes_sorted:
+        atm = min(all_strikes_sorted, key=lambda s: abs(s.strike - spot)).strike
+    else:
+        atm = oi.atm_strike
+
     atm_data = next((s for s in oi.strikes if s.strike == atm), None)
     straddle: float = 0.0
     if atm_data:
         straddle = round((atm_data.ce_ltp or 0) + (atm_data.pe_ltp or 0), 2)
 
-    spot     = oi.spot
     upper_be = round(spot + straddle, 2)
     lower_be = round(spot - straddle, 2)
 
@@ -1590,11 +1690,8 @@ def get_stock_options(symbol: str) -> dict:
     if oi.strikes:
         gamma_wall = max(oi.strikes, key=lambda s: s.ce_oi + s.pe_oi).strike
 
-    # Build full strike list sorted by strike
-    all_strikes_sorted = sorted(oi.strikes, key=lambda s: s.strike)
+    # Keep only 3 below live ATM + ATM + 3 above live ATM (7 rows total)
     atm_idx = next((i for i, s in enumerate(all_strikes_sorted) if s.strike == atm), None)
-
-    # Keep only 3 below ATM + ATM + 3 above ATM (7 rows total)
     if atm_idx is not None:
         lo = max(0, atm_idx - 3)
         hi = min(len(all_strikes_sorted), atm_idx + 4)
@@ -1646,6 +1743,7 @@ def get_stock_options(symbol: str) -> dict:
         })
 
     return {
+        "symbol":      symbol,
         "is_fo":       True,
         "strikes":     strikes_out,
         "straddle":    straddle,
@@ -1658,6 +1756,12 @@ def get_stock_options(symbol: str) -> dict:
         "total_pcr":   oi.pcr if oi.pcr else None,
         "gamma_wall":  gamma_wall,
     }
+
+
+# ── Kite WebSocket ticker (stub — polling fallback used until WS is implemented) ─
+def start_ticker() -> None:
+    """No-op stub. Intraday data is currently sourced via REST polling every 5s."""
+    log.info("start_ticker: WebSocket not yet implemented — using REST polling fallback")
 
 
 # ── Market breadth (StockSessionDrawer — advance/decline strip) ───────────────
@@ -1715,23 +1819,70 @@ def get_market_breadth() -> dict:
 
 
 # ── Intraday chart data (StockSessionDrawer — left panel) ─────────────────────
+def _get_intraday_kite_base(
+    symbol: str, token: int, trade_date, avg_vol20: float
+) -> tuple[list[dict], float | None, float | None]:
+    """Fetch today's 1-min OHLCV from Kite; cached by (symbol, minute).
+    Returns (bars, vwap, volume_ratio). Calls Kite at most once per minute per symbol.
+    """
+    from datetime import timedelta
+    date_str   = trade_date.isoformat()
+    minute_key = datetime.now().strftime("%H%M")
+
+    cached = _intra_kite_cache.get(symbol)
+    if cached and cached[0] == date_str and cached[1] == minute_key:
+        return cached[2], cached[3], cached[4]
+
+    with _intra_kite_lock:
+        cached = _intra_kite_cache.get(symbol)
+        if cached and cached[0] == date_str and cached[1] == minute_key:
+            return cached[2], cached[3], cached[4]
+
+        try:
+            kite    = get_kite()
+            from_dt = datetime(trade_date.year, trade_date.month, trade_date.day, 9, 0)
+            to_dt   = datetime.now()
+            raw     = kite.historical_data(token, from_dt, to_dt, "minute")
+
+            bars: list[dict] = []
+            total_vol = 0
+            vwap_num  = 0.0
+            for b in raw:
+                dt_obj   = b["date"]
+                time_str = dt_obj.strftime("%H:%M") if hasattr(dt_obj, "strftime") else str(dt_obj)[11:16]
+                vol = int(b.get("volume", 0) or 0)
+                o   = round(float(b["open"]),  2)
+                hi  = round(float(b["high"]),  2)
+                lo  = round(float(b["low"]),   2)
+                c   = round(float(b["close"]), 2)
+                bars.append({"time": time_str, "open": o, "high": hi, "low": lo, "close": c, "volume": vol})
+                total_vol += vol
+                vwap_num  += (hi + lo + c) / 3 * vol
+
+            vwap      = round(vwap_num / total_vol, 2) if total_vol > 0 else None
+            vol_ratio = round(total_vol / avg_vol20, 2) if avg_vol20 > 0 and total_vol > 0 else None
+            _intra_kite_cache[symbol] = (date_str, minute_key, bars, vwap, vol_ratio)
+            return bars, vwap, vol_ratio
+
+        except Exception as exc:
+            log.debug("_get_intraday_kite_base %s: %s", symbol, exc)
+            if cached:
+                return cached[2], cached[3], cached[4]
+            return [], None, None
+
+
 def get_stock_intraday(symbol: str) -> dict | None:
     """Live intraday chart data, polled every 5 seconds by the frontend.
 
-    Source priority:
-      1. _iday accumulator  — real-time LTP ticks collapsed to 1-min OHLC bars.
-                              Available whenever the server has been running during
-                              market hours. Updates on every 5-second frontend poll.
-      2. Kite 15-min bars   — used when accumulator is empty (server cold-start or
-                              market closed). Fetched once; Kite charges per call.
-      3. EOD fallback       — Kite offline; bars=[]; ltp=prev_close.
+    Always shows from 9:15 AM by stitching Kite 1-min historical (base, cached per
+    minute) with _iday live ticks (current partial minute). Falls back to _iday-only
+    or EOD if Kite is unavailable.
     """
     from collections import defaultdict
     from datetime import timedelta
 
     symbol = symbol.upper()
 
-    # Historical context (cached daily, no extra DuckDB query)
     hist = _get_hist()
     h = hist.get(symbol)
     if not h:
@@ -1748,13 +1899,29 @@ def get_stock_intraday(symbol: str) -> dict | None:
     vwap: float | None = None
     volume_ratio: float | None = None
     source = "eod"
-
-    # ── Priority 1: live Kite quote → push into _iday → build 1-min bars ────────
-    # During market hours every 5-second poll fetches a fresh LTP and pushes it
-    # into the accumulator so the chart advances in real-time even if no other
-    # page is open to trigger bulk quote fetches.
     today_str = date.today().isoformat()
 
+    # ── Step 1: Resolve trade date & instrument token ─────────────────────────
+    ist_now    = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    trade_date = ist_now.date()
+    mins_ist   = ist_now.hour * 60 + ist_now.minute
+    if trade_date.weekday() >= 5 or mins_ist < 555:
+        trade_date -= timedelta(days=1)
+    while trade_date.weekday() >= 5:
+        trade_date -= timedelta(days=1)
+
+    token: int | None = None
+    try:
+        kite     = get_kite()
+        ltp_resp = kite.ltp([f"NSE:{symbol}"])
+        inst     = ltp_resp.get(f"NSE:{symbol}")
+        if inst:
+            token = int(inst["instrument_token"])
+            ltp   = round(float(inst["last_price"]), 2)
+    except Exception as exc:
+        log.debug("get_stock_intraday ltp failed for %s: %s", symbol, exc)
+
+    # ── Step 2: During market hours push fresh quote into _iday accumulator ───
     if _market_is_open():
         try:
             kite   = get_kite()
@@ -1772,91 +1939,77 @@ def get_stock_intraday(symbol: str) -> dict | None:
                     volume_ratio = round(vol_today / avg_vol20, 2)
                 source = "live"
         except Exception as exc:
-            log.debug("get_stock_intraday live quote failed for %s: %s", symbol, exc)
+            log.debug("get_stock_intraday quote failed for %s: %s", symbol, exc)
 
-    with _iday_lock:
-        iday_for_today = (_iday_date == today_str)
-        iday_buf = list(_iday.get(symbol, []))
+    # ── Step 3: Kite 1-min historical base (always from 9:15, cached/minute) ──
+    if token is not None:
+        kite_bars, kite_vwap, kite_vol = _get_intraday_kite_base(symbol, token, trade_date, avg_vol20)
+        if kite_bars:
+            bars = [dict(b) for b in kite_bars]  # mutable copy
+            if vwap is None:
+                vwap = kite_vwap
+            if volume_ratio is None:
+                volume_ratio = kite_vol
+            if source == "eod":
+                source = "1min_kite"
 
-    log.debug(
-        "get_stock_intraday %s — iday_ticks=%d iday_for_today=%s market_open=%s",
-        symbol, len(iday_buf), iday_for_today, _market_is_open(),
-    )
+            # ── Step 4: Extend with _iday live ticks for current partial minute ─
+            with _iday_lock:
+                iday_for_today = (_iday_date == today_str)
+                iday_buf = list(_iday.get(symbol, []))
 
-    if iday_buf and iday_for_today:
-        # Collapse 5-sec ticks into 1-minute OHLC bars
-        by_minute: dict[str, list[float]] = defaultdict(list)
-        for t, price in iday_buf:
-            by_minute[t].append(price)
+            if iday_buf and iday_for_today and bars:
+                last_kite_min = bars[-1]["time"]
+                live_by_min: dict[str, list[float]] = defaultdict(list)
+                for t, price in iday_buf:
+                    if t >= last_kite_min:
+                        live_by_min[t].append(price)
 
-        for t in sorted(by_minute.keys()):
-            prices = by_minute[t]
-            bars.append({
-                "time":   t,
-                "open":   prices[0],
-                "high":   max(prices),
-                "low":    min(prices),
-                "close":  prices[-1],
-                "volume": 0,
-            })
+                # Update last completed bar with same-minute live ticks
+                same_prices = live_by_min.get(last_kite_min, [])
+                if same_prices:
+                    bars[-1]["close"] = same_prices[-1]
+                    bars[-1]["high"]  = max(bars[-1]["high"], max(same_prices))
+                    bars[-1]["low"]   = min(bars[-1]["low"],  min(same_prices))
 
-        if ltp is None:
-            ltp = iday_buf[-1][1]
-        if source == "eod":
-            source = "live"
+                # Append newer minutes as new bars
+                for t in sorted(t for t in live_by_min if t > last_kite_min):
+                    prices = live_by_min[t]
+                    bars.append({
+                        "time":   t,
+                        "open":   prices[0],
+                        "high":   max(prices),
+                        "low":    min(prices),
+                        "close":  prices[-1],
+                        "volume": 0,
+                    })
 
-    # ── Priority 2: Kite 15-min historical (cold-start or market closed) ─────
+    # ── Step 5: _iday-only fallback (Kite token lookup failed) ───────────────
     if not bars:
-        try:
-            kite     = get_kite()
-            ltp_resp = kite.ltp([f"NSE:{symbol}"])
-            inst     = ltp_resp.get(f"NSE:{symbol}")
-            if not inst:
-                raise ValueError(f"No Kite instrument for {symbol}")
+        with _iday_lock:
+            iday_for_today = (_iday_date == today_str)
+            iday_buf = list(_iday.get(symbol, []))
 
-            token = int(inst["instrument_token"])
-            ltp   = round(float(inst["last_price"]), 2)
-
-            ist_now    = datetime.utcnow() + timedelta(hours=5, minutes=30)
-            trade_date = ist_now.date()
-            mins_ist   = ist_now.hour * 60 + ist_now.minute
-            if trade_date.weekday() >= 5 or mins_ist < 555:
-                trade_date -= timedelta(days=1)
-            while trade_date.weekday() >= 5:
-                trade_date -= timedelta(days=1)
-
-            from_dt  = datetime(trade_date.year, trade_date.month, trade_date.day, 9, 0)
-            to_dt    = datetime(trade_date.year, trade_date.month, trade_date.day, 15, 35)
-            raw_bars = kite.historical_data(token, from_dt, to_dt, "minute")
-            source   = "1min_kite"
-
-            total_vol = 0
-            vwap_num  = 0.0
-            for b in raw_bars:
-                dt_obj   = b["date"]
-                time_str = dt_obj.strftime("%H:%M") if hasattr(dt_obj, "strftime") else str(dt_obj)[11:16]
-                vol = int(b.get("volume", 0) or 0)
-                o   = round(float(b["open"]),  2)
-                hi  = round(float(b["high"]),  2)
-                lo  = round(float(b["low"]),   2)
-                c   = round(float(b["close"]), 2)
-                bars.append({"time": time_str, "open": o, "high": hi, "low": lo, "close": c, "volume": vol})
-                total_vol += vol
-                vwap_num  += (hi + lo + c) / 3 * vol
-
-            if total_vol > 0:
-                vwap         = round(vwap_num / total_vol, 2)
-                volume_ratio = round(total_vol / avg_vol20, 2) if avg_vol20 > 0 else None
-
-        except Exception as exc:
-            log.debug("get_stock_intraday Kite failed for %s: %s", symbol, exc)
-            ltp = prev_close   # EOD fallback — bars stay []
+        if iday_buf and iday_for_today:
+            by_minute: dict[str, list[float]] = defaultdict(list)
+            for t, price in iday_buf:
+                by_minute[t].append(price)
+            for t in sorted(by_minute.keys()):
+                prices = by_minute[t]
+                bars.append({"time": t, "open": prices[0], "high": max(prices),
+                             "low": min(prices), "close": prices[-1], "volume": 0})
+            if ltp is None:
+                ltp = iday_buf[-1][1]
+            source = "live"
+        else:
+            ltp = prev_close  # final EOD fallback
 
     pct_52w_high = None
     if ltp and high_52w and high_52w > 0:
         pct_52w_high = round((ltp - high_52w) / high_52w * 100, 2)
 
     return {
+        "symbol":       symbol,
         "bars":         bars,
         "ltp":          ltp,
         "source":       source,
