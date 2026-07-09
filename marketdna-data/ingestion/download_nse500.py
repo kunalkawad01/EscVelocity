@@ -178,9 +178,17 @@ def process_symbol(
             start = START_DATE
         else:
             last = get_last_stored_date(symbol)
-            if last is not None and last >= END_DATE:
+            if last is None:
+                start = START_DATE
+            elif last < END_DATE:
+                start = last + timedelta(days=1)
+            elif last == END_DATE:
+                # Today's stored candle may be a partial intraday snapshot from an
+                # earlier same-day run — always re-fetch today so the final EOD
+                # close overwrites it (merge_into_lake dedups by date, keep="last").
+                start = END_DATE
+            else:
                 return symbol, "up-to-date"
-            start = START_DATE if last is None else last + timedelta(days=1)
 
         if start > END_DATE:
             return symbol, "up-to-date"

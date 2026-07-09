@@ -18,6 +18,15 @@ const TF_LABELS: Record<TF, string> = {
   '1d': '1D', '5d': '5D', '1m': '1M', '3m': '3M', '6m': '6M', '1y': '1Y', '2y': '2Y',
 }
 
+// NSE cash market hours: 9:15–15:30 IST, Mon–Fri
+function isMarketOpenIST(): boolean {
+  const ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  const day = ist.getDay()
+  if (day === 0 || day === 6) return false
+  const mins = ist.getHours() * 60 + ist.getMinutes()
+  return mins >= 555 && mins <= 930
+}
+
 const UNIVERSES = ['nifty50', 'nifty200', 'nifty500', 'fno'] as const
 type Universe = typeof UNIVERSES[number]
 
@@ -450,21 +459,25 @@ export default function SectorHeatmapPage() {
   const [error, setError]       = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
-  const fetchData = useCallback(async (u: Universe) => {
-    setLoading(true)
+  const fetchData = useCallback(async (u: Universe, { background = false } = {}) => {
+    if (!background) setLoading(true)
     setError(null)
     try {
       const result = await sectorHeatmapApi.getHeatmap(u)
       setData(result)
     } catch (e: any) {
-      setError(e.message || 'Failed to load heatmap')
+      if (!background) setError(e.message || 'Failed to load heatmap')
     } finally {
-      setLoading(false)
+      if (!background) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     fetchData(universe)
+    const id = setInterval(() => {
+      if (isMarketOpenIST()) fetchData(universe, { background: true })
+    }, 60_000)
+    return () => clearInterval(id)
   }, [universe, fetchData])
 
   const handleUniverseChange = (u: Universe) => {

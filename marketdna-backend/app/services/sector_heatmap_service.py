@@ -44,7 +44,7 @@ MOMENTUM_WEIGHTS: dict[str, float] = {
 }
 
 
-# ─── Kite 5-min sparkline helpers ─────────────────────────────────────────────
+# ─── Kite 1-min sparkline helpers ─────────────────────────────────────────────
 
 def _trade_date_str() -> str:
     """Last completed NSE trading day as YYYY-MM-DD (IST-aware)."""
@@ -58,15 +58,15 @@ def _trade_date_str() -> str:
     return d.isoformat()
 
 
-def _5min_slot() -> str:
-    """Current IST time floored to nearest 5 minutes — used as sparkline cache key."""
+def _1min_slot() -> str:
+    """Current IST time floored to nearest 1 minute — used as sparkline cache key."""
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    mins = (ist_now.hour * 60 + ist_now.minute) // 5 * 5
+    mins = ist_now.hour * 60 + ist_now.minute
     return f"{mins // 60:02d}:{mins % 60:02d}"
 
 
-def _fetch_5min_closes(symbols: list[str]) -> dict[str, list[float]]:
-    """Fetch today's 5-min Kite bars for all symbols sequentially.
+def _fetch_1min_closes(symbols: list[str]) -> dict[str, list[float]]:
+    """Fetch today's 1-min Kite bars for all symbols sequentially.
 
     Returns {symbol: [open_of_first_bar, close_bar1, close_bar2, ...]} so the
     sparkline anchors at the 9:15 open and traces each bar's close.
@@ -84,7 +84,7 @@ def _fetch_5min_closes(symbols: list[str]) -> dict[str, list[float]]:
             for k, v in ltp_resp.items()
         }
         if not tokens:
-            log.warning("_fetch_5min_closes: ltp() returned no tokens for %d symbols", len(symbols))
+            log.warning("_fetch_1min_closes: ltp() returned no tokens for %d symbols", len(symbols))
             return {}
 
         trade_date_s = _trade_date_str()
@@ -100,22 +100,22 @@ def _fetch_5min_closes(symbols: list[str]) -> dict[str, list[float]]:
                 missing.append(sym)
                 continue
             try:
-                bars = kite.historical_data(tok, from_dt, to_dt, "5minute")
+                bars = kite.historical_data(tok, from_dt, to_dt, "minute")
                 if bars:
                     result[sym] = [float(bars[0]["open"])] + [float(b["close"]) for b in bars]
                 else:
-                    log.warning("5min empty bars: %s", sym)
+                    log.warning("1min empty bars: %s", sym)
             except Exception as exc:
-                log.warning("5min fetch failed: %s — %s", sym, exc)
+                log.warning("1min fetch failed: %s — %s", sym, exc)
 
         if missing:
-            log.warning("5min: no token from ltp() for %d symbols: %s", len(missing), missing[:10])
-        log.info("sector-heatmap 5min sparklines: %d/%d symbols, trade_date=%s",
+            log.warning("1min: no token from ltp() for %d symbols: %s", len(missing), missing[:10])
+        log.info("sector-heatmap 1min sparklines: %d/%d symbols, trade_date=%s",
                  len(result), len(symbols), trade_date_s)
         return result
 
     except Exception as exc:
-        log.warning("_fetch_5min_closes failed: %s", exc)
+        log.warning("_fetch_1min_closes failed: %s", exc)
         return {}
 
 
@@ -459,10 +459,18 @@ def _build_stock(
     stock_rets = {tf: _pct_return(closes, TF_RETURN_BARS[tf]) for tf in TFS}
     stock_series = {tf: _series_for_tf(closes, tf) for tf in TFS}
 
-    # Override 1D series with Kite 5-min closes if available
+    # Override 1D series + return with live Kite 1-min bars if available.
+    # closes[-1] is yesterday's daily close during market hours (today's row
+    # doesn't land in the daily parquet until EOD ingestion), so the plain
+    # close-to-close _pct_return would be stale by a day. Kite's intraday
+    # series is [today_open, bar1_close, bar2_close, ...] — use today's open
+    # as the 1D baseline so the number matches live session performance.
     kite_1d = (sparklines_1d or {}).get(stock_def["symbol"])
     if kite_1d:
         stock_series["1d"] = kite_1d
+        today_open = kite_1d[0]
+        if today_open:
+            stock_rets["1d"] = round((kite_1d[-1] - today_open) / today_open * 100, 2)
 
     last_252 = closes[-252:] if len(closes) >= 252 else closes
     if last_252:
@@ -570,8 +578,8 @@ def _compute(universe: str) -> SectorHeatmapResponse:
         vals = [_pct_return(closes_map.get(sym, []), TF_RETURN_BARS[tf]) for sym in n50_symbols]
         nifty_rets[tf] = round(float(np.mean(vals)), 2) if vals else 0.0
 
-    # 1D sparklines from Kite 5-min bars (falls back to {} if Kite unavailable)
-    sparklines_1d = _fetch_5min_closes(all_symbols)
+    # 1D sparklines from Kite 1-min bars (falls back to {} if Kite unavailable)
+    sparklines_1d = _fetch_1min_closes(all_symbols)
 
     sectors_out = [_build_sector(sec, closes_map, nifty_rets, sparklines_1d) for sec in sectors_def]
 
@@ -585,7 +593,7 @@ def _compute(universe: str) -> SectorHeatmapResponse:
 
 def get_heatmap(universe: str = "nifty500") -> SectorHeatmapResponse:
     today = datetime.now().strftime("%Y-%m-%d")
-    cache_key = f"{universe}:{today}:{_5min_slot()}"
+    cache_key = f"{universe}:{today}:{_1min_slot()}"
 
     cached = _cache.get(cache_key)
     if cached:
