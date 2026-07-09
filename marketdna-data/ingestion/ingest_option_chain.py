@@ -17,6 +17,7 @@ Usage (from marketdna-data/ with venv active):
     .venv\\Scripts\\python.exe -m ingestion.ingest_option_chain
 """
 
+import argparse
 import logging
 import sys
 import time
@@ -108,30 +109,33 @@ def _atm_strike(spot: float, interval: float) -> float:
     return round(round(spot / interval) * interval, 4)
 
 
-def _prev_oi(symbol: str, strike: float, opt_type: str, expiry: date) -> int | None:
-    """Load yesterday's OI from stored parquet if it exists."""
-    yesterday = date.fromordinal(date.today().toordinal() - 1)
+def _load_prev_oi_map(ref_date: date) -> dict[tuple[str, float, str, str], int]:
+    """Load the prior trading day's OI (relative to ref_date) once into a lookup dict."""
+    yesterday = date.fromordinal(ref_date.toordinal() - 1)
     prev_path = LAKE_ROOT / f"date={yesterday}" / "data.parquet"
     if not prev_path.exists():
-        return None
+        return {}
     try:
-        df = pl.read_parquet(prev_path).filter(
-            (pl.col("symbol") == symbol)
-            & (pl.col("strike") == strike)
-            & (pl.col("option_type") == opt_type)
-            & (pl.col("expiry") == expiry.isoformat())
-        )
-        if df.is_empty():
-            return None
-        return int(df["oi"][0])
+        df = pl.read_parquet(prev_path, columns=["symbol", "strike", "option_type", "expiry", "oi"])
+        return {
+            (row["symbol"], row["strike"], row["option_type"], row["expiry"]): row["oi"]
+            for row in df.iter_rows(named=True)
+        }
     except Exception:
-        return None
+        return {}
 
 
 # ── Main ingestion logic ──────────────────────────────────────────────────────
 
-def ingest_option_chain() -> None:
+def ingest_option_chain(label_date: date | None = None) -> None:
+    """Fetch live option chain quotes and write them under `label_date`'s partition.
+
+    `label_date` defaults to today. Pass an earlier date to backfill a day that was
+    missed — Kite's quote API only returns live data, so this stamps the current
+    live snapshot as a stand-in for the requested (unrecoverable) historical day.
+    """
     today = date.today()
+    write_date = label_date or today
     fo_symbols = _load_fo_symbols()
     log.info("Loaded %d F&O symbols from FO.csv", len(fo_symbols))
 
@@ -240,7 +244,8 @@ def ingest_option_chain() -> None:
 
     # Step 6 — Build rows
     rows: list[dict] = []
-    today_str = today.isoformat()
+    today_str = write_date.isoformat()
+    prev_oi_map = _load_prev_oi_map(write_date)
 
     for token, q in raw_quotes.items():
         meta = token_to_meta.get(token)
@@ -262,7 +267,7 @@ def ingest_option_chain() -> None:
         bid       = depth.get("buy",  [{}])[0].get("price", 0.0) or 0.0
         ask       = depth.get("sell", [{}])[0].get("price", 0.0) or 0.0
 
-        prev_oi_val = _prev_oi(sym, strike, opt_type, date.fromisoformat(expiry))
+        prev_oi_val = prev_oi_map.get((sym, strike, opt_type, expiry))
         oi_change   = (oi - prev_oi_val) if prev_oi_val is not None else None
 
         iv = compute_iv(ltp, spot, strike, T, opt_type) if ltp > 0 and spot > 0 else None
@@ -337,4 +342,12 @@ def ingest_option_chain() -> None:
 
 
 if __name__ == "__main__":
-    ingest_option_chain()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--date", type=str, default=None,
+        help="Label this live quote pull as YYYY-MM-DD instead of today "
+             "(backfill for a day whose live snapshot was never captured).",
+    )
+    args = parser.parse_args()
+    label = date.fromisoformat(args.date) if args.date else None
+    ingest_option_chain(label_date=label)

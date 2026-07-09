@@ -17,6 +17,7 @@ Usage (from marketdna-data/ with venv active):
     .venv\\Scripts\\python.exe -m ingestion.ingest_futures
 """
 
+import argparse
 import logging
 import sys
 import time
@@ -55,26 +56,31 @@ def _nearest_monthly_expiry(expiries: list[date]) -> date | None:
     return future[0] if future else None
 
 
-def _prev_oi(symbol: str, expiry: date) -> int | None:
-    yesterday = date.fromordinal(date.today().toordinal() - 1)
+def _load_prev_oi_map(ref_date: date) -> dict[tuple[str, str], int]:
+    """Load the prior trading day's OI (relative to ref_date) once into a lookup dict."""
+    yesterday = date.fromordinal(ref_date.toordinal() - 1)
     prev_path = LAKE_ROOT / f"date={yesterday}" / "data.parquet"
     if not prev_path.exists():
-        return None
+        return {}
     try:
-        df = pl.read_parquet(prev_path).filter(
-            (pl.col("symbol") == symbol)
-            & (pl.col("expiry") == expiry.isoformat())
-        )
-        return int(df["oi"][0]) if not df.is_empty() else None
+        df = pl.read_parquet(prev_path, columns=["symbol", "expiry", "oi"])
+        return {(row["symbol"], row["expiry"]): row["oi"] for row in df.iter_rows(named=True)}
     except Exception:
-        return None
+        return {}
 
 
 # ── Main ingestion logic ──────────────────────────────────────────────────────
 
-def ingest_futures() -> None:
+def ingest_futures(label_date: date | None = None) -> None:
+    """Fetch live futures quotes and write them under `label_date`'s partition.
+
+    `label_date` defaults to today. Pass an earlier date to backfill a day that was
+    missed — Kite's quote API only returns live data, so this stamps the current
+    live snapshot as a stand-in for the requested (unrecoverable) historical day.
+    """
     today     = date.today()
-    today_str = today.isoformat()
+    write_date = label_date or today
+    today_str = write_date.isoformat()
     fo_symbols = _load_fo_symbols()
     log.info("Loaded %d F&O symbols from FO.csv", len(fo_symbols))
 
@@ -143,6 +149,7 @@ def ingest_futures() -> None:
 
     # Step 5 — Build rows
     rows: list[dict] = []
+    prev_oi_map = _load_prev_oi_map(write_date)
 
     for token, q in raw_quotes.items():
         meta   = token_to_meta.get(int(token))
@@ -161,7 +168,7 @@ def ingest_futures() -> None:
         bid    = depth.get("buy",  [{}])[0].get("price", 0.0) or 0.0
         ask    = depth.get("sell", [{}])[0].get("price", 0.0) or 0.0
 
-        prev_oi_val = _prev_oi(sym, date.fromisoformat(expiry))
+        prev_oi_val = prev_oi_map.get((sym, expiry))
         oi_change   = (oi - prev_oi_val) if prev_oi_val is not None else None
 
         basis     = round(ltp - spot, 4) if ltp > 0 and spot > 0 else None
@@ -235,4 +242,12 @@ def ingest_futures() -> None:
 
 
 if __name__ == "__main__":
-    ingest_futures()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--date", type=str, default=None,
+        help="Label this live quote pull as YYYY-MM-DD instead of today "
+             "(backfill for a day whose live snapshot was never captured).",
+    )
+    args = parser.parse_args()
+    label = date.fromisoformat(args.date) if args.date else None
+    ingest_futures(label_date=label)
