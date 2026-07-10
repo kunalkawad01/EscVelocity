@@ -34,6 +34,7 @@ const NAV_GROUPS = [
   {
     label: 'Signals',
     items: [
+      { to: '/fno-tactical',     label: 'F&O Tactical', desc: 'Live OI positioning & trend-aligned entries' },
       { to: '/live-trading',     label: 'Live',      desc: 'Sector scatter & breakthrough signals' },
       { to: '/intraday-race',    label: 'Race',      desc: 'Bar race, ATR scatter & norm returns'  },
       { to: '/delivery',         label: 'Delivery',  desc: 'Accumulation & distribution signals'   },
@@ -46,6 +47,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/options',       label: 'Options OI', desc: 'Open interest & OI buildup'  },
       { to: '/expected-move', label: 'Exp. Move',  desc: 'IV-based expected move scan' },
+      { to: '/iv-smile',      label: 'IV Smile',   desc: 'Vol smile, greeks & skew'   },
     ],
   },
 ]

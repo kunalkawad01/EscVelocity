@@ -8,7 +8,9 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [cointegration_page.md](cointegration_page.md) | `/cointegration` | Statistical pairs trading via Engle-Granger + Johansen |
 | [dataviz_page.md](dataviz_page.md) | `/dataviz` | Returns Intelligence — cross-sectional returns, scatter, breadth for NSE 500 |
 | [delivery_page.md](delivery_page.md) | `/delivery` | NSE delivery data intelligence — 6 signals, graded edge |
+| [fno_tactical_page.md](fno_tactical_page.md) | `/fno-tactical` | Live intraday F&O dashboard — breadth gate, OI positioning scatter, 9:15 lines, option-chain drilldown |
 | [indicators_page.md](indicators_page.md) | `/indicators` | **Reference UI.** Technical indicator scanner + edge lab |
+| [iv_smile_page.md](iv_smile_page.md) | `/iv-smile` | Options volatility smile + Black-Scholes greeks + skew analytics |
 | [landing_page.md](landing_page.md) | `/` | Editorial home — module showcase + platform philosophy |
 | [markov_options_page.md](markov_options_page.md) | `/markov-options` | 6-regime Markov classifier + options strategy engine |
 | [options_page.md](options_page.md) | `/options` | F&O OI analysis — butterfly, max pain, CE/PE walls, 4-way buildup signal |

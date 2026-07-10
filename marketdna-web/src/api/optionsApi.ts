@@ -1,4 +1,4 @@
-import type { OIAnalysis, OIScannerResponse, ExpectedMoveHistory, EMScanResponse } from '../types/options'
+import type { OIAnalysis, OIScannerResponse, ExpectedMoveHistory, EMScanResponse, IVSmileResponse } from '../types/options'
 
 const BASE = 'http://localhost:8000/api/options'
 
@@ -38,4 +38,13 @@ export const optionsApi = {
 
   invalidateEMScan: (): Promise<void> =>
     fetch(`${BASE}/em-scan/invalidate`, { method: 'POST' }).then(() => undefined),
+
+  getIVSmile: (symbol: string): Promise<IVSmileResponse> =>
+    fetch(`${BASE}/${symbol}/iv-smile`).then(r => {
+      if (!r.ok) throw new Error(r.statusText)
+      return r.json()
+    }),
+
+  invalidateIVSmile: (symbol: string): Promise<void> =>
+    fetch(`${BASE}/${symbol}/iv-smile/invalidate`, { method: 'POST' }).then(() => undefined),
 }

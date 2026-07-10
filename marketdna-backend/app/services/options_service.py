@@ -1,15 +1,19 @@
 """Options OI Analysis service — DuckDB-backed, in-process cache."""
 import logging
 import math
+import threading
+from collections import defaultdict
 from typing import Optional
 
 import numpy as np
 
+from app.config import settings
 from app.services.duckdb_client import get_connection, ensure_fo_views
 from app.models.options import (
     OIAnalysis, StrikeData, MaxPainPoint, OIBuildupItem, OIScannerResponse,
     ExpectedMovePoint, ExpectedMoveHistory,
     EMHistoryRow, EMScanRow, EMScanResponse,
+    IVSmileStrike, IVSmileResponse, IVHistoryPoint,
 )
 
 log = logging.getLogger(__name__)
@@ -18,6 +22,230 @@ _symbol_cache: dict[str, OIAnalysis] = {}
 _scanner_cache: Optional[OIScannerResponse] = None
 _em_cache: dict[str, ExpectedMoveHistory] = {}  # keyed by symbol
 _em_scan_cache: Optional[EMScanResponse] = None
+_iv_smile_cache: dict[str, IVSmileResponse] = {}  # keyed by symbol
+
+# Serializes the expensive full-view scans (get_scanner / get_em_scan) so a burst
+# of concurrent cold-cache requests computes once, not N times (CLAUDE.md lesson).
+_scan_lock = threading.Lock()
+
+# Latest options data-date the caches were built for. When ingestion adds a newer
+# date, _refresh_if_new_day() clears every cache so pages pick up fresh prices
+# without needing an explicit /invalidate call.
+_data_date: Optional[str] = None
+
+# Plausible IV band (annualised %). NSE feed carries garbage IV (>100, up to ~500)
+# on deep-OTM / illiquid strikes; anything outside this band is treated as missing.
+_IV_MIN, _IV_MAX = 1.0, 150.0
+_RISK_FREE = 0.065  # India risk-free proxy for Black-Scholes greeks
+
+
+def _clean_iv(iv) -> Optional[float]:
+    """Return IV only if within the plausible band, else None (drops feed garbage)."""
+    if iv is None:
+        return None
+    try:
+        v = float(iv)
+    except (TypeError, ValueError):
+        return None
+    return v if _IV_MIN <= v <= _IV_MAX else None
+
+
+def _latest_options_date(con) -> Optional[str]:
+    try:
+        row = con.execute("SELECT MAX(date) FROM options_chain").fetchone()
+        return str(row[0]) if row and row[0] else None
+    except Exception:
+        return None
+
+
+def _refresh_if_new_day(con) -> None:
+    """Clear all caches when a newer options data-date appears (post-ingestion)."""
+    global _data_date, _symbol_cache, _scanner_cache, _em_cache, _em_scan_cache, _iv_smile_cache
+    ld = _latest_options_date(con)
+    if ld is not None and ld != _data_date:
+        _data_date = ld
+        _symbol_cache = {}
+        _scanner_cache = None
+        _em_cache = {}
+        _em_scan_cache = None
+        _iv_smile_cache = {}
+
+
+# ── Black-Scholes greeks (deterministic; no scipy) ────────────────────────────
+
+def _norm_cdf(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _norm_pdf(x: float) -> float:
+    return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
+
+
+def _bs_greeks(spot: float, strike: float, iv_pct: Optional[float],
+               dte_days: int, opt_type: str, r: float = _RISK_FREE) -> Optional[dict]:
+    """Black-Scholes greeks. `iv_pct` is annualised vol in percent (e.g. 22.5).
+
+    Returns {delta, gamma, vega, theta} (theta/vega per-day / per-1-vol-point),
+    or None when inputs are unusable. Deterministic — safe for the Feature Store.
+    """
+    try:
+        iv = _clean_iv(iv_pct)
+        if iv is None:
+            return None
+        iv /= 100.0
+        T = max(int(dte_days), 1) / 365.0
+        if spot <= 0 or strike <= 0 or iv <= 0 or T <= 0:
+            return None
+        sqrtT = math.sqrt(T)
+        d1 = (math.log(spot / strike) + (r + 0.5 * iv * iv) * T) / (iv * sqrtT)
+        d2 = d1 - iv * sqrtT
+        pdf = _norm_pdf(d1)
+        gamma = pdf / (spot * iv * sqrtT)
+        vega = spot * pdf * sqrtT / 100.0                     # per 1 vol point
+        if opt_type == "CE":
+            delta = _norm_cdf(d1)
+            theta = (-(spot * pdf * iv) / (2 * sqrtT)
+                     - r * strike * math.exp(-r * T) * _norm_cdf(d2)) / 365.0
+        else:
+            delta = _norm_cdf(d1) - 1.0
+            theta = (-(spot * pdf * iv) / (2 * sqrtT)
+                     + r * strike * math.exp(-r * T) * _norm_cdf(-d2)) / 365.0
+        return {"delta": round(delta, 4), "gamma": round(gamma, 6),
+                "vega": round(vega, 4), "theta": round(theta, 4)}
+    except Exception:
+        return None
+
+
+# ── IV-Rank history (persisted daily ATM-IV series) ───────────────────────────
+#
+# We persist one ATM-IV value per (symbol, date) to a derived parquet, rebuilt
+# from the whole options_chain each time a new options date appears. As history
+# accumulates (currently ~15 days) this unlocks IV-Rank / IV-percentile, which
+# is the missing "is vol rich or cheap" signal the Strategy Lens needs.
+
+_IV_RANK_LOOKBACK = 252          # ~1 trading year
+_IV_RANK_MIN_DAYS = 20           # below this, rank is not yet meaningful
+
+_iv_hist_lock = threading.Lock()
+_iv_hist: Optional[dict[str, list[tuple[str, float]]]] = None  # symbol -> [(date, atm_iv), ...] asc
+_iv_hist_date: Optional[str] = None                            # options data-date the series was built for
+
+
+def _iv_history_path():
+    return settings.data_path / "data_lake" / "derived" / "iv_history" / "atm_iv.parquet"
+
+
+def _rebuild_iv_history(con) -> None:
+    """Recompute ATM-IV for every (symbol, date) from options_chain and write parquet.
+
+    ATM IV = mean cleaned IV of CE+PE at the strike nearest spot, per symbol per date.
+    Idempotent — always derivable from the immutable raw options parquet.
+    """
+    path = _iv_history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out = str(path).replace("\\", "/")
+    con.execute(f"""
+        COPY (
+            WITH spots AS (
+                SELECT STRFTIME('%Y-%m-%d', date) AS d, symbol, MAX(underlying_price) AS spot
+                FROM options_chain
+                GROUP BY 1, 2
+            ),
+            atm AS (
+                SELECT d, symbol, strike FROM (
+                    SELECT s.d, s.symbol, o.strike,
+                           ROW_NUMBER() OVER (PARTITION BY s.d, s.symbol ORDER BY ABS(o.strike - s.spot)) AS rn
+                    FROM options_chain o
+                    JOIN spots s ON STRFTIME('%Y-%m-%d', o.date) = s.d AND o.symbol = s.symbol
+                    GROUP BY s.d, s.symbol, o.strike, s.spot
+                ) WHERE rn = 1
+            )
+            SELECT a.d AS date, a.symbol, ROUND(AVG(o.iv), 2) AS atm_iv
+            FROM atm a
+            JOIN options_chain o
+                ON STRFTIME('%Y-%m-%d', o.date) = a.d AND o.symbol = a.symbol AND o.strike = a.strike
+            WHERE o.iv BETWEEN {_IV_MIN} AND {_IV_MAX}
+            GROUP BY a.d, a.symbol
+            ORDER BY a.symbol, a.d
+        ) TO '{out}' (FORMAT PARQUET)
+    """)
+    log.info("iv_history: rebuilt %s", out)
+
+
+def _ensure_iv_history(con) -> None:
+    """Load the ATM-IV series into memory, rebuilding the parquet if a new date appeared."""
+    global _iv_hist, _iv_hist_date
+    latest = _latest_options_date(con)
+    if _iv_hist is not None and _iv_hist_date == latest:
+        return
+    with _iv_hist_lock:
+        if _iv_hist is not None and _iv_hist_date == latest:
+            return
+        path = _iv_history_path()
+        out = str(path).replace("\\", "/")
+        need_rebuild = True
+        if path.exists():
+            try:
+                mx = con.execute(f"SELECT MAX(date) FROM read_parquet('{out}')").fetchone()[0]
+                need_rebuild = str(mx) != str(latest)
+            except Exception:
+                need_rebuild = True
+        if need_rebuild:
+            try:
+                _rebuild_iv_history(con)
+            except Exception as e:
+                log.error("iv_history rebuild failed: %s", e, exc_info=True)
+                _iv_hist, _iv_hist_date = {}, latest
+                return
+        hist: dict[str, list[tuple[str, float]]] = defaultdict(list)
+        try:
+            for sym, dt, iv in con.execute(
+                f"SELECT symbol, date, atm_iv FROM read_parquet('{out}') ORDER BY symbol, date"
+            ).fetchall():
+                hist[sym].append((str(dt), float(iv)))
+        except Exception as e:
+            log.error("iv_history load failed: %s", e, exc_info=True)
+        _iv_hist, _iv_hist_date = dict(hist), latest
+
+
+def warm_iv_history() -> None:
+    """Startup/prewarm entry point — builds + loads the ATM-IV series."""
+    ensure_fo_views()
+    try:
+        _ensure_iv_history(get_connection())
+    except Exception as e:
+        log.warning("warm_iv_history: %s", e)
+
+
+def invalidate_iv_history() -> None:
+    """Force the ATM-IV series to rebuild + reload on next access (post-ingestion)."""
+    global _iv_hist, _iv_hist_date
+    _iv_hist, _iv_hist_date = None, None
+    warm_iv_history()
+
+
+def _iv_rank_for(symbol: str, current_iv: Optional[float]) -> tuple[Optional[float], Optional[float], int]:
+    """Return (iv_rank, iv_percentile, n_days) over trailing history for a symbol.
+
+    Rank/percentile are None until at least _IV_RANK_MIN_DAYS of history exist.
+    """
+    if _iv_hist is None or current_iv is None:
+        return None, None, 0
+    series = _iv_hist.get(symbol, [])
+    ivs = [iv for _, iv in series][-_IV_RANK_LOOKBACK:]
+    n = len(ivs)
+    if n < _IV_RANK_MIN_DAYS:
+        return None, None, n
+    mn, mx = min(ivs), max(ivs)
+    rank = 0.0 if mx == mn else (current_iv - mn) / (mx - mn) * 100.0
+    pct = sum(1 for v in ivs if v < current_iv) / n * 100.0
+    return round(max(0.0, min(100.0, rank)), 1), round(pct, 1), n
+
+
+def _iv_history_series(symbol: str, tail: int = 90) -> list[IVHistoryPoint]:
+    if _iv_hist is None:
+        return []
+    return [IVHistoryPoint(date=d, atm_iv=v) for d, v in _iv_hist.get(symbol, [])[-tail:]]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -113,11 +341,12 @@ def _build_signal(
 # ── Per-symbol OI Analysis ────────────────────────────────────────────────────
 
 def get_oi_analysis(symbol: str, invalidate: bool = False) -> Optional[OIAnalysis]:
-    if not invalidate and symbol in _symbol_cache:
-        return _symbol_cache[symbol]
-
     ensure_fo_views()
     con = get_connection()
+    _refresh_if_new_day(con)
+
+    if not invalidate and symbol in _symbol_cache:
+        return _symbol_cache[symbol]
 
     # Check view exists
     try:
@@ -211,7 +440,8 @@ def get_oi_analysis(symbol: str, invalidate: bool = False) -> Optional[OIAnalysi
         atm_data = strike_map.get(atm_strike)
         atm_iv: Optional[float] = None
         if atm_data:
-            ivs = [v for v in (atm_data["ce_iv"], atm_data["pe_iv"]) if v is not None]
+            ivs = [c for v in (atm_data["ce_iv"], atm_data["pe_iv"])
+                   if (c := _clean_iv(v)) is not None]
             atm_iv = round(sum(ivs) / len(ivs), 2) if ivs else None
 
         max_pain_strike, pain_curve = _compute_max_pain(strike_list)
@@ -265,6 +495,18 @@ def invalidate_symbol(symbol: str) -> None:
 # ── Scanner ───────────────────────────────────────────────────────────────────
 
 def get_scanner(invalidate: bool = False) -> Optional[OIScannerResponse]:
+    """Day-keyed, locked wrapper — one compute even under concurrent cold hits."""
+    ensure_fo_views()
+    _refresh_if_new_day(get_connection())
+    if not invalidate and _scanner_cache is not None:
+        return _scanner_cache
+    with _scan_lock:
+        if not invalidate and _scanner_cache is not None:
+            return _scanner_cache
+        return _build_scanner(invalidate)
+
+
+def _build_scanner(invalidate: bool = False) -> Optional[OIScannerResponse]:
     global _scanner_cache
     if not invalidate and _scanner_cache is not None:
         return _scanner_cache
@@ -339,6 +581,7 @@ def get_scanner(invalidate: bool = False) -> Optional[OIScannerResponse]:
                 FROM options_chain o
                 JOIN spot_cte s ON o.symbol = s.symbol
                 WHERE o.date = ? AND o.iv IS NOT NULL
+                  AND o.iv BETWEEN 1 AND 150   -- drop feed-garbage IV
             )
             SELECT symbol, AVG(iv) AS atm_iv
             FROM ranked WHERE rn = 1
@@ -575,6 +818,18 @@ def _fut_dir(chg_pct: Optional[float]) -> str:
 
 
 def get_em_scan(invalidate: bool = False) -> Optional[EMScanResponse]:
+    """Day-keyed, locked wrapper — one compute even under concurrent cold hits."""
+    ensure_fo_views()
+    _refresh_if_new_day(get_connection())
+    if not invalidate and _em_scan_cache is not None:
+        return _em_scan_cache
+    with _scan_lock:
+        if not invalidate and _em_scan_cache is not None:
+            return _em_scan_cache
+        return _build_em_scan(invalidate)
+
+
+def _build_em_scan(invalidate: bool = False) -> Optional[EMScanResponse]:
     """Return Expected Move scan for all symbols — all historical dates embedded per symbol.
 
     Main row = latest date. history[] = previous dates, newest first.
@@ -881,3 +1136,167 @@ def get_em_scan(invalidate: bool = False) -> Optional[EMScanResponse]:
 def invalidate_em_scan() -> None:
     global _em_scan_cache
     _em_scan_cache = None
+
+
+# ── IV Smile / Skew Engine ────────────────────────────────────────────────────
+
+def get_iv_smile(symbol: str, invalidate: bool = False) -> Optional[IVSmileResponse]:
+    """Per-strike volatility smile + Black-Scholes greeks for the front expiry.
+
+    For each strike we take the OTM-side IV (puts below spot, calls above spot —
+    the standard smile convention), compute greeks from that IV, and derive skew
+    metrics: 25-delta risk reversal, OLS skew slope, and put/call wing IVs.
+    """
+    ensure_fo_views()
+    con = get_connection()
+
+    try:
+        con.execute("SELECT 1 FROM options_chain LIMIT 0")
+    except Exception:
+        log.warning("options_chain view not available for iv-smile")
+        return None
+
+    _refresh_if_new_day(con)
+    if not invalidate and symbol in _iv_smile_cache:
+        return _iv_smile_cache[symbol]
+
+    try:
+        row = con.execute(
+            "SELECT MAX(date) FROM options_chain WHERE symbol = ?", [symbol]
+        ).fetchone()
+        if not row or not row[0]:
+            return None
+        latest_date = str(row[0])
+
+        # Front (nearest) expiry only — the liquid smile
+        exp_row = con.execute(
+            "SELECT MIN(expiry) FROM options_chain WHERE symbol = ? AND date = ?",
+            [symbol, latest_date],
+        ).fetchone()
+        if not exp_row or not exp_row[0]:
+            return None
+        expiry = str(exp_row[0])
+
+        rows = con.execute("""
+            SELECT strike, option_type, iv, oi, underlying_price
+            FROM options_chain
+            WHERE symbol = ? AND date = ? AND expiry = ?
+            ORDER BY strike
+        """, [symbol, latest_date, expiry]).fetchall()
+    except Exception as e:
+        log.error("options_service.get_iv_smile(%s): %s", symbol, e, exc_info=True)
+        return None
+
+    if not rows:
+        return None
+
+    # Group by strike, cleaning IV
+    strike_map: dict[float, dict] = {}
+    spot = 0.0
+    for strike, opt_type, iv, oi, underlying_price in rows:
+        spot = underlying_price or spot
+        d = strike_map.setdefault(strike, {"ce_iv": None, "pe_iv": None, "ce_oi": 0, "pe_oi": 0})
+        if opt_type == "CE":
+            d["ce_iv"] = _clean_iv(iv)
+            d["ce_oi"] = int(oi or 0)
+        else:
+            d["pe_iv"] = _clean_iv(iv)
+            d["pe_oi"] = int(oi or 0)
+
+    if spot <= 0:
+        return None
+
+    try:
+        dte = max(int(np.busday_count(latest_date, expiry)), 1)
+    except Exception:
+        dte = 1
+
+    sorted_strikes = sorted(strike_map.keys())
+    atm_strike = _nearest_strike(sorted_strikes, spot)
+
+    smile: list[IVSmileStrike] = []
+    for k in sorted_strikes:
+        d = strike_map[k]
+        moneyness = (k - spot) / spot * 100.0
+        ce_g = _bs_greeks(spot, k, d["ce_iv"], dte, "CE")
+        pe_g = _bs_greeks(spot, k, d["pe_iv"], dte, "PE")
+
+        # OTM-side IV: puts below spot, calls above spot, blend at ATM
+        if k < spot:
+            smile_iv = d["pe_iv"] if d["pe_iv"] is not None else d["ce_iv"]
+        elif k > spot:
+            smile_iv = d["ce_iv"] if d["ce_iv"] is not None else d["pe_iv"]
+        else:
+            both = [v for v in (d["ce_iv"], d["pe_iv"]) if v is not None]
+            smile_iv = round(sum(both) / len(both), 2) if both else None
+
+        smile.append(IVSmileStrike(
+            strike=k,
+            moneyness=round(moneyness, 2),
+            ce_iv=d["ce_iv"],
+            pe_iv=d["pe_iv"],
+            smile_iv=round(smile_iv, 2) if smile_iv is not None else None,
+            ce_delta=ce_g["delta"] if ce_g else None,
+            pe_delta=pe_g["delta"] if pe_g else None,
+            gamma=(ce_g or pe_g or {}).get("gamma"),
+            vega=(ce_g or pe_g or {}).get("vega"),
+            ce_theta=ce_g["theta"] if ce_g else None,
+            pe_theta=pe_g["theta"] if pe_g else None,
+            ce_oi=d["ce_oi"],
+            pe_oi=d["pe_oi"],
+        ))
+
+    # ATM IV — cleaned avg of ATM CE + PE
+    atm_d = strike_map.get(atm_strike, {})
+    atm_ivs = [v for v in (atm_d.get("ce_iv"), atm_d.get("pe_iv")) if v is not None]
+    atm_iv = round(sum(atm_ivs) / len(atm_ivs), 2) if atm_ivs else None
+
+    # Skew slope: OLS of smile_iv vs moneyness (IV points per +1% OTM)
+    xs = np.array([s.moneyness for s in smile if s.smile_iv is not None], dtype=float)
+    ys = np.array([s.smile_iv for s in smile if s.smile_iv is not None], dtype=float)
+    skew_slope = round(float(np.polyfit(xs, ys, 1)[0]), 4) if len(xs) >= 3 else None
+
+    # 25-delta risk reversal = IV(25Δ put) - IV(25Δ call)  (+ = put skew)
+    call_25 = min((s for s in smile if s.ce_delta is not None and s.ce_iv is not None),
+                  key=lambda s: abs(s.ce_delta - 0.25), default=None)
+    put_25 = min((s for s in smile if s.pe_delta is not None and s.pe_iv is not None),
+                 key=lambda s: abs(s.pe_delta + 0.25), default=None)
+    rr_25d = round(put_25.pe_iv - call_25.ce_iv, 2) if (call_25 and put_25) else None
+
+    # Wing IVs: average smile_iv within the 8-12% OTM band on each side
+    put_wing = [s.smile_iv for s in smile if s.smile_iv is not None and -12.0 <= s.moneyness <= -8.0]
+    call_wing = [s.smile_iv for s in smile if s.smile_iv is not None and 8.0 <= s.moneyness <= 12.0]
+    put_wing_iv = round(sum(put_wing) / len(put_wing), 2) if put_wing else None
+    call_wing_iv = round(sum(call_wing) / len(call_wing), 2) if call_wing else None
+
+    # IV-Rank / percentile over the persisted ATM-IV history
+    _ensure_iv_history(con)
+    iv_rank, iv_pct, iv_days = _iv_rank_for(symbol, atm_iv)
+
+    result = IVSmileResponse(
+        symbol=symbol,
+        date=latest_date,
+        expiry=expiry,
+        dte=dte,
+        spot=round(spot, 2),
+        atm_strike=atm_strike,
+        atm_iv=atm_iv,
+        rr_25d=rr_25d,
+        skew_slope=skew_slope,
+        put_wing_iv=put_wing_iv,
+        call_wing_iv=call_wing_iv,
+        iv_rank=iv_rank,
+        iv_percentile=iv_pct,
+        iv_history_days=iv_days,
+        atm_iv_history=_iv_history_series(symbol),
+        strikes=smile,
+        note=(f"Front expiry {expiry} ({dte} business days). Smile uses OTM-side IV "
+              f"(puts below spot, calls above); greeks are Black-Scholes at r={_RISK_FREE:.1%}. "
+              f"IV outside {_IV_MIN:.0f}-{_IV_MAX:.0f}% filtered as feed garbage."),
+    )
+    _iv_smile_cache[symbol] = result
+    return result
+
+
+def invalidate_iv_smile(symbol: str) -> None:
+    _iv_smile_cache.pop(symbol, None)

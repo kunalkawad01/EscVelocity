@@ -145,3 +145,47 @@ class ExpectedMovePoint(BaseModel):
 class ExpectedMoveHistory(BaseModel):
     symbol: str
     history: list[ExpectedMovePoint]
+
+
+# ── IV Smile / Skew ───────────────────────────────────────────────────────────
+
+class IVSmileStrike(BaseModel):
+    strike: float
+    moneyness: float                    # (strike - spot) / spot * 100  (+ = OTM call side)
+    ce_iv: Optional[float] = None       # cleaned (garbage IV filtered out)
+    pe_iv: Optional[float] = None
+    smile_iv: Optional[float] = None    # OTM-side IV used for the smile curve
+    ce_delta: Optional[float] = None
+    pe_delta: Optional[float] = None
+    gamma: Optional[float] = None       # same for CE/PE at a strike
+    vega: Optional[float] = None
+    ce_theta: Optional[float] = None
+    pe_theta: Optional[float] = None
+    ce_oi: int = 0
+    pe_oi: int = 0
+
+
+class IVHistoryPoint(BaseModel):
+    date: str
+    atm_iv: float
+
+
+class IVSmileResponse(BaseModel):
+    symbol: str
+    date: str
+    expiry: str
+    dte: int                            # business days to expiry
+    spot: float
+    atm_strike: float
+    atm_iv: Optional[float] = None      # cleaned avg of ATM CE + PE IV
+    rr_25d: Optional[float] = None      # 25-delta risk reversal = IV(25Δ put) - IV(25Δ call); + = put skew
+    skew_slope: Optional[float] = None  # OLS slope of smile_iv vs moneyness (IV pts per +1% OTM)
+    put_wing_iv: Optional[float] = None  # avg smile_iv for ~8-12% OTM puts
+    call_wing_iv: Optional[float] = None  # avg smile_iv for ~8-12% OTM calls
+    # IV-Rank / percentile over the persisted ATM-IV history (lookback ≤ 252 days).
+    iv_rank: Optional[float] = None     # (atm_iv - min) / (max - min) × 100 over history
+    iv_percentile: Optional[float] = None  # % of history days with ATM IV below today's
+    iv_history_days: int = 0            # number of days in the history series
+    atm_iv_history: list[IVHistoryPoint] = []  # trailing ATM-IV series (for sparkline)
+    strikes: list[IVSmileStrike]
+    note: str                           # documents assumptions (r, OTM-side IV, greeks source)

@@ -17,6 +17,7 @@ import DataVizPage from './pages/DataVizPage'
 import StockHealthPage from './pages/StockHealthPage'
 import RandomnessPage from './pages/RandomnessPage'
 import OptionsPage from './pages/OptionsPage'
+import IVSmilePage from './pages/IVSmilePage'
 import ExpectedMovePage from './pages/ExpectedMovePage'
 import BreakoutScannerPage from './pages/BreakoutScannerPage'
 import LiveTradingPage from './pages/LiveTradingPage'
@@ -24,6 +25,7 @@ import IntradayRacePage from './pages/IntradayRacePage'
 import DruckenmillerROCPage from './pages/DruckenmillerROCPage'
 import SectorHeatmapPage from './pages/SectorHeatmapPage'
 import CompanyIntelligencePage from './pages/CompanyIntelligencePage'
+import FnoTacticalPage from './pages/FnoTacticalPage'
 
 export default function App() {
   return (
@@ -50,6 +52,7 @@ export default function App() {
           <Route path="/randomness"            element={<RandomnessPage />} />
           <Route path="/options"               element={<OptionsPage />} />
           <Route path="/expected-move"         element={<ExpectedMovePage />} />
+          <Route path="/iv-smile"              element={<IVSmilePage />} />
           <Route path="/breakout-scanner"      element={<BreakoutScannerPage />} />
           <Route path="/live-trading"          element={<LiveTradingPage />} />
           <Route path="/intraday-race"         element={<IntradayRacePage />} />
@@ -57,6 +60,7 @@ export default function App() {
           <Route path="/sector-heatmap"                    element={<SectorHeatmapPage />} />
           <Route path="/company-intelligence"           element={<CompanyIntelligencePage />} />
           <Route path="/company-intelligence/:symbol"   element={<CompanyIntelligencePage />} />
+          <Route path="/fno-tactical"                   element={<FnoTacticalPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
