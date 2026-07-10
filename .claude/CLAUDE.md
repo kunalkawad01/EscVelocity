@@ -399,6 +399,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `quant_strategies.py` | `/api/quant` | `/scan` (slow 20–40s, should be nightly), POST `/invalidate` |
 | `dataviz.py` + `dataviz_analytics.py` + `dataviz_breadth_extra.py` | `/api/dataviz` | NSE 500 universe. Key: `/returns/snapshot?horizon=ret_1d`, `/returns/history/{symbol}`, `/scatter?horizon=1m`, `/breadth/above200-weekly`. Horizons: `ret_1d` → `cagr_5y` (11 total). |
 | `stock_health.py` | `/api/stock-health` | GET `/scan` (instant — parquet-backed), GET `/{symbol}` (on-demand, ~1-2s), POST `/scan/invalidate` (forces recompute + parquet refresh), POST `/{symbol}/invalidate`. Scan parquet at `data_lake/derived/stock_health/scan.parquet`. |
+| `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
 
 ---
 
@@ -596,7 +597,8 @@ $endpoints = @(
     "http://localhost:8000/api/stock-health/scan/invalidate",
     "http://localhost:8000/api/quant/invalidate",
     "http://localhost:8000/api/options/em-scan/invalidate",
-    "http://localhost:8000/api/options/scan/invalidate"
+    "http://localhost:8000/api/options/scan/invalidate",
+    "http://localhost:8000/api/fno/invalidate"
 )
 foreach ($url in $endpoints) {
     try {
@@ -789,6 +791,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/cointegration` | `page_docu/cointegration_page.md` |
 | `/dataviz` | `page_docu/dataviz_page.md` |
 | `/delivery` | `page_docu/delivery_page.md` |
+| `/fno-tactical` | `page_docu/fno_tactical_page.md` |
 | `/indicators` | `page_docu/indicators_page.md` |
 | `/markov-options` | `page_docu/markov_options_page.md` |
 | `/pattern-dna` | `page_docu/pattern_dna_page.md` |

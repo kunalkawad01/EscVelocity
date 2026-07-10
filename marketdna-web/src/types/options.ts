@@ -141,3 +141,44 @@ export interface ExpectedMoveHistory {
   symbol: string
   history: ExpectedMovePoint[]
 }
+
+export interface IVSmileStrike {
+  strike: number
+  moneyness: number
+  ce_iv: number | null
+  pe_iv: number | null
+  smile_iv: number | null
+  ce_delta: number | null
+  pe_delta: number | null
+  gamma: number | null
+  vega: number | null
+  ce_theta: number | null
+  pe_theta: number | null
+  ce_oi: number
+  pe_oi: number
+}
+
+export interface IVHistoryPoint {
+  date: string
+  atm_iv: number
+}
+
+export interface IVSmileResponse {
+  symbol: string
+  date: string
+  expiry: string
+  dte: number
+  spot: number
+  atm_strike: number
+  atm_iv: number | null
+  rr_25d: number | null
+  skew_slope: number | null
+  put_wing_iv: number | null
+  call_wing_iv: number | null
+  iv_rank: number | null
+  iv_percentile: number | null
+  iv_history_days: number
+  atm_iv_history: IVHistoryPoint[]
+  strikes: IVSmileStrike[]
+  note: string
+}

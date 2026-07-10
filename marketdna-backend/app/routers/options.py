@@ -3,7 +3,9 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from app.services import options_service
-from app.models.options import OIAnalysis, OIScannerResponse, ExpectedMoveHistory, EMScanResponse
+from app.models.options import (
+    OIAnalysis, OIScannerResponse, ExpectedMoveHistory, EMScanResponse, IVSmileResponse,
+)
 
 router = APIRouter(prefix="/api/options", tags=["options"])
 log = logging.getLogger(__name__)
@@ -41,6 +43,13 @@ def invalidate_em_scan():
     return {"status": "invalidated"}
 
 
+@router.post("/iv-history/rebuild")
+def rebuild_iv_history():
+    """Rebuild the persisted ATM-IV series (run after post-market options ingestion)."""
+    options_service.invalidate_iv_history()
+    return {"status": "rebuilt"}
+
+
 # ── Per-symbol endpoints (sub-paths before bare /{symbol}) ────────────────────
 
 @router.get("/{symbol}/expected-move", response_model=ExpectedMoveHistory)
@@ -55,6 +64,21 @@ def get_expected_move(symbol: str):
 @router.post("/{symbol}/expected-move/invalidate")
 def invalidate_expected_move(symbol: str):
     options_service.invalidate_em(symbol.upper())
+    return {"status": "invalidated", "symbol": symbol.upper()}
+
+
+@router.get("/{symbol}/iv-smile", response_model=IVSmileResponse)
+def get_iv_smile(symbol: str):
+    """Volatility smile + Black-Scholes greeks + skew metrics for the front expiry."""
+    result = options_service.get_iv_smile(symbol.upper())
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No IV smile data for {symbol}")
+    return result
+
+
+@router.post("/{symbol}/iv-smile/invalidate")
+def invalidate_iv_smile(symbol: str):
+    options_service.invalidate_iv_smile(symbol.upper())
     return {"status": "invalidated", "symbol": symbol.upper()}
 
 
