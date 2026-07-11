@@ -667,4 +667,9 @@ def invalidate() -> None:
         _scan_cache.clear()
     with _fut_meta_lock:
         _fut_meta_date = ""
+    # The scatter's price/return fields come from live_trading_service._get_hist(),
+    # whose daily cache is NOT keyed on the underlying data date — so post-market
+    # re-ingestion leaves it stale (serving the prior session). Reset it too, else
+    # clearing only the fno caches re-derives from the same stale hist.
+    _lts.invalidate()
     log.info("F&O tactical: caches invalidated")

@@ -134,6 +134,24 @@ def _get_hist() -> dict[str, dict]:
     return _hist
 
 
+def invalidate() -> None:
+    """Force the daily historical-context cache to recompute on next access.
+
+    _get_hist() is keyed by the calendar date, so same-day re-ingestion — the
+    post-market OHLCV run that appends today's candle after the backend has
+    already cached hist earlier in the day — does NOT refresh it: the key
+    (today's date) is unchanged, so the guard short-circuits and the page keeps
+    serving the prior session. Resetting _hist_date forces a recompute from the
+    fresh parquet on the next call, so every page built on _get_hist (F&O
+    tactical, live trading, intraday race, sector heatmap) picks up the new bar
+    without a backend restart.
+    """
+    global _hist_date
+    with _hist_lock:
+        _hist_date = ""
+    log.info("Live trading: historical-context cache invalidated")
+
+
 # ── Intraday LTP accumulator ──────────────────────────────────────────────────
 _iday_date: str = ""
 _iday: dict[str, list[tuple[str, float]]] = {}  # symbol → [(HH:MM, ltp)]

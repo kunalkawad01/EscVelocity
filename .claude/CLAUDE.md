@@ -598,7 +598,8 @@ $endpoints = @(
     "http://localhost:8000/api/quant/invalidate",
     "http://localhost:8000/api/options/em-scan/invalidate",
     "http://localhost:8000/api/options/scan/invalidate",
-    "http://localhost:8000/api/fno/invalidate"
+    "http://localhost:8000/api/fno/invalidate",
+    "http://localhost:8000/api/portfolios/invalidate"
 )
 foreach ($url in $endpoints) {
     try {
@@ -612,6 +613,22 @@ foreach ($url in $endpoints) {
 
 After invalidation each page re-queries DuckDB (which reads directly from the fresh parquet
 files) on its next request — no backend restart needed.
+
+## Step 3 — Snapshot portfolio NAV curves (backend running on port 8000)
+
+`/api/portfolios/track/snapshot` is **not** a cache flush — it persists one EOD NAV point per
+portfolio × universe to the append-only `data_lake/derived/portfolios/nav.parquet`. Run it AFTER
+Step 1 (so today's bar is in `equities_prices`) and AFTER the Step 2 `/api/portfolios/invalidate`
+(so it snapshots off fresh data). It is keyed by trading date — idempotent, safe to re-run.
+
+```powershell
+try {
+    $r = Invoke-RestMethod -Uri "http://localhost:8000/api/portfolios/track/snapshot" -Method POST -TimeoutSec 180
+    Write-Output "snapshotted=$($r.snapshotted) failed=$($r.failed -join ',')"
+} catch {
+    Write-Output "ERROR portfolios/track/snapshot — $($_.Exception.Message)"
+}
+```
 
 ## Alternative: restart both servers
 
@@ -642,6 +659,7 @@ Start-Process powershell -ArgumentList "-NoExit -Command cd 'C:\Users\amitk\EscV
 | `/api/quant/invalidate` | Quant Strategies scan |
 | `/api/options/em-scan/invalidate` | Expected Move page (all symbols scan) |
 | `/api/options/scan/invalidate` | OI Buildup scanner |
+| `/api/portfolios/invalidate` | Portfolios page (screen/track/live/backtest caches) |
 
 Per-symbol options caches (`/api/options/{symbol}`) are populated on demand — they pick up
 fresh parquet automatically on first request after ingestion, no explicit invalidation needed.
