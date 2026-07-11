@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, portfolios
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
@@ -29,6 +29,7 @@ from app.services.pattern_service import start_screener_prewarm
 from app.services import breakout_service
 from app.services import live_trading_service
 from app.services import options_service
+from app.services import portfolios_service
 
 app = FastAPI(
     title="MarketDNA API",
@@ -67,6 +68,7 @@ app.include_router(druckenmiller_roc.router)
 app.include_router(sector_heatmap.router)
 app.include_router(intelligence.router)
 app.include_router(fno.router)
+app.include_router(portfolios.router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -88,6 +90,7 @@ def _background_prewarm() -> None:
     for name, fn in [
         ("kite ticker",      live_trading_service.start_ticker),   # WebSocket OI accumulator
         ("cointegration",    start_preload),              # ~3s, user-visible page
+        ("portfolios",       portfolios_service.start_prewarm),   # ~17s, user-visible; before slow tasks
         ("screener prewarm", start_screener_prewarm),    # ~3min, all 9 pattern tabs
         ("health scan",      stock_health_service.start_scan_warmup),
         ("options em-scan",  options_service.get_em_scan),   # multi-CTE full scan, ~user-visible

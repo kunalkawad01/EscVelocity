@@ -26,6 +26,9 @@ import DruckenmillerROCPage from './pages/DruckenmillerROCPage'
 import SectorHeatmapPage from './pages/SectorHeatmapPage'
 import CompanyIntelligencePage from './pages/CompanyIntelligencePage'
 import FnoTacticalPage from './pages/FnoTacticalPage'
+import PortfoliosPage from './pages/PortfoliosPage'
+import PortfolioDetailPage from './pages/PortfolioDetailPage'
+import PortfolioBuilderPage from './pages/PortfolioBuilderPage'
 
 export default function App() {
   return (
@@ -61,6 +64,10 @@ export default function App() {
           <Route path="/company-intelligence"           element={<CompanyIntelligencePage />} />
           <Route path="/company-intelligence/:symbol"   element={<CompanyIntelligencePage />} />
           <Route path="/fno-tactical"                   element={<FnoTacticalPage />} />
+          <Route path="/portfolios"                     element={<PortfoliosPage />} />
+          <Route path="/portfolios/new"                 element={<PortfolioBuilderPage />} />
+          <Route path="/portfolios/edit/:key"           element={<PortfolioBuilderPage />} />
+          <Route path="/portfolios/:key"                element={<PortfolioDetailPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
