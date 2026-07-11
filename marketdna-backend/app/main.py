@@ -124,6 +124,14 @@ async def startup():
         ("live trading hist",    live_trading_service._get_hist),
     ]:
         _run_task(name, fn)
+    # Ensure the custom-portfolios Postgres table exists + migrate any legacy JSON.
+    # Non-fatal: init_store() logs and returns if the DB is unreachable.
+    from app.services import portfolios_store
+    _run_task("custom portfolios store", portfolios_store.init_store)
+    # Ensure the forward-tracker Postgres tables exist + migrate any legacy parquet history.
+    # Also non-fatal — tracking stays unavailable (503) until the DB is reachable.
+    from app.services import portfolios_tracker_service
+    _run_task("portfolio tracker store", portfolios_tracker_service.init_store)
     threading.Thread(target=_background_prewarm, daemon=True).start()
 
 

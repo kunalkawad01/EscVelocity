@@ -11,6 +11,7 @@ from app.services import portfolios_service
 from app.services import portfolios_tracker_service
 from app.services import portfolios_rules
 from app.services import portfolios_store
+from app.db import StoreUnavailable
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/portfolios", tags=["portfolios"])
@@ -73,6 +74,8 @@ def create_custom(spec: PortfolioSpec):
         portfolios_store.save_spec(spec)
     except portfolios_rules.RuleError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except StoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Portfolio database unavailable: {exc}") from exc
     portfolios_service.invalidate_cache()
     return _meta(portfolios_service.get_portfolio(key))
 
@@ -88,6 +91,8 @@ def update_custom(key: str, spec: PortfolioSpec):
         portfolios_store.save_spec(spec)
     except portfolios_rules.RuleError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except StoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Portfolio database unavailable: {exc}") from exc
     portfolios_service.invalidate_cache()
     return _meta(portfolios_service.get_portfolio(key))
 
@@ -96,9 +101,16 @@ def update_custom(key: str, spec: PortfolioSpec):
 def delete_custom(key: str):
     """Delete a custom portfolio and purge its tracker history (basis / NAV / log)."""
     key = key.lower()
-    if not portfolios_store.delete_spec(key):
+    try:
+        removed_spec = portfolios_store.delete_spec(key)
+    except StoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Portfolio database unavailable: {exc}") from exc
+    if not removed_spec:
         raise HTTPException(status_code=404, detail=f"No custom portfolio '{key}'")
-    removed = portfolios_tracker_service.purge(key)
+    try:
+        removed = portfolios_tracker_service.purge(key)
+    except StoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Portfolio database unavailable: {exc}") from exc
     portfolios_service.invalidate_cache()
     return {"status": "ok", "deleted": key, "purged": removed}
 
@@ -122,6 +134,8 @@ def track(key: str, universe: str = Query("nifty500", description="nifty200 | ni
         return portfolios_tracker_service.get_track(key.lower(), universe=_norm_universe(universe))
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Portfolio database unavailable: {exc}") from exc
 
 
 @router.post("/track/snapshot")
