@@ -18,10 +18,14 @@ post-market). DURING market hours the current NAV is recomputed from live Kite L
 headline NAV. Intraday values are NOT persisted — only EOD points are, written whenever
 equities_prices has today's bar (i.e. by the post-market snapshot or the next visit).
 
-Persistence (pandas parquet under data_lake/derived/portfolios/):
-  basis.parquet       current active holdings + entry closes (rewritten on rebalance)
-  nav.parquet         append-only EOD NAV per (key, universe)
-  rebalances.parquet  append-only event log (INCEPTION / ADD / DROP) with rationale
+Persistence (PostgreSQL via the app.db pool — see init_store):
+  portfolio_basis        current active holdings + entry closes (replaced per key/universe on rebalance)
+  portfolio_nav          one EOD NAV row per (key, universe, date) — upserted
+  portfolio_rebalances   append-only event log (INCEPTION / ADD / DROP) with rationale
+
+The legacy pandas-parquet stores under data_lake/derived/portfolios/ are migrated into these
+tables once at startup (init_store) and then left untouched. If Postgres is unreachable the
+tracker raises StoreUnavailable and the track endpoint surfaces 503 — there is no file fallback.
 """
 from __future__ import annotations
 
@@ -34,6 +38,7 @@ import numpy as np
 import pandas as pd
 
 from app.config import settings
+from app.db import StoreUnavailable, connection, ensure_database
 from app.services.duckdb_client import get_connection
 from app.services import portfolios_service as ps
 from app.services import portfolios_rules as pr
@@ -44,10 +49,12 @@ INCEPTION_DATE = _date(2026, 7, 10)
 BASE_NAV = 100.0
 CASH_SYMBOL = "$CASH"          # reserved basis row for the un-invested (cash) sleeve
 
-_DIR = settings.data_path / "data_lake" / "derived" / "portfolios"
-_BASIS = _DIR / "basis.parquet"
-_NAV = _DIR / "nav.parquet"
-_LOG = _DIR / "rebalances.parquet"
+# Legacy parquet location — read once at startup (init_store) to migrate pre-existing
+# forward-track history into Postgres. Files are left in place after migration.
+_LEGACY_DIR = settings.data_path / "data_lake" / "derived" / "portfolios"
+_LEGACY_BASIS = _LEGACY_DIR / "basis.parquet"
+_LEGACY_NAV = _LEGACY_DIR / "nav.parquet"
+_LEGACY_LOG = _LEGACY_DIR / "rebalances.parquet"
 
 _lock = threading.Lock()
 
@@ -59,25 +66,199 @@ _LOG_COLS = ["key", "universe", "date", "action", "symbol", "rationale"]
 _HORIZONS = {"ret_1d": 1, "ret_5d": 5, "ret_1m": 21, "ret_3m": 63, "ret_6m": 126, "ret_1y": 252}
 
 
-# ── parquet io ────────────────────────────────────────────────────────────────
-def _load(path, cols) -> pd.DataFrame:
-    if path.exists():
-        try:
-            return pd.read_parquet(path)
-        except Exception as exc:
-            log.warning("tracker: could not read %s (%s); starting fresh", path, exc)
-    return pd.DataFrame(columns=cols)
+# ── postgres schema / persistence ───────────────────────────────────────────────
+_DDL = (
+    """
+    CREATE TABLE IF NOT EXISTS portfolio_basis (
+        key         TEXT             NOT NULL,
+        universe    TEXT             NOT NULL,
+        symbol      TEXT             NOT NULL,
+        base_date   TEXT             NOT NULL,
+        base_nav    DOUBLE PRECISION NOT NULL,
+        entry_close DOUBLE PRECISION NOT NULL,
+        weight      DOUBLE PRECISION NOT NULL,
+        rationale   TEXT             NOT NULL DEFAULT '',
+        PRIMARY KEY (key, universe, symbol)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS portfolio_nav (
+        key      TEXT             NOT NULL,
+        universe TEXT             NOT NULL,
+        date     TEXT             NOT NULL,
+        nav      DOUBLE PRECISION NOT NULL,
+        PRIMARY KEY (key, universe, date)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS portfolio_rebalances (
+        id        BIGSERIAL PRIMARY KEY,
+        key       TEXT NOT NULL,
+        universe  TEXT NOT NULL,
+        date      TEXT NOT NULL,
+        action    TEXT NOT NULL,
+        symbol    TEXT NOT NULL,
+        rationale TEXT NOT NULL DEFAULT ''
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_portfolio_rebalances_key "
+    "ON portfolio_rebalances (key, universe, date)",
+)
 
 
-def _save(df: pd.DataFrame, path) -> None:
-    _DIR.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(path, index=False)
+def init_store() -> None:
+    """Ensure the tracker tables exist and migrate any legacy parquet history into Postgres.
+
+    Non-fatal: if Postgres is unreachable this logs a warning and returns; forward tracking
+    stays unavailable (get_track raises StoreUnavailable) until the DB is reachable."""
+    try:
+        ensure_database()                              # create the DB on a fresh install
+        with connection() as con:
+            for stmt in _DDL:
+                con.execute(stmt)
+    except StoreUnavailable as exc:
+        log.warning("tracker: Postgres unavailable at startup (%s) — forward tracking "
+                    "disabled until the DB is reachable", exc)
+        return
+    _migrate_legacy_parquet()
 
 
-def _cat(*frames: pd.DataFrame) -> pd.DataFrame:
-    """concat that skips empty frames — avoids pandas' all-NA concat deprecation."""
-    non_empty = [f for f in frames if len(f)]
-    return pd.concat(non_empty, ignore_index=True) if non_empty else frames[0]
+# ── one-time legacy parquet → postgres migration ─────────────────────────────────
+def _s(v) -> str:
+    """NaN/None-safe text coercion for migrated parquet cells."""
+    return "" if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
+
+
+def _read_legacy(path, cols) -> pd.DataFrame:
+    try:
+        return pd.read_parquet(path).reindex(columns=cols)
+    except Exception as exc:
+        log.warning("tracker: could not read legacy %s (%s); skipping", path, exc)
+        return pd.DataFrame(columns=cols)
+
+
+def _table_empty(con, table: str) -> bool:
+    return con.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone() is None
+
+
+def _migrate_legacy_parquet() -> None:
+    """Import the old basis/nav/rebalances parquet files into Postgres exactly once.
+
+    Each table is imported only when it is still empty, so this is idempotent and never
+    double-imports the append-only rebalance log. Parquet files are left in place. The
+    basis migration is essential — without the original entry closes a re-inception would
+    re-baseline the whole book at today's prices and corrupt the forward track."""
+    try:
+        _migrate_basis()
+        _migrate_nav()
+        _migrate_log()
+    except StoreUnavailable:
+        return
+
+
+def _migrate_basis() -> None:
+    if not _LEGACY_BASIS.exists():
+        return
+    with connection() as con:
+        if not _table_empty(con, "portfolio_basis"):
+            return
+        df = _read_legacy(_LEGACY_BASIS, _BASIS_COLS)
+        rows = [(r["key"], r["universe"], _s(r["base_date"]), float(r["base_nav"]), r["symbol"],
+                 float(r["entry_close"]), float(r["weight"]), _s(r["rationale"]))
+                for _, r in df.iterrows() if r["symbol"] is not None]
+        if rows:
+            con.cursor().executemany(
+                "INSERT INTO portfolio_basis (key, universe, base_date, base_nav, symbol, "
+                "entry_close, weight, rationale) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT (key, universe, symbol) DO NOTHING", rows)
+            log.info("tracker: migrated %d legacy basis row(s) into Postgres", len(rows))
+
+
+def _migrate_nav() -> None:
+    if not _LEGACY_NAV.exists():
+        return
+    with connection() as con:
+        if not _table_empty(con, "portfolio_nav"):
+            return
+        df = _read_legacy(_LEGACY_NAV, _NAV_COLS)
+        rows = [(r["key"], r["universe"], _s(r["date"]), float(r["nav"]))
+                for _, r in df.iterrows() if r["key"] is not None]
+        if rows:
+            con.cursor().executemany(
+                "INSERT INTO portfolio_nav (key, universe, date, nav) VALUES (%s,%s,%s,%s) "
+                "ON CONFLICT (key, universe, date) DO NOTHING", rows)
+            log.info("tracker: migrated %d legacy NAV row(s) into Postgres", len(rows))
+
+
+def _migrate_log() -> None:
+    if not _LEGACY_LOG.exists():
+        return
+    with connection() as con:
+        if not _table_empty(con, "portfolio_rebalances"):
+            return
+        df = _read_legacy(_LEGACY_LOG, _LOG_COLS)
+        rows = [(r["key"], r["universe"], _s(r["date"]), r["action"], r["symbol"], _s(r["rationale"]))
+                for _, r in df.iterrows() if r["key"] is not None]
+        if rows:
+            con.cursor().executemany(
+                "INSERT INTO portfolio_rebalances (key, universe, date, action, symbol, rationale) "
+                "VALUES (%s,%s,%s,%s,%s,%s)", rows)
+            log.info("tracker: migrated %d legacy rebalance-log row(s) into Postgres", len(rows))
+
+
+# ── scoped reads (one key/universe slice, as a DataFrame matching *_COLS) ─────────
+def _basis_for(key: str, universe: str) -> pd.DataFrame:
+    with connection() as con:
+        rows = con.execute(
+            "SELECT key, universe, base_date, base_nav, symbol, entry_close, weight, rationale "
+            "FROM portfolio_basis WHERE key=%s AND universe=%s", (key, universe)).fetchall()
+    return pd.DataFrame(rows, columns=_BASIS_COLS)
+
+
+def _nav_for(key: str, universe: str) -> pd.DataFrame:
+    with connection() as con:
+        rows = con.execute(
+            "SELECT key, universe, date, nav FROM portfolio_nav "
+            "WHERE key=%s AND universe=%s ORDER BY date", (key, universe)).fetchall()
+    return pd.DataFrame(rows, columns=_NAV_COLS)
+
+
+def _log_for(key: str, universe: str) -> pd.DataFrame:
+    with connection() as con:
+        rows = con.execute(
+            "SELECT key, universe, date, action, symbol, rationale FROM portfolio_rebalances "
+            "WHERE key=%s AND universe=%s", (key, universe)).fetchall()
+    return pd.DataFrame(rows, columns=_LOG_COLS)
+
+
+# ── scoped writes (share a caller's connection so a whole phase is one transaction) ──
+def _replace_basis(con, key: str, universe: str, df: pd.DataFrame) -> None:
+    """Replace the entire basis slice for one key/universe (delete + reinsert)."""
+    con.execute("DELETE FROM portfolio_basis WHERE key=%s AND universe=%s", (key, universe))
+    rows = [(key, universe, str(r["base_date"]), float(r["base_nav"]), r["symbol"],
+             float(r["entry_close"]), float(r["weight"]), (r["rationale"] or ""))
+            for _, r in df.iterrows()]
+    if rows:
+        con.cursor().executemany(
+            "INSERT INTO portfolio_basis (key, universe, base_date, base_nav, symbol, "
+            "entry_close, weight, rationale) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)", rows)
+
+
+def _append_log(con, events: list[dict]) -> None:
+    if not events:
+        return
+    con.cursor().executemany(
+        "INSERT INTO portfolio_rebalances (key, universe, date, action, symbol, rationale) "
+        "VALUES (%s,%s,%s,%s,%s,%s)",
+        [(e["key"], e["universe"], str(e["date"]), e["action"], e["symbol"],
+          (e.get("rationale") or "")) for e in events])
+
+
+def _upsert_nav(con, key: str, universe: str, date: str, nav: float) -> None:
+    con.execute(
+        "INSERT INTO portfolio_nav (key, universe, date, nav) VALUES (%s,%s,%s,%s) "
+        "ON CONFLICT (key, universe, date) DO UPDATE SET nav = EXCLUDED.nav",
+        (key, universe, str(date), float(nav)))
 
 
 # ── market data ───────────────────────────────────────────────────────────────
@@ -321,10 +502,7 @@ def get_track(key: str, universe: str = ps.DEFAULT_UNIVERSE) -> dict:
     feats = ps.build_features(universe=universe) if is_custom else None
 
     with _lock:
-        basis = _load(_BASIS, _BASIS_COLS)
-        nav = _load(_NAV, _NAV_COLS)
-        rlog = _load(_LOG, _LOG_COLS)
-        mine = basis[(basis["key"] == key) & (basis["universe"] == universe)]
+        mine = _basis_for(key, universe)
 
         # 1) Constitute at inception if never tracked.
         if mine.empty:
@@ -336,15 +514,14 @@ def get_track(key: str, universe: str = ps.DEFAULT_UNIVERSE) -> dict:
             # (which would also duplicate the NAV point on every subsequent call).
             if new_basis.empty:
                 return _empty_track(p, key, universe, asof_str)
-            basis = _cat(basis, new_basis)
             log_rows = [{"key": key, "universe": universe, "date": str(base_date),
                          "action": "INCEPTION", "symbol": r["symbol"], "rationale": r["rationale"]}
                         for _, r in new_basis.iterrows()]
-            rlog = _cat(rlog, pd.DataFrame(log_rows, columns=_LOG_COLS))
-            nav = _cat(nav, pd.DataFrame([{"key": key, "universe": universe,
-                       "date": str(base_date), "nav": BASE_NAV}], columns=_NAV_COLS))
-            mine = basis[(basis["key"] == key) & (basis["universe"] == universe)]
-            _save(basis, _BASIS); _save(rlog, _LOG); _save(nav, _NAV)
+            with connection() as con, con.transaction():
+                _replace_basis(con, key, universe, new_basis)
+                _append_log(con, log_rows)
+                _upsert_nav(con, key, universe, str(base_date), BASE_NAV)
+            mine = new_basis
 
         # 2) Rebalance if a new cadence period has begun since the current basis date.
         base_date = _date.fromisoformat(str(mine["base_date"].iloc[0]))
@@ -366,13 +543,11 @@ def get_track(key: str, universe: str = ps.DEFAULT_UNIVERSE) -> dict:
             for s in sorted(old_syms - new_syms):
                 events.append({"key": key, "universe": universe, "date": asof_str,
                                "action": "DROP", "symbol": s, "rationale": "No longer meets screen criteria"})
-            basis = basis[~((basis["key"] == key) & (basis["universe"] == universe))]
             new_basis = _make_basis_rows(key, universe, asof, old_nav, screen, rtab)
-            basis = _cat(basis, new_basis)
-            if events:
-                rlog = _cat(rlog, pd.DataFrame(events, columns=_LOG_COLS))
+            with connection() as con, con.transaction():
+                _replace_basis(con, key, universe, new_basis)
+                _append_log(con, events)
             mine = new_basis
-            _save(basis, _BASIS); _save(rlog, _LOG)
 
         # 2b) Otherwise, between rebalances, apply intra-period eviction / stop-loss
         #     (custom portfolios only). NAV is carried forward and the surviving basket
@@ -386,24 +561,18 @@ def get_track(key: str, universe: str = ps.DEFAULT_UNIVERSE) -> dict:
                 events = [{"key": key, "universe": universe, "date": asof_str, "action": "DROP",
                            "symbol": s, "rationale": f"Eviction rule: {rule_txt}"} for s in evicted]
                 new_basis = _evict(p, mine, evicted, rtab, cur_nav, base_date, key, universe)
-                basis = basis[~((basis["key"] == key) & (basis["universe"] == universe))]
-                basis = _cat(basis, new_basis)
-                rlog = _cat(rlog, pd.DataFrame(events, columns=_LOG_COLS))
+                with connection() as con, con.transaction():
+                    _replace_basis(con, key, universe, new_basis)
+                    _append_log(con, events)
                 mine = new_basis
-                _save(basis, _BASIS); _save(rlog, _LOG)
 
         # 3) Write the EOD NAV point for `asof` (the latest ingested trading day).
         eod_nav = _basket_nav(mine, rtab)
-        mask = (nav["key"] == key) & (nav["universe"] == universe) & (nav["date"] == asof_str)
-        if mask.any():
-            nav.loc[mask, "nav"] = eod_nav
-        else:
-            nav = _cat(nav, pd.DataFrame([{"key": key, "universe": universe,
-                       "date": asof_str, "nav": eod_nav}], columns=_NAV_COLS))
-        _save(nav, _NAV)
+        with connection() as con:
+            _upsert_nav(con, key, universe, asof_str, eod_nav)
 
-        curve_df = nav[(nav["key"] == key) & (nav["universe"] == universe)].sort_values("date").copy()
-        my_log = rlog[(rlog["key"] == key) & (rlog["universe"] == universe)].copy()
+        curve_df = _nav_for(key, universe).sort_values("date").copy()
+        my_log = _log_for(key, universe).copy()
         mine_out = mine.copy()
 
     # ── live overlay (outside the lock: network I/O) ──
@@ -477,15 +646,13 @@ def snapshot_all() -> dict:
 
 
 def purge(key: str) -> dict:
-    """Remove all tracker rows (basis / NAV / rebalance log) for a portfolio key.
-    Called when a custom portfolio is deleted so its history doesn't linger."""
+    """Remove all tracker rows (basis / NAV / rebalance log) for a portfolio key across
+    every universe. Called when a custom portfolio is deleted so its history doesn't linger.
+    Raises StoreUnavailable if Postgres is down."""
     removed = {}
     with _lock:
-        for path, cols in ((_BASIS, _BASIS_COLS), (_NAV, _NAV_COLS), (_LOG, _LOG_COLS)):
-            df = _load(path, cols)
-            before = len(df)
-            if before and "key" in df.columns:
-                df = df[df["key"] != key]
-                _save(df, path)
-            removed[path.stem] = before - len(df)
+        with connection() as con, con.transaction():
+            for table in ("portfolio_basis", "portfolio_nav", "portfolio_rebalances"):
+                cur = con.execute(f"DELETE FROM {table} WHERE key=%s", (key,))
+                removed[table] = cur.rowcount
     return removed

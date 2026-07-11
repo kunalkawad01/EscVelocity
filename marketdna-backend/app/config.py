@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
+    # PostgreSQL (application layer — custom Quant Portfolios persistence).
+    # Override via .env: MARKETDNA_PG_HOST / _PORT / _DB / _USER / _PASSWORD.
+    pg_host: str = "localhost"
+    pg_port: int = 5432
+    pg_db: str = "marketdna"
+    pg_user: str = "postgres"
+    pg_password: str = "postgres"
+
     model_config = {"env_prefix": "MARKETDNA_"}
 
 

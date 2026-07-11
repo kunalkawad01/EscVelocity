@@ -12,3 +12,5 @@ langgraph
 langchain-ollama
 redis==5.0.8
 hiredis==2.3.2
+psycopg[binary]==3.2.3
+psycopg-pool==3.2.3

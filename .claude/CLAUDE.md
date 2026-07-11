@@ -73,7 +73,11 @@ Querying `returns_features` or `std_deviation_features` when the file is absent 
 
 Application Layer:
 
-- PostgreSQL (planned — not yet implemented)
+- PostgreSQL (local install) — app-layer persistence for Quant Portfolios. Tables:
+  `custom_portfolios` (user-defined portfolio specs, JSONB), and the forward tracker's
+  `portfolio_basis` / `portfolio_nav` / `portfolio_rebalances`. Access via `app/db.py`
+  (psycopg3 pool + `ensure_database()` + `StoreUnavailable` graceful-degradation).
+  Config in `settings.pg_*` (`.env`: `MARKETDNA_PG_*`). Other subsystems still pre-PG.
 
 Caching:
 
@@ -617,7 +621,7 @@ files) on its next request — no backend restart needed.
 ## Step 3 — Snapshot portfolio NAV curves (backend running on port 8000)
 
 `/api/portfolios/track/snapshot` is **not** a cache flush — it persists one EOD NAV point per
-portfolio × universe to the append-only `data_lake/derived/portfolios/nav.parquet`. Run it AFTER
+portfolio × universe to the `portfolio_nav` Postgres table (upserted, keyed by trading date). Run it AFTER
 Step 1 (so today's bar is in `equities_prices`) and AFTER the Step 2 `/api/portfolios/invalidate`
 (so it snapshots off fresh data). It is keyed by trading date — idempotent, safe to re-run.
 
