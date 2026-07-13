@@ -26,6 +26,7 @@ const NAV_GROUPS = [
       { to: '/cointegration',    label: 'Cointegration', desc: 'Pair spreads & ADF scan'      },
       { to: '/markov-options',   label: 'Markov',        desc: '6-regime transition matrix'   },
       { to: '/quant-strategies', label: 'Quant',         desc: 'Momentum, MR, Vol, Rotation'  },
+      { to: '/edge-observatory', label: 'Edge Observatory', desc: 'Which edges still work — and how fast they are dying' },
       { to: '/portfolios',       label: 'Portfolios',    desc: 'OHLCV-only quant baskets · Nifty 200/500' },
       { to: '/dataviz',          label: 'DataViz',       desc: 'NSE 500 return visualisation' },
       { to: '/druckenmiller-roc',label: 'ROC²',          desc: 'Druckenmiller second-derivative signal' },
