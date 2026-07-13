@@ -73,6 +73,15 @@ export interface FieldCatalogResponse {
   operators: string[]
 }
 
+export interface NLDraftResponse {
+  spec: PortfolioSpec          // generated draft (not yet saved) — fills the builder form
+  summary: string              // plain-English readback of what the rules do
+  warnings: string[]           // e.g. no eviction rule, empty-screen risk
+  preview_count: number        // how many stocks the entry rule matches right now
+  preview_symbols: string[]    // first few current matches
+  attempts: number             // LLM passes incl. auto-repairs
+}
+
 export interface PortfolioListResponse {
   portfolios: PortfolioMeta[]
 }

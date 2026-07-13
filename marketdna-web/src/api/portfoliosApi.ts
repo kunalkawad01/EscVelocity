@@ -1,7 +1,7 @@
 // src/api/portfoliosApi.ts
 import type {
   PortfolioListResponse, ScreenResponse, BacktestResponse, LiveResponse, TrackResponse, Universe,
-  PortfolioSpec, PortfolioMeta, FieldCatalogResponse,
+  PortfolioSpec, PortfolioMeta, FieldCatalogResponse, NLDraftResponse,
 } from '../types/portfolios'
 
 const BASE = ''
@@ -57,6 +57,14 @@ export const portfoliosApi = {
   getFields: async (): Promise<FieldCatalogResponse> => {
     const res = await fetch(`${BASE}/api/portfolios/custom/fields`)
     if (!res.ok) throw new Error(`Fields API ${res.status}`)
+    return res.json()
+  },
+  draftFromText: async (description: string, universe: Universe = 'nifty500'): Promise<NLDraftResponse> => {
+    const res = await fetch(`${BASE}/api/portfolios/custom/from-text`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description, universe }),
+    })
+    if (!res.ok) throw new Error(await errDetail(res, 'Generate failed'))
     return res.json()
   },
   getCustomSpec: async (key: string): Promise<PortfolioSpec> => {

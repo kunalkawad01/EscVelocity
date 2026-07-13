@@ -5,12 +5,13 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.models.portfolios import (
     PortfolioListResponse, PortfolioMeta, ScreenResponse, BacktestResponse, LiveResponse,
-    TrackResponse, PortfolioSpec, FieldCatalogResponse,
+    TrackResponse, PortfolioSpec, FieldCatalogResponse, NLDraftRequest, NLDraftResponse,
 )
 from app.services import portfolios_service
 from app.services import portfolios_tracker_service
 from app.services import portfolios_rules
 from app.services import portfolios_store
+from app.services import portfolios_nl
 from app.db import StoreUnavailable
 
 log = logging.getLogger(__name__)
@@ -50,6 +51,19 @@ def custom_fields():
     `position_only` (usable only in eviction/stop-loss rules)."""
     return {"fields": portfolios_rules.field_catalog("eviction"),
             "operators": portfolios_rules._CATALOG_OPERATORS}
+
+
+@router.post("/custom/from-text", response_model=NLDraftResponse)
+def custom_from_text(req: NLDraftRequest):
+    """Translate a plain-English idea into a DRAFT custom-portfolio rule spec.
+
+    The LLM only emits the rule DSL (it never scores or picks stocks); the draft is
+    validated by the same strict rule engine and returned with a live match-count preview.
+    Nothing is saved — the client reviews the rules and creates it via POST /custom."""
+    try:
+        return portfolios_nl.draft_from_text(req.description, universe=_norm_universe(req.universe))
+    except portfolios_nl.TranslationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/custom/{key}/spec", response_model=PortfolioSpec)
