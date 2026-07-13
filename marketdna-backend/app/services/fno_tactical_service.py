@@ -161,20 +161,35 @@ def _get_fut_meta() -> dict[str, dict[str, Any]]:
         meta: dict[str, dict[str, Any]] = {}
         try:
             con = get_connection()
+            # Rank each symbol's sessions newest-first so we can read both the latest OI
+            # and the prior session's OI. We derive oi_change day-over-day (latest − prior)
+            # instead of trusting the parquet `oi_change` column, which is NULL on the
+            # ingest day — that NULL is why the EOD/closed quadrant used to come out flat
+            # (0 change → no quadrant → everything graded NONE → empty page after close).
             rows = con.execute("""
-                WITH latest AS (
-                    SELECT symbol, MAX(date) AS md FROM futures_chain GROUP BY symbol
+                WITH ranked AS (
+                    SELECT symbol,
+                           oi, oi_change,
+                           STRFTIME('%Y-%m-%d', CAST(expiry AS DATE)) AS expiry,
+                           ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY CAST(date AS DATE) DESC) AS rn
+                    FROM futures_chain
                 )
-                SELECT f.symbol,
-                       STRFTIME('%Y-%m-%d', CAST(f.expiry AS DATE)) AS expiry,
-                       f.oi, f.oi_change
-                FROM futures_chain f
-                JOIN latest l ON f.symbol = l.symbol AND f.date = l.md
+                SELECT l.symbol, l.expiry, l.oi AS oi_now, l.oi_change AS oi_change_col,
+                       p.oi AS oi_prev_session
+                FROM ranked l
+                LEFT JOIN ranked p ON p.symbol = l.symbol AND p.rn = 2
+                WHERE l.rn = 1
             """).fetchall()
-            for sym, expiry, oi, oi_change in rows:
+            for sym, expiry, oi_now, oi_change_col, oi_prev_session in rows:
+                if oi_now is not None and oi_prev_session is not None:
+                    oi_change = int(oi_now) - int(oi_prev_session)     # true day-over-day delta
+                elif oi_change_col is not None:
+                    oi_change = int(oi_change_col)                     # fall back to ingested column
+                else:
+                    oi_change = 0
                 meta[str(sym).upper()] = {
-                    "oi_prev": int(oi) if oi is not None else None,
-                    "oi_change": int(oi_change) if oi_change is not None else 0,
+                    "oi_prev": int(oi_now) if oi_now is not None else None,
+                    "oi_change": oi_change,
                     "expiry": expiry,
                 }
             log.info("F&O tactical: futures meta for %d symbols", len(meta))

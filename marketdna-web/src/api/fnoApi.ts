@@ -3,7 +3,10 @@ import type {
   OptionChainResponse, StrikeChartResponse,
 } from '../types/fno'
 
-const BASE = 'http://localhost:8000/api/fno'
+// Relative path so requests go through Vite's dev proxy (→ 127.0.0.1:8000) like every
+// other API. Avoids the hardcoded `localhost:8000`, which browsers may resolve to IPv6
+// `::1` — where the IPv4-only backend isn't listening, causing "no data" on this page.
+const BASE = '/api/fno'
 
 function json<T>(r: Response): Promise<T> {
   if (!r.ok) throw new Error(r.statusText)

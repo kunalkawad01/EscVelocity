@@ -1,6 +1,8 @@
 import type { OIAnalysis, OIScannerResponse, ExpectedMoveHistory, EMScanResponse, IVSmileResponse } from '../types/options'
 
-const BASE = 'http://localhost:8000/api/options'
+// Relative path → Vite proxy (127.0.0.1:8000). Avoids hardcoded `localhost:8000`, which
+// browsers may resolve to IPv6 `::1` where the IPv4-only backend isn't listening.
+const BASE = '/api/options'
 
 export const optionsApi = {
   getOIAnalysis: (symbol: string): Promise<OIAnalysis> =>
