@@ -180,6 +180,23 @@ class FieldCatalogResponse(BaseModel):
     operators: list[str]
 
 
+class NLDraftRequest(BaseModel):
+    """Plain-English description of a portfolio idea, to be translated into a rule spec."""
+    description: str = Field(min_length=3, max_length=2000)
+    universe: str = "nifty500"
+
+
+class NLDraftResponse(BaseModel):
+    """A draft PortfolioSpec produced from natural language. NOT saved — the user reviews
+    the generated rules (and the live match preview) before creating it via POST /custom."""
+    spec: PortfolioSpec                   # generated draft (key auto-slugged, editable)
+    summary: str                          # plain-English readback of what the rules do
+    warnings: list[str] = []              # e.g. no eviction rule, empty-screen risk
+    preview_count: int = 0                # how many stocks the entry rule matches right now
+    preview_symbols: list[str] = []       # first few current matches, for a sanity check
+    attempts: int = 1                     # LLM passes incl. auto-repairs
+
+
 class BacktestResponse(BaseModel):
     key: str
     name: str

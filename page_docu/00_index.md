@@ -8,6 +8,7 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [cointegration_page.md](cointegration_page.md) | `/cointegration` | Statistical pairs trading via Engle-Granger + Johansen |
 | [dataviz_page.md](dataviz_page.md) | `/dataviz` | Returns Intelligence — cross-sectional returns, scatter, breadth for NSE 500 |
 | [delivery_page.md](delivery_page.md) | `/delivery` | NSE delivery data intelligence — 6 signals, graded edge |
+| [edge_observatory_page.md](edge_observatory_page.md) | `/edge-observatory` | Longitudinal edge health monitor — monthly decay curves, CI bands, HEALTHY/FADING/DEAD statuses |
 | [fno_tactical_page.md](fno_tactical_page.md) | `/fno-tactical` | Live intraday F&O dashboard — breadth gate, OI positioning scatter, 9:15 lines, option-chain drilldown |
 | [indicators_page.md](indicators_page.md) | `/indicators` | **Reference UI.** Technical indicator scanner + edge lab |
 | [iv_smile_page.md](iv_smile_page.md) | `/iv-smile` | Options volatility smile + Black-Scholes greeks + skew analytics |

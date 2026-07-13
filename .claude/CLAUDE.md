@@ -403,6 +403,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `quant_strategies.py` | `/api/quant` | `/scan` (slow 20–40s, should be nightly), POST `/invalidate` |
 | `dataviz.py` + `dataviz_analytics.py` + `dataviz_breadth_extra.py` | `/api/dataviz` | NSE 500 universe. Key: `/returns/snapshot?horizon=ret_1d`, `/returns/history/{symbol}`, `/scatter?horizon=1m`, `/breadth/above200-weekly`. Horizons: `ret_1d` → `cagr_5y` (11 total). |
 | `stock_health.py` | `/api/stock-health` | GET `/scan` (instant — parquet-backed), GET `/{symbol}` (on-demand, ~1-2s), POST `/scan/invalidate` (forces recompute + parquet refresh), POST `/{symbol}/invalidate`. Scan parquet at `data_lake/derived/stock_health/scan.parquet`. |
+| `edges.py` | `/api/edges` | Edge Decay Observatory (read-only over Postgres `edge_measurements`). `/observatory` (all edges: vitals + status + decay series), `/{edge_key}/history`, POST `/invalidate`. Rows written by the standalone `jobs/measure_edges.py` (see Step 4) — never by the server. |
 | `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
 
 ---
@@ -633,6 +634,29 @@ try {
     Write-Output "ERROR portfolios/track/snapshot — $($_.Exception.Message)"
 }
 ```
+
+## Step 4 — Edge Observatory + IV history (from `marketdna-backend/`)
+
+Both safe to run daily. Never run these inside the backend process — standalone batch
+jobs by design.
+
+```powershell
+# a. IV history — distill today's option chain into ATM IV per symbol (incremental, ~5s).
+#    This series CANNOT be backfilled later — run it every day after option ingestion.
+.\.venv\Scripts\python.exe -m jobs.extract_iv
+
+# b. Edge measurements — exits instantly unless a newly completed month is unmeasured.
+#    Also records the monthly universe-membership snapshot (survivorship antidote).
+.\.venv\Scripts\python.exe -m jobs.measure_edges --if-new-month
+```
+
+`measure_edges` writes append-only, idempotent rows into Postgres `edge_measurements`.
+Other modes: `--backfill` (walk 2022-06 → latest), `--period YYYY-MM`, `--edge <key>`.
+Edges registered in `app/services/edges/__init__.py`: `momentum_12_1`, `bb_meanrev`,
+`low_vol`, `delivery_accumulation`, `delivery_distribution`. Methodology changes must
+bump `METHODOLOGY_VERSION` in `app/services/edges/base.py` — history is never
+overwritten. `FIELD_EDGE_MAP` (same file's package) powers the Portfolio Builder's
+edge-health badges via GET `/api/edges/field-health`.
 
 ## Alternative: restart both servers
 

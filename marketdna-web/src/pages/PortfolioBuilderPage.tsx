@@ -7,6 +7,8 @@ import Navbar from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import SectionHead from '../components/shared/SectionHead'
 import { portfoliosApi } from '../api/portfoliosApi'
+import { edgesApi } from '../api/edgesApi'
+import type { FieldHealth } from '../types/edges'
 import type {
   FieldInfo, PortfolioSpec, Universe, WeightScheme, EvictionWeight, RebalanceFreq,
 } from '../types/portfolios'
@@ -34,6 +36,48 @@ function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40)
 }
 
+// Edge-health badge colors (Observatory statuses worth flagging in a rule).
+const EDGE_STATUS_COLOR: Record<string, string> = {
+  FADING: '#fbbf24', DEAD: '#ef4444', WEAK: '#f97316', REVIVING: '#3b82f6',
+}
+
+/** Unique concerning edges whose mapped fields appear (as whole words) in a rule. */
+function ruleEdgeWarnings(rule: string, health: Record<string, FieldHealth>): FieldHealth[] {
+  if (!rule.trim()) return []
+  const seen = new Set<string>()
+  const out: FieldHealth[] = []
+  for (const [field, h] of Object.entries(health)) {
+    if (!EDGE_STATUS_COLOR[h.status]) continue
+    if (!new RegExp(`\\b${field}\\b`).test(rule)) continue
+    if (seen.has(h.edge_key)) continue
+    seen.add(h.edge_key)
+    out.push(h)
+  }
+  return out
+}
+
+/** Inline strip under a rule input: the Observatory's verdict on the edges it leans on. */
+function EdgeHealthStrip({ rule, health }: { rule: string; health: Record<string, FieldHealth> }) {
+  const warnings = ruleEdgeWarnings(rule, health)
+  if (!warnings.length) return null
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4, mt: 0.75 }}>
+      {warnings.map(w => {
+        const c = EDGE_STATUS_COLOR[w.status]
+        return (
+          <Box key={w.edge_key} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: c, flexShrink: 0 }} />
+            <Typography sx={{ ...JAKARTA, fontSize: '0.66rem', color: c, lineHeight: 1.4 }}>
+              {w.status === 'REVIVING' ? 'ℹ' : '⚠'} This rule leans on <b>{w.edge_label}</b> — Observatory
+              status <b>{w.status}</b> ({w.latest_edge_ann_pct != null ? `${w.latest_edge_ann_pct > 0 ? '+' : ''}${w.latest_edge_ann_pct.toFixed(1)}%/yr` : '—'}). {w.reason}
+            </Typography>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
 export default function PortfolioBuilderPage() {
   const { key: editKey } = useParams<{ key: string }>()
   const isEdit = Boolean(editKey)
@@ -46,6 +90,13 @@ export default function PortfolioBuilderPage() {
   const [loading, setLoading] = useState(isEdit)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // plain-English → rules (AI-assisted authoring)
+  const [nlText, setNlText] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [draft, setDraft] = useState<
+    { summary: string; warnings: string[]; count: number; symbols: string[] } | null
+  >(null)
 
   // form state
   const [name, setName] = useState('')
@@ -72,8 +123,12 @@ export default function PortfolioBuilderPage() {
   const activeRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
   const activeSetter = useRef<((v: string) => void) | null>(null)
 
+  const [fieldHealth, setFieldHealth] = useState<Record<string, FieldHealth>>({})
+
   useEffect(() => {
     portfoliosApi.getFields().then(r => setFields(r.fields)).catch(() => {})
+    // Edge-health badges are best-effort — the builder works fine without them.
+    edgesApi.getFieldHealth().then(r => setFieldHealth(r.fields)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -104,6 +159,35 @@ export default function PortfolioBuilderPage() {
     for (const f of fields) (g[f.group ?? 'other'] ??= []).push(f)
     return Object.entries(g).sort((a, b) => a[0].localeCompare(b[0]))
   }, [fields])
+
+  // Fill every form field from a generated/loaded spec (user then reviews + edits).
+  function applySpec(s: PortfolioSpec) {
+    setName(s.name)
+    setDescription(s.description ?? '')
+    setUniverse((s.universe as Universe) ?? 'nifty500')
+    setMaxHoldings(s.max_holdings ?? 20); setVolatility(s.volatility_stars ?? 3)
+    setEntry(s.entry); setRankBy(s.rank_by ?? 'mom_score')
+    setWeightScheme(s.weight?.scheme ?? 'equal'); setWeightField(s.weight?.field ?? '')
+    setFill(s.fill ?? ''); setFillRankBy(s.fill_rank_by ?? '')
+    setEviction(s.eviction ?? ''); setEvictionWeight(s.eviction_weight ?? 'redistribute')
+    setRebalanceFreq(s.rebalance_freq ?? 'M'); setRebalance(s.rebalance ?? '')
+    setRebWeightScheme(s.rebalance_weight?.scheme ?? 'equal'); setRebWeightField(s.rebalance_weight?.field ?? '')
+  }
+
+  async function generate() {
+    setError(null)
+    if (nlText.trim().length < 3) { setError('Describe your portfolio idea first.'); return }
+    setGenerating(true)
+    try {
+      const r = await portfoliosApi.draftFromText(nlText.trim(), universe)
+      applySpec(r.spec)
+      setDraft({ summary: r.summary, warnings: r.warnings, count: r.preview_count, symbols: r.preview_symbols })
+    } catch (e: any) {
+      setError(String(e.message ?? e))
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   function insertToken(tok: string) {
     const el = activeRef.current, set = activeSetter.current
@@ -197,6 +281,55 @@ export default function PortfolioBuilderPage() {
         {/* ── left: the form ── */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
 
+          {/* plain-English → rules */}
+          <Box sx={{ ...CARD, p: 2.5, bgcolor: PAPER, border: `1px solid ${CYAN}55` }}>
+            <SectionHead title="Describe in plain English" accent={CYAN} meta="AI-assisted" />
+            <Typography sx={{ ...JAKARTA, fontSize: '0.72rem', color: INK2, mb: 1.25 }}>
+              Write your idea in words — no field names or syntax. It's translated into rules below,
+              which you review and edit before saving. Nothing is saved until you click Create.
+            </Typography>
+            <TextField fullWidth multiline minRows={2} value={nlText} onChange={e => setNlText(e.target.value)}
+              placeholder="Quality stocks in an uptrend — above their 50- and 200-day averages, ranked by momentum. Drop anything that falls 10% from entry. Rebalance monthly."
+              sx={{ ...INPUT_SX, '& textarea': { ...JAKARTA, fontSize: '0.82rem' } }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.5 }}>
+              <Button onClick={generate} disabled={generating} variant="outlined"
+                sx={{ ...JAKARTA, fontWeight: 700, textTransform: 'none', color: CYAN, borderColor: `${CYAN}88`,
+                      '&:hover': { borderColor: CYAN, bgcolor: `${CYAN}11` } }}>
+                {generating ? 'Generating…' : draft ? 'Regenerate rules' : 'Generate rules'}
+              </Button>
+              {generating && <CircularProgress size={16} sx={{ color: CYAN }} />}
+            </Box>
+            {draft && (
+              <Box sx={{ mt: 2, borderTop: `1px solid ${BORDER}`, pt: 1.75 }}>
+                {draft.summary && (
+                  <Typography sx={{ ...JAKARTA, fontSize: '0.78rem', color: INK, lineHeight: 1.55, mb: 1 }}>
+                    {draft.summary}
+                  </Typography>
+                )}
+                <Typography sx={{ ...MONO, fontSize: '0.7rem', color: draft.count > 0 ? '#22c55e' : '#f59e0b', mb: draft.symbols.length ? 0.75 : 0 }}>
+                  Matches {draft.count} stock{draft.count === 1 ? '' : 's'} right now
+                </Typography>
+                {draft.symbols.length > 0 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: draft.warnings.length ? 1 : 0 }}>
+                    {draft.symbols.map(s => (
+                      <Chip key={s} label={s} size="small"
+                        sx={{ ...MONO, fontSize: '0.62rem', height: 20, borderRadius: '6px',
+                              bgcolor: PAPER2, color: INK2, border: `1px solid ${BORDER}` }} />
+                    ))}
+                  </Box>
+                )}
+                {draft.warnings.map((w, i) => (
+                  <Typography key={i} sx={{ ...JAKARTA, fontSize: '0.7rem', color: '#f59e0b', lineHeight: 1.5, mt: 0.4 }}>
+                    ⚠ {w}
+                  </Typography>
+                ))}
+                <Typography sx={{ ...JAKARTA, fontSize: '0.68rem', color: INK3, mt: 1 }}>
+                  Rules filled into the form below — review and tweak anything, then Create.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+
           {/* identity */}
           <Box sx={{ ...CARD, p: 2.5, bgcolor: PAPER }}>
             <SectionHead title="Identity" accent="#6366f1" />
@@ -238,11 +371,13 @@ export default function PortfolioBuilderPage() {
             <Typography sx={{ ...JAKARTA, fontSize: '0.68rem', color: INK3, mt: 0.6 }}>
               A condition over the fields on the right. Arithmetic (+ − × ÷) is allowed, e.g. <code>(close - sma50) / std20 &gt; 2</code>.
             </Typography>
+            <EdgeHealthStrip rule={entry} health={fieldHealth} />
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 2 }}>
               <Box>{label('RANK BY (score)')}
                 <TextField fullWidth size="small" value={rankBy} onChange={e => setRankBy(e.target.value)}
                   {...bindRule(setRankBy)} placeholder="mom_score"
-                  sx={{ ...INPUT_SX, '& input': { ...MONO, fontSize: '0.78rem' } }} /></Box>
+                  sx={{ ...INPUT_SX, '& input': { ...MONO, fontSize: '0.78rem' } }} />
+                <EdgeHealthStrip rule={rankBy} health={fieldHealth} /></Box>
               <Box>{label('WEIGHT')}
                 <Select fullWidth size="small" value={weightScheme} onChange={e => setWeightScheme(e.target.value as WeightScheme)}
                   MenuProps={menuProps} sx={INPUT_SX}>
@@ -280,6 +415,7 @@ export default function PortfolioBuilderPage() {
             <Typography sx={{ ...JAKARTA, fontSize: '0.68rem', color: INK3, mt: 0.6 }}>
               Evaluated on each EOD snapshot. May use the position fields <code>since_entry_pct</code> and <code>days_held</code>. Leave blank for none.
             </Typography>
+            <EdgeHealthStrip rule={eviction} health={fieldHealth} />
             <Box sx={{ mt: 2, maxWidth: 360 }}>{label('WEIGHT AFTER EVICTION')}
               <Select fullWidth size="small" value={evictionWeight} onChange={e => setEvictionWeight(e.target.value as EvictionWeight)}
                 MenuProps={menuProps} sx={INPUT_SX}>
@@ -347,15 +483,22 @@ export default function PortfolioBuilderPage() {
                 {group}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6 }}>
-                {fs.map(f => (
-                  <Tooltip key={f.name} title={`${f.label}${f.unit ? ` (${f.unit})` : ''}`} arrow>
-                    <Chip label={f.name} size="small" onClick={() => insertToken(f.name)}
-                      sx={{ ...MONO, fontSize: '0.64rem', height: 22, cursor: 'pointer', borderRadius: '6px',
-                            bgcolor: PAPER2, color: f.position_only ? '#f59e0b' : INK2,
-                            border: `1px solid ${f.position_only ? '#f59e0b55' : BORDER}`,
-                            '&:hover': { borderColor: CYAN, color: INK } }} />
-                  </Tooltip>
-                ))}
+                {fs.map(f => {
+                  const h = fieldHealth[f.name]
+                  const hc = h ? EDGE_STATUS_COLOR[h.status] : undefined
+                  const tip = `${f.label}${f.unit ? ` (${f.unit})` : ''}` +
+                    (h && hc ? ` — ${h.edge_label}: ${h.status}` : '')
+                  return (
+                    <Tooltip key={f.name} title={tip} arrow>
+                      <Chip label={f.name} size="small" onClick={() => insertToken(f.name)}
+                        icon={hc ? <Box component="span" sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: hc, ml: '6px !important' }} /> : undefined}
+                        sx={{ ...MONO, fontSize: '0.64rem', height: 22, cursor: 'pointer', borderRadius: '6px',
+                              bgcolor: PAPER2, color: f.position_only ? '#f59e0b' : INK2,
+                              border: `1px solid ${hc ? `${hc}66` : f.position_only ? '#f59e0b55' : BORDER}`,
+                              '&:hover': { borderColor: CYAN, color: INK } }} />
+                    </Tooltip>
+                  )
+                })}
               </Box>
             </Box>
           ))}

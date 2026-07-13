@@ -29,6 +29,7 @@ import FnoTacticalPage from './pages/FnoTacticalPage'
 import PortfoliosPage from './pages/PortfoliosPage'
 import PortfolioDetailPage from './pages/PortfolioDetailPage'
 import PortfolioBuilderPage from './pages/PortfolioBuilderPage'
+import EdgeObservatoryPage from './pages/EdgeObservatoryPage'
 
 export default function App() {
   return (
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="/portfolios/new"                 element={<PortfolioBuilderPage />} />
           <Route path="/portfolios/edit/:key"           element={<PortfolioBuilderPage />} />
           <Route path="/portfolios/:key"                element={<PortfolioDetailPage />} />
+          <Route path="/edge-observatory"               element={<EdgeObservatoryPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
