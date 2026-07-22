@@ -1,0 +1,233 @@
+# Stock Drivers dossier — Infosys (INFY)
+# DRAFT (AI-assisted, web-researched 2026-07-14) — pending human review pass.
+
+symbol: INFY
+company: Infosys
+sector: IT Services
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+sources:
+  - doc_type: filing
+    title: Infosys FY26 results (Form 6-K)
+    period: FY26
+    url: https://www.stocktitan.net/sec-filings/INFY/6-k-infosys-ltd-current-report-foreign-issuer-ef7670a5a8b6.html
+  - doc_type: concall_transcript
+    title: Infosys Q4 FY26 earnings call
+    period: Q4 FY26
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: US/EU enterprise IT spend & FY guidance
+    category: demand
+    weight: primary
+    narrative: >
+      Revenue follows US/EU enterprise tech budgets. FY26 closed ~$20.2bn revenue at
+      ~21% margin; initial FY27 guidance of 1.5-3.5% cc growth frames a still-muted
+      discretionary-spend environment. The quarterly guidance revision (raise/hold/cut)
+      is the single most price-moving datapoint. Next print: Q1 FY27 on 23 Jul 2026.
+    simple_english: >
+      Infosys earns by doing technology work for big American and European companies.
+      When those companies feel confident, they start new tech projects and Infosys
+      grows; when they're nervous, they postpone projects. Four times a year Infosys
+      tells the market how much it expects to grow — the stock moves most on whether
+      that forecast goes up or down.
+    forecast:
+      how: >
+        Enterprise budgets are set in the Dec-Feb window (US budget season) and trued-up
+        quarterly. Deal TCV leads revenue by 2-4 quarters as bookings convert. US macro
+        prints (which drive client confidence) lead budgets by a further quarter or two.
+      leading_indicators:
+        - name: Large deal TCV / bookings
+          source: Infosys quarterly results
+          cadence: quarterly
+          lead: 2-4 quarters ahead of revenue
+        - name: US enterprise IT spend forecasts
+          source: Gartner press releases; hyperscaler/US software earnings
+          cadence: quarterly
+          lead: sets the demand backdrop 1-2 quarters out
+        - name: Guidance revision direction
+          source: Infosys quarterly results
+          cadence: quarterly
+          lead: the price-moving event itself
+      rule_of_thumb: >
+        Guidance raised with TCV holding above ~$3-4bn/quarter = upgrade cycle;
+        January guidance cuts (post US budget season) are the key negative marker.
+    watch: FY27 guidance revision on quarterly results (next 23 Jul 2026)
+    direction: Guidance raise → positive; cut → sharply negative
+    verify_note: FY26 revenue ~$20.2bn / margin ~21% / FY27 guide 1.5-3.5% cc — verify against the FY26 6-K and Q4 release.
+
+  - title: Large deal wins & GenAI repositioning
+    category: orders
+    weight: primary
+    narrative: >
+      FY26 large-deal TCV ~$14.9bn with ~55% net-new — the forward revenue book.
+      The structural question is whether GenAI-led productivity deflates traditional
+      time-and-materials revenue faster than new AI programs add to it; mega-deal
+      announcements are the visible counter-evidence.
+    simple_english: >
+      Infosys signs multi-year contracts before the work (and revenue) shows up, so
+      today's contract signings tell you next year's growth. The new wrinkle is AI:
+      it lets the same work be done with fewer people, which cuts billing — but it
+      also creates brand-new AI projects to win. Watching contract wins tells you
+      which force is bigger.
+    forecast:
+      how: >
+        TCV converts to revenue over 2-4 quarters. Net-new share (vs renewals) is the
+        quality read. Client-side AI budget commentary (US earnings calls) leads
+        service-provider bookings by ~1-2 quarters.
+      leading_indicators:
+        - name: Quarterly TCV and net-new share
+          source: Infosys quarterly results
+          cadence: quarterly
+          lead: 2-4 quarters ahead of revenue
+        - name: Mega-deal announcements (>$1bn)
+          source: Exchange filings / press releases
+          cadence: event-driven
+          lead: multi-year visibility events
+        - name: Enterprise AI adoption commentary
+          source: US enterprise software & hyperscaler earnings
+          cadence: quarterly
+          lead: 1-2 quarters ahead of provider bookings
+      rule_of_thumb: >
+        Two consecutive quarters of TCV growth without revenue growth = conversion
+        delay, usually bullish deferred; net-new share falling below ~40% = growth
+        increasingly just renewals.
+    watch: Quarterly TCV print and net-new %
+    direction: TCV strength → positive
+    verify_note: FY26 TCV $14.9bn / 55% net-new — verify against Q4 FY26 release.
+
+  - title: Margins & USDINR
+    category: input_costs
+    weight: primary
+    narrative: >
+      Operating margin guided ~20-22%. Levers: pricing, utilization, pyramid, onsite
+      mix — and USDINR, where rupee depreciation is a direct tailwind (most revenue
+      in USD/EUR, most cost in INR). Wage-hike quarters compress margins predictably.
+    simple_english: >
+      Infosys is paid mostly in dollars but pays salaries mostly in rupees. When the
+      rupee weakens, every dollar earned converts into more rupees — instant extra
+      profit without doing anything. Salary-raise season does the opposite. So profit
+      margins wiggle with the currency and the annual pay cycle.
+    forecast:
+      how: >
+        USDINR is observable daily and passes through near-coincidently. Wage-hike
+        timing is pre-announced on concalls. Utilization and attrition trends
+        (disclosed quarterly) lead margin capacity by a quarter.
+      leading_indicators:
+        - name: USDINR
+          source: RBI reference rate
+          cadence: daily
+          lead: near-coincident on margins
+        - name: Wage-hike timing announcements
+          source: Quarterly concall
+          cadence: quarterly
+          lead: 1 quarter ahead of the margin dip
+        - name: Utilization and attrition metrics
+          source: Quarterly factsheet
+          cadence: quarterly
+          lead: ~1 quarter ahead of margin flexibility
+      rule_of_thumb: >
+        1% INR depreciation ≈ ~25-35bps margin tailwind (verify company-stated
+        sensitivity); margin guided below 20% would signal structural pricing pressure.
+    watch: USDINR trend; margin guidance band
+    direction: Weaker INR → positive; wage hikes → transient negative
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: US immigration & visa policy
+    category: policy
+    weight: secondary
+    narrative: >
+      H-1B/L-1 policy shifts and any US moves on outsourcing taxation are recurring
+      headline risks for the sector. Cost impact is manageable (localization is high
+      vs a decade ago) but headlines still hit the multiple.
+    simple_english: >
+      Infosys sends some Indian engineers to work at client sites in America using
+      work visas. When US politics turns against immigration or outsourcing, rules
+      get stricter and costs rise a bit — but mostly, scary headlines make investors
+      nervous and the stock dips even when the real damage is small.
+    forecast:
+      how: >
+        Not forecastable — event-driven policy risk. Footprints: US legislative
+        proposals, USCIS fee/rule notices, and election-cycle rhetoric. Sector-wide
+        impact — watch peers' disclosures too.
+      leading_indicators:
+        - name: USCIS rule/fee notices and H-1B lottery data
+          source: USCIS announcements
+          cadence: event-driven / annual (lottery in Mar-Apr)
+          lead: weeks-to-months ahead of cost impact
+        - name: US political rhetoric on outsourcing
+          source: News flow, especially in election years
+          cadence: event-driven
+          lead: sentiment impact is immediate
+      rule_of_thumb: >
+        Rule changes raising visa costs = single-digit-bps margin nuisance; proposed
+        outsourcing taxes = multiple-compression events even if never enacted.
+    watch: USCIS notices; US election-cycle outsourcing rhetoric
+    direction: Restrictive policy headlines → negative (mostly sentiment)
+
+  - title: Capital returns
+    category: catalyst
+    weight: secondary
+    narrative: >
+      High-payout policy (dividends + periodic buybacks) supports the floor. Buyback
+      announcements are dated, board-driven events that historically cushion drawdowns.
+    simple_english: >
+      Infosys generates more cash than it needs and hands most of it back to
+      shareholders — regular dividends plus occasional share buybacks. A buyback
+      means the company itself is buying shares in the market, which props up the
+      price. These announcements often arrive when the stock has been weak.
+    forecast:
+      how: >
+        Board-calendar driven. Capital-allocation policy (payout % of FCF over a
+        multi-year window) is published; buyback windows follow board meetings.
+      leading_indicators:
+        - name: Board meeting agenda notices
+          source: Exchange filings
+          cadence: event-driven
+          lead: days ahead of announcement
+        - name: Stated capital-return policy vs cash on books
+          source: Annual report
+          cadence: yearly
+          lead: tells you when a buyback is "due"
+      rule_of_thumb: >
+        Cash building beyond ~2 years of policy payout = buyback increasingly likely.
+    watch: Board meeting notices; payout policy math
+    direction: Buyback announcement → supportive
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: Shareholding structure
+    category: ownership
+    weight: background
+    narrative: >
+      Founders hold a small residual stake (~13% historically, declining); FII-heavy
+      register makes the stock sensitive to global tech sentiment and FPI flows.
+      ADR listing adds an overnight price-discovery channel.
+    simple_english: >
+      The founders now own only a small piece; most of the company is held by big
+      global funds. That ties the share price to worldwide technology-sector mood —
+      when US tech falls overnight, Infosys's US-listed shares fall with it, and the
+      Indian shares usually follow the next morning.
+    forecast:
+      how: >
+        Directly observable: quarterly BSE shareholding, daily NSDL FPI flows, and the
+        ADR premium/discount as an overnight sentiment gauge.
+      leading_indicators:
+        - name: Quarterly shareholding pattern
+          source: BSE filings
+          cadence: quarterly
+          lead: coincident ownership read
+        - name: ADR overnight move vs NSE close
+          source: NYSE INFY ADR
+          cadence: daily
+          lead: overnight gap predictor
+      rule_of_thumb: >
+        Persistent ADR discount = FII distribution pressure; founders' stake sales
+        are noise unless clustered.
+    watch: ADR overnight moves; BSE shareholding filing
+    direction: FII inflows / ADR premium → positive
+    as_of: 2026-Q1
+    verify_note: Confirm current promoter/founder and FII/DII split from the latest BSE filing.

@@ -15,6 +15,7 @@ Route: `/stock/:symbol` (URL param support — linkable to any symbol).
 |---|---------|--------|
 | 1 | Hero — price, regime, DNA score | CYAN |
 | 2 | Price Chart — candlestick + SMA overlays | Indigo |
+| 2b | Stock Drivers — curated fundamental drivers (F&O coverage only) | Orange |
 | 3 | Relative Strength — vs NIFTY 50 proxy | Violet |
 | 4 | Return Intelligence — forward return deciles | Amber |
 | 5 | Risk Intelligence — ATR, drawdown risk, VaR | Teal |
@@ -89,6 +90,30 @@ drawdown(t) = (price(t) - rolling_max(price)) / rolling_max(price)
 **Z-Score**: `(current_price - rolling_mean_252) / rolling_std_252`
 
 **Historical Analog (DTW)**: finds top 3 price path matches in the last 5 years using Dynamic Time Warping on normalized 60-day price windows.
+
+**Stock Drivers (section 3, `s-drivers`)**: curated fundamental context from
+`GET /api/drivers/{symbol}` (YAML content store, see `fundamental.md` at repo root).
+Renders ONLY when the symbol has a dossier — the fetch catches 404 and leaves `data.drivers`
+null, hiding the section (same pattern as `oiAnalysis` for non-F&O symbols). Each driver card
+has a three-tab toggle (Driver / Plain English / How to Forecast); primary drivers render
+expanded, secondary/background collapse behind a `Record<string, boolean>` toggle. Category
+chips use a fixed color map (demand blue, policy amber, orders green, input_costs red,
+competition violet, ownership teal, catalyst purple). The staleness badge (last_reviewed vs
+review_cadence) is load-bearing — content rots; never hide it. Dated driver `events` are listed
+in-card AND flagged on the Price Chart (section 2): PriceChart takes an `events` prop (flattened
+in StockPage from the dossier), renders a Highstock flags series pinned to the candles, colored
+by driver category, with an orange "◆ Events" toggle next to the timeframe buttons. Events snap
+to the first trading bar on/after their date within a 7-day tolerance — month-precision dates
+("2026-02") resolve to month start; events outside the visible timeframe are dropped, so 1Y may
+show fewer flags than 3Y (correct behavior, not a bug).
+Component: `src/components/stock/StockDrivers.tsx`; types `src/types/drivers.ts`;
+API `src/api/driversApi.ts`. **Live-metric chips (step 6)**: a driver with `live: {metric,
+label}` in its YAML gets a green pulsing LIVE chip showing a value computed from our own data
+at request time (`live_values` in the API response). Registry: `atm_iv_percentile` (options IV
+history; shows raw ATM IV until 20d of history exist) and `futures_basis` (futures_chain).
+Resolution failures degrade silently — the card renders without the chip. Currently wired only
+on BHARATFORG (tariff driver → IV percentile, FY27 driver → futures basis). NOTE: the IntersectionObserver effect re-registers on
+`[data.summary, data.drivers]` so data-gated sections get observed after their fetch resolves.
 
 **Section wrapper**:
 ```tsx

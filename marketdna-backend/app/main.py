@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, portfolios, edges
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
@@ -30,6 +30,7 @@ from app.services import breakout_service
 from app.services import live_trading_service
 from app.services import options_service
 from app.services import portfolios_service
+from app.services import drivers_service
 
 app = FastAPI(
     title="MarketDNA API",
@@ -68,8 +69,10 @@ app.include_router(druckenmiller_roc.router)
 app.include_router(sector_heatmap.router)
 app.include_router(intelligence.router)
 app.include_router(fno.router)
+app.include_router(fno_momentum.router)
 app.include_router(portfolios.router)
 app.include_router(edges.router)
+app.include_router(drivers.router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -123,6 +126,7 @@ async def startup():
         ("pattern scanner",      pattern_service.get_scanner),
         ("breakout levels",      breakout_service._get_historical_levels),
         ("live trading hist",    live_trading_service._get_hist),
+        ("stock drivers",        drivers_service.load_all),   # YAML content store, <100ms
     ]:
         _run_task(name, fn)
     # Ensure the custom-portfolios Postgres table exists + migrate any legacy JSON.

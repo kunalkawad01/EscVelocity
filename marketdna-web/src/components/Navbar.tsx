@@ -37,6 +37,7 @@ const NAV_GROUPS = [
     label: 'Signals',
     items: [
       { to: '/fno-tactical',     label: 'F&O Tactical', desc: 'Live OI positioning & trend-aligned entries' },
+      { to: '/fno-momentum',     label: 'F&O Momentum', desc: 'OI gainers & short covering with momentum filters' },
       { to: '/live-trading',     label: 'Live',      desc: 'Sector scatter & breakthrough signals' },
       { to: '/intraday-race',    label: 'Race',      desc: 'Bar race, ATR scatter & norm returns'  },
       { to: '/delivery',         label: 'Delivery',  desc: 'Accumulation & distribution signals'   },

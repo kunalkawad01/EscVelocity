@@ -1,0 +1,246 @@
+# Stock Drivers dossier — Bharat Electronics (BEL)
+# DRAFT (AI-assisted, web-researched 2026-07-14) — pending human review pass.
+
+symbol: BEL
+company: Bharat Electronics
+sector: Defence Electronics (PSU)
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+sources:
+  - doc_type: concall_transcript
+    title: BEL Q4 FY26 earnings call
+    period: Q4 FY26
+  - doc_type: filing
+    title: BEL FY26 results release (order book ₹73,882 cr as of 1 Apr 2026)
+    period: FY26
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: Defence order flow (the FY27 mega-pipeline)
+    category: orders
+    weight: primary
+    narrative: >
+      FY26 order inflow came in around ₹30,000 cr (vs ₹27,000 cr guided); order book
+      ~₹73,882 cr as of 1 Apr 2026 (~2.7x trailing revenue). The FY27 target is the
+      story: management is guiding for over ₹55,000 cr of inflows anchored by QRSAM,
+      with P-75I combat systems, AMCA-linked electronics, and data-centre solutions
+      in the pipeline. Announcements move the stock; execution moves earnings.
+    simple_english: >
+      BEL makes radars, missile-defence electronics and military communication gear,
+      almost entirely for the Indian armed forces. The government places huge orders
+      that take years to build. Right now BEL is sitting on nearly three years of
+      confirmed work, and this year the government may hand it the biggest order in
+      its history (a missile-defence system called QRSAM). Order announcements make
+      the stock jump the same day; the profits arrive slowly over years.
+    forecast:
+      how: >
+        Not forecastable as a series — event-driven. The procurement pipeline is the
+        earliest visible footprint: Acceptance of Necessity (AoN) → RFP → trials →
+        award runs quarters-to-years. QRSAM already has AoN — contract signature
+        timing is the watch item. Management's inflow guidance updates quarterly.
+      leading_indicators:
+        - name: DAC meeting outcomes / AoN announcements
+          source: PIB defence press releases
+          cadence: event-driven (~monthly meetings)
+          lead: quarters ahead of contract award
+        - name: QRSAM contract signature progress
+          source: MoD announcements; BEL exchange filings
+          cadence: event-driven
+          lead: the single largest near-term catalyst
+        - name: Order inflow guidance updates
+          source: BEL quarterly concall
+          cadence: quarterly
+          lead: management's own probability read
+        - name: Defence capital outlay + domestic procurement share
+          source: Union Budget (Feb) and revised estimates
+          cadence: yearly
+          lead: sets the total award envelope
+      rule_of_thumb: >
+        Book-to-bill above ~3x = multi-year visibility priced as growth. FY27 inflows
+        landing near ₹55,000 cr would nearly double the book; slippage of QRSAM into
+        FY28 is the main downside marker.
+    watch: PIB defence releases; QRSAM signature; quarterly inflow number
+    direction: New orders → positive on announcement; earnings follow execution
+    verify_note: >
+      FY26 inflow ~₹30,000 cr, order book ₹73,882 cr, FY27 target ₹55,000+ cr — verify
+      against the FY26 results release and Q4 concall before marking reviewed.
+
+  - title: Execution ramp & margins
+    category: demand
+    weight: primary
+    narrative: >
+      FY26 revenue ~₹27,480 cr (+16%, within the 15-17% guided band), PAT ~₹6,048 cr
+      (+14%), EBITDA margin ~27%; FY27 guidance: >15% revenue growth with margins
+      sustained above 28%. With a swelling order book, conversion speed (supply
+      chains, semiconductors, staffing) becomes the binding constraint — execution
+      misses against a big book de-rate harder than small-book misses.
+    simple_english: >
+      Having orders is one thing; delivering them on time is another. BEL grew sales
+      16% last year and keeps an unusually fat profit margin for a government
+      company. The risk flips as the order pile grows: the question stops being
+      "will orders come?" and becomes "can they build it all fast enough?" If
+      deliveries slip, the stock falls even with a record order book.
+    forecast:
+      how: >
+        Quarterly revenue growth vs the guided band is the direct read. Inventory and
+        receivables build (half-yearly balance sheet) flags execution friction ~1-2
+        quarters early. Electronics component lead-time commentary is the supply-side
+        canary.
+      leading_indicators:
+        - name: Quarterly revenue growth vs 15%+ guidance
+          source: BEL quarterly results
+          cadence: quarterly
+          lead: coincident scorecard
+        - name: Inventory + receivable days
+          source: Half-yearly balance sheet
+          cadence: half-yearly
+          lead: 1-2 quarters ahead of execution misses
+        - name: Component sourcing / indigenization commentary
+          source: Quarterly concall
+          cadence: quarterly
+          lead: supply-side constraint signal
+      rule_of_thumb: >
+        Two consecutive quarters below the guided growth band with a rising order
+        book = execution bottleneck, not demand — historically a de-rating trigger
+        despite the book.
+    watch: Quarterly revenue growth vs guidance; margin band
+    direction: On-guidance execution → positive; slippage → de-rating
+    verify_note: FY26 revenue/PAT/margin figures — verify against the audited results.
+
+  - title: Indigenization policy tailwind
+    category: policy
+    weight: primary
+    narrative: >
+      Positive import-substitution lists, Make-in-India procurement preference, and
+      rising domestic share of defence capex structurally route orders to BEL. This
+      is a policy moat: much of BEL's addressable pipeline is reserved for domestic
+      players by regulation.
+    simple_english: >
+      India has decided, as policy, to buy defence equipment from Indian companies
+      instead of importing it. Lists of items that MUST be bought domestically keep
+      growing. BEL is the biggest state-owned defence electronics maker, so a large
+      share of this reserved spending flows to it almost by default — a tailwind
+      written into the rules.
+    forecast:
+      how: >
+        Policy-driven, slow-moving and directional. Footprints: new positive-
+        indigenization list notifications, defence budget domestic-procurement share,
+        and any policy shift toward private-sector competition in BEL's niches
+        (the long-run risk).
+      leading_indicators:
+        - name: Positive indigenization list updates
+          source: MoD / PIB notifications
+          cadence: event-driven (~yearly batches)
+          lead: expands the reserved pipeline years out
+        - name: Domestic share of defence capital procurement
+          source: Union Budget documents
+          cadence: yearly
+          lead: structural envelope
+        - name: Private-sector wins in defence electronics tenders
+          source: Tender award news
+          cadence: event-driven
+          lead: competitive-erosion early warning
+      rule_of_thumb: >
+        Domestic procurement share holding ≥75% = moat intact; repeated private-sector
+        wins in radar/EW tenders = start discounting BEL's win-rate assumption.
+    watch: Indigenization list updates; private competitor wins
+    direction: Deeper indigenization → positive
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: Defence exports
+    category: orders
+    weight: secondary
+    narrative: >
+      Export wins (friendly-nation radar, EW and communication systems) are small in
+      revenue but large in narrative — they validate product competitiveness and
+      open a growth lane independent of the Indian budget cycle.
+    simple_english: >
+      BEL has started selling its radars and military electronics to other countries.
+      The amounts are still small, but every export win matters because it proves
+      BEL's products can compete globally — and gives it customers beyond one
+      government's budget.
+    forecast:
+      how: >
+        Event-driven. Footprints: government-to-government defence cooperation MoUs,
+        defence-expo announcements, and the export order component disclosed in
+        quarterly inflows.
+      leading_indicators:
+        - name: Export order announcements / inflow share
+          source: BEL filings and concall
+          cadence: quarterly
+          lead: coincident
+        - name: G2G defence cooperation agreements
+          source: MEA/MoD announcements
+          cadence: event-driven
+          lead: quarters ahead of orders
+      rule_of_thumb: >
+        Export share of order inflow sustainably above ~10% would deserve a
+        re-rating; below 5% it remains narrative, not numbers.
+    watch: Export share of quarterly order inflow
+    direction: Export wins → positive
+
+  - title: Geopolitical escalation (event risk, both ways)
+    category: catalyst
+    weight: secondary
+    narrative: >
+      Border tensions and regional conflict escalations mechanically re-rate defence
+      stocks (emergency procurement expectations); de-escalation phases and budget
+      squeezes do the opposite. This is exposure, not edge — unforecastable.
+    simple_english: >
+      When military tensions rise anywhere near India, defence stocks jump because
+      investors expect emergency spending. When things calm down, they cool off.
+      BEL rides these waves whether or not its own business changed that week.
+    forecast:
+      how: >
+        Not forecastable — pure event risk. The tradeable footprint is emergency
+        procurement announcements that follow escalations (fast-track acquisition
+        approvals), which convert sentiment into actual orders.
+      leading_indicators:
+        - name: Emergency / fast-track procurement approvals
+          source: MoD / PIB releases post-escalation
+          cadence: event-driven
+          lead: converts headlines into orders within months
+      rule_of_thumb: >
+        Escalation rallies without follow-on procurement approvals fade within
+        weeks — treat them as exits, not entries.
+    watch: Fast-track acquisition approvals after tension spikes
+    direction: Escalation → positive (sentiment); fades without orders
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: Government ownership & divestment overhang
+    category: ownership
+    weight: background
+    narrative: >
+      GoI holds a majority stake (~51%); periodic OFS (offer-for-sale) tranches to
+      meet divestment targets create supply overhangs. High dividend payout is the
+      PSU compensation. DII/FII hold most of the float.
+    simple_english: >
+      The government owns just over half of BEL. Every so often it sells a small
+      slice to raise money, which temporarily floods the market with shares and
+      pushes the price down — nothing to do with the business itself. In exchange,
+      as a state company, BEL pays generous dividends.
+    forecast:
+      how: >
+        Divestment intent is telegraphed: budget divestment targets (Feb), DIPAM
+        pipeline commentary, and the government's stake level vs the 51% floor it
+        has committed to maintain in defence PSUs.
+      leading_indicators:
+        - name: Union Budget divestment target and DIPAM pipeline
+          source: Budget documents; DIPAM statements
+          cadence: yearly + event-driven
+          lead: quarters ahead of OFS
+        - name: GoI stake level in quarterly shareholding
+          source: BSE filings
+          cadence: quarterly
+          lead: room-to-sell math (stake minus 51% floor)
+      rule_of_thumb: >
+        GoI stake near 51% = OFS overhang effectively exhausted; stake well above
+        it + aggressive divestment targets = expect supply.
+    watch: DIPAM announcements; GoI stake vs 51%
+    direction: OFS tranches → transient negative
+    as_of: 2026-Q1
+    verify_note: Confirm exact GoI stake from the latest BSE shareholding filing.

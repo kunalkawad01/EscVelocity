@@ -1,0 +1,233 @@
+# Stock Drivers dossier — HDFC Bank (HDFCBANK)
+# DRAFT (AI-assisted, web-researched 2026-07-14) — pending human review pass.
+
+symbol: HDFCBANK
+company: HDFC Bank
+sector: Private Banks
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+sources:
+  - doc_type: investor_presentation
+    title: HDFC Bank Q4 FY26 earnings presentation
+    period: Q4 FY26
+    url: https://www.hdfc.bank.in/content/dam/hdfcbankpws/in/en/pdf/about-us/financial-results/2025-2026/quarter-4/q4fy26-earnings-presentation.pdf
+  - doc_type: concall_transcript
+    title: HDFC Bank Q4 FY26 earnings call
+    period: Q4 FY26
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: NIM cycle (rate transmission)
+    category: demand
+    weight: primary
+    narrative: >
+      Net interest margin is the earnings engine. FY26 NIM settled at ~3.38% with two
+      consecutive quarters of expansion as cost of funds fell — the classic
+      back-half-of-a-rate-cut-cycle pattern where deposits reprice down after loans
+      already have. Continued deposit repricing is the near-term earnings tailwind.
+    simple_english: >
+      A bank earns the gap between what it charges borrowers and what it pays
+      depositors. When RBI cuts rates, loan income falls quickly but deposit costs
+      fall slowly — so the gap shrinks first, then recovers as old expensive deposits
+      mature. HDFC Bank is now in the recovery part: its costs are falling, so the
+      gap (and profit) is widening again each quarter.
+    forecast:
+      how: >
+        NIM moves lag RBI rate changes by 2-4 quarters as deposits and loans reprice
+        at different speeds. With the cut cycle largely transmitted on the asset side,
+        deposit maturity/repricing is the observable driver of further expansion.
+      leading_indicators:
+        - name: RBI repo rate decisions and stance
+          source: RBI MPC statements (bi-monthly)
+          cadence: bi-monthly
+          lead: 2-4 quarters ahead of NIM impact
+        - name: Cost-of-funds and deposit-repricing commentary
+          source: HDFC Bank quarterly concall
+          cadence: quarterly
+          lead: direct read on the margin trajectory
+        - name: System deposit rates (card rates of top banks)
+          source: Bank websites / RBI WSS
+          cadence: monthly
+          lead: ~1-2 quarters ahead of blended cost of funds
+      rule_of_thumb: >
+        In a pause-after-cuts regime, each quarter of falling cost of funds ≈ NIM
+        expansion; a fresh cut cycle restarting = 2-3 quarters of compression first.
+    watch: Quarterly NIM print and cost-of-funds trend
+    direction: NIM expansion → positive
+    verify_note: FY26 NIM ~3.38% and the two-quarter expansion claim — verify against Q4 FY26 presentation.
+
+  - title: Loan growth vs deposit growth (post-merger normalization)
+    category: demand
+    weight: primary
+    narrative: >
+      FY26 closed with loan growth ~12% YoY against deposit growth ~14.4% — deposits
+      outpacing loans is the deliberate post-merger repair of the loan-deposit ratio
+      inherited from the HDFC Ltd merger. As LDR normalizes, loan growth can re-accelerate
+      toward system-plus rates, which is the medium-term re-rating argument.
+    simple_english: >
+      After absorbing its home-loan parent, the bank had lent out too much compared to
+      the deposits it held. For two years it has been fixing this by growing deposits
+      faster than loans. Once the balance is restored, it can go back to growing loans
+      fast — and faster loan growth is what makes a bank's profit (and stock) grow.
+    forecast:
+      how: >
+        System credit growth (RBI fortnightly) sets the ceiling; the bank's LDR glide
+        path (disclosed on concalls) tells you when it steps back on the accelerator.
+        Deposit market-share wins are the confirming signal.
+      leading_indicators:
+        - name: RBI fortnightly bank credit / deposit growth
+          source: RBI Weekly Statistical Supplement
+          cadence: fortnightly
+          lead: sector backdrop, coincident
+        - name: LDR / CD-ratio commentary and guidance
+          source: HDFC Bank quarterly concall
+          cadence: quarterly
+          lead: signals the re-acceleration timing
+      rule_of_thumb: >
+        LDR back near management's stated comfort zone + loan growth printing at or
+        above system = the normalization thesis delivered; deposit growth slipping
+        below system is the warning sign.
+    watch: Quarterly loan growth vs deposit growth spread
+    direction: Loan growth re-accelerating toward system-plus → positive
+
+  - title: Asset quality
+    category: demand
+    weight: primary
+    narrative: >
+      GNPA ~1.15% (ex-agri ~0.91%) at FY26-end — best-in-class. The book is granular
+      retail-heavy; the cycle risk is unsecured retail and MSME stress industry-wide.
+      Credit costs staying benign underwrites the ~1.9-2.0% ROA.
+    simple_english: >
+      Banks lose money when borrowers don't repay. HDFC Bank has one of the cleanest
+      loan books in India — barely 1 rupee in 100 is in trouble. As long as that stays
+      true, profits are predictable. If unsecured loans (credit cards, personal loans)
+      start going bad across the industry, this stock feels it too.
+    forecast:
+      how: >
+        Asset quality lags the economy by 2-6 quarters. Early markers are industry-wide:
+        credit-card and personal-loan delinquency data, bureau (CIBIL/TransUnion) retail
+        stress reports, and peer commentary — stress shows up at aggressive lenders
+        first, HDFC Bank last.
+      leading_indicators:
+        - name: Slippage ratio and credit-cost guidance
+          source: HDFC Bank quarterly results
+          cadence: quarterly
+          lead: coincident
+        - name: TransUnion CIBIL retail delinquency trends
+          source: CIBIL quarterly Credit Market Indicator
+          cadence: quarterly
+          lead: 1-2 quarters ahead of bank-level stress
+        - name: Peer unsecured-book commentary (aggressive NBFCs first)
+          source: Sector concalls
+          cadence: quarterly
+          lead: canary signal, 2-4 quarters early
+      rule_of_thumb: >
+        GNPA drifting above ~1.4% or credit costs guided above ~50bps = thesis check;
+        industry unsecured delinquencies rising for 2+ quarters = pre-position for it.
+    watch: Quarterly GNPA and slippage ratio
+    direction: Stable/improving asset quality → positive
+    verify_note: GNPA 1.15% / ex-agri 0.91% figures — verify against Q4 FY26 presentation.
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: FII ownership headroom & index flows
+    category: ownership
+    weight: secondary
+    narrative: >
+      The stock is a top index weight where FII holding swings drive large passive and
+      active flows. Periods of FII selling pressure have historically created the
+      entry points; MSCI weight adjustments tied to foreign headroom are a mechanical
+      flow driver unique to this name.
+    simple_english: >
+      This is one of the largest stocks in India's index, so big foreign funds must
+      own it in size. When foreigners sell India, this stock gets hit hardest simply
+      because they own so much of it — even if the bank itself is doing fine. Those
+      periods have usually been good times to buy.
+    forecast:
+      how: >
+        Directly observable: NSDL FPI flow data daily/monthly, quarterly shareholding
+        for the FII percentage, and MSCI review dates (Feb/May/Aug/Nov) for weight
+        changes tied to foreign headroom.
+      leading_indicators:
+        - name: FII net flows into Indian equities
+          source: NSDL FPI monitor
+          cadence: daily/monthly
+          lead: pressure gauge between filings
+        - name: Quarterly shareholding pattern (FII %)
+          source: BSE filings
+          cadence: quarterly
+          lead: determines MSCI headroom math
+        - name: MSCI index review announcements
+          source: MSCI (Feb/May/Aug/Nov)
+          cadence: quarterly
+          lead: mechanical flow events, dated in advance
+      rule_of_thumb: >
+        FII% falling toward the level that raises MSCI headroom = potential weight-up
+        flow event; sustained FII selling with resilient price = domestic absorption,
+        a strength signal.
+    watch: NSDL FPI flows; MSCI review dates
+    direction: FII inflow / index weight-up → positive
+
+  - title: Subsidiary value unlocking
+    category: catalyst
+    weight: secondary
+    narrative: >
+      Listed and unlisted subsidiaries (HDB Financial Services, HDFC Life, HDFC AMC,
+      securities arm) contribute a sum-of-the-parts kicker. Stake sales, listings, or
+      regulatory-driven restructuring periodically crystallize value.
+    simple_english: >
+      The bank owns valuable side businesses — an insurer, a mutual-fund company, a
+      lender for consumer loans. Sometimes it sells a slice or lists one on the stock
+      exchange, which shows investors exactly what these are worth — and the parent's
+      stock usually rises when that hidden value becomes visible.
+    forecast:
+      how: >
+        Event-driven. Footprints: regulatory requirements on subsidiary listings/stake
+        levels, banker appointment news, and management commentary on monetization
+        timelines.
+      leading_indicators:
+        - name: Management commentary on subsidiary stakes
+          source: Quarterly concall, AGM
+          cadence: quarterly
+          lead: signals intent quarters ahead
+        - name: RBI rules on bank-NBFC overlap / subsidiary stakes
+          source: RBI circulars
+          cadence: event-driven
+          lead: forces timelines
+      rule_of_thumb: >
+        Each monetization event re-prices the SOTP discount; no event, no driver —
+        do not carry this as a standing bull point.
+    watch: Stake-sale / listing headlines
+    direction: Value unlocking events → positive
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: Shareholding structure
+    category: ownership
+    weight: background
+    narrative: >
+      No promoter (professionally managed, diversified ownership) — FII + DII together
+      dominate the register. The absence of a promoter block means governance risk is
+      low but also that there is no anchor buyer in drawdowns beyond institutions.
+    simple_english: >
+      Nobody "owns" HDFC Bank the way a founding family owns most Indian companies —
+      it's held almost entirely by big investment funds, Indian and foreign. That
+      means clean governance, but also that the share price is driven by fund flows
+      rather than any single committed owner.
+    forecast:
+      how: >
+        Directly observable quarterly via the BSE shareholding pattern; FII/DII split
+        shifts are the swing factor (see the FII headroom driver above).
+      leading_indicators:
+        - name: Quarterly shareholding pattern
+          source: BSE filings (within 21 days of quarter end)
+          cadence: quarterly
+          lead: coincident ownership read
+      rule_of_thumb: >
+        DII share rising through FII selling phases = domestic floor strengthening.
+    watch: BSE quarterly shareholding filing
+    direction: Rising DII share → stabilizing
+    as_of: 2026-Q1
+    verify_note: Pull exact FII/DII split from the latest BSE filing before marking reviewed.

@@ -15,9 +15,12 @@ import type {
   RegimeClustersResponse, PatternMatchResponse, MarketDynamicsResponse,
   OIAnalysis,
 } from '../types/stock'
+import type { StockDriversResponse } from '../types/drivers'
 import { stockApi } from '../api/stockApi'
+import { driversApi } from '../api/driversApi'
 import Navbar from '../components/Navbar'
 import PriceChart from '../components/stock/PriceChart'
+import StockDrivers from '../components/stock/StockDrivers'
 import RelativeStrengthSection from '../components/stock/RelativeStrengthSection'
 import ReturnIntelligence from '../components/stock/ReturnIntelligence'
 import RiskIntelligence from '../components/stock/RiskIntelligence'
@@ -60,6 +63,7 @@ function formatVolume(v: number): string {
 const SECTION_INDEX = [
   { id: 's-today',       label: 'Today',        accent: '#3B82F6' },
   { id: 's-chart',       label: 'Chart',         accent: '#3B82F6' },
+  { id: 's-drivers',     label: 'Drivers',       accent: '#F97316' },
   { id: 's-structure',   label: 'Structure',     accent: '#3B82F6' },
   { id: 's-rs',          label: 'Rel Strength',  accent: '#22C55E' },
   { id: 's-returns',     label: 'Returns',       accent: '#3B82F6' },
@@ -102,6 +106,7 @@ interface StockData {
   patternMatch: PatternMatchResponse | null
   marketDynamics: MarketDynamicsResponse | null
   oiAnalysis: OIAnalysis | null
+  drivers: StockDriversResponse | null
 }
 
 const INITIAL: StockData = {
@@ -110,7 +115,7 @@ const INITIAL: StockData = {
   regime: null, persistence: null, insights: null, analogs: null,
   zscore: null, dualMomentum: null,
   statSignals: null, volLab: null, regimeClusters: null, patternMatch: null, marketDynamics: null,
-  oiAnalysis: null,
+  oiAnalysis: null, drivers: null,
 }
 
 type LoadState = { [K in keyof StockData]: boolean }
@@ -120,7 +125,7 @@ const INIT_LOAD: LoadState = {
   regime: false, persistence: false, insights: false, analogs: false,
   zscore: false, dualMomentum: false,
   statSignals: false, volLab: false, regimeClusters: false, patternMatch: false, marketDynamics: false,
-  oiAnalysis: false,
+  oiAnalysis: false, drivers: false,
 }
 
 // ─── Section card ─────────────────────────────────────────────────────────────
@@ -196,7 +201,8 @@ export default function StockPage() {
       if (el) observer.observe(el)
     })
     return () => observer.disconnect()
-  }, [])
+    // Re-register when data-gated sections (Today, Drivers) mount after their fetch resolves
+  }, [data.summary, data.drivers])
 
   useEffect(() => {
     if (!symbol) return
@@ -241,6 +247,11 @@ export default function StockPage() {
       .then(r => setData(prev => ({ ...prev, oiAnalysis: r })))
       .catch(() => {/* non-F&O — leave oiAnalysis null */})
       .finally(() => setLoad('oiAnalysis', false))
+    setLoad('drivers', true)
+    driversApi.getDrivers(symbol)
+      .then(r => setData(prev => ({ ...prev, drivers: r })))
+      .catch(() => {/* no dossier yet — section stays hidden */})
+      .finally(() => setLoad('drivers', false))
   }, [symbol])
 
   const summary = data.summary
@@ -453,7 +464,7 @@ export default function StockPage() {
                 ...JAKARTA, fontSize: '0.9375rem', color: INK2,
                 lineHeight: 1.75, mb: 3, maxWidth: 440,
               }}>
-                20-section deep dive — regime, returns, volatility, patterns, AI copilot
+                21-section deep dive — drivers, regime, returns, volatility, patterns, AI copilot
               </Typography>
 
               {/* Badges row */}
@@ -654,10 +665,22 @@ export default function StockPage() {
         )}
 
         <Section id="s-chart" title="Price Chart" accent="#3B82F6" num={2}>
-          <PriceChart data={data.ohlcv} loading={loading.ohlcv} />
+          <PriceChart
+            data={data.ohlcv}
+            loading={loading.ohlcv}
+            events={data.drivers?.drivers.flatMap(d =>
+              d.events.map(ev => ({ ...ev, category: d.category, driver: d.title }))
+            )}
+          />
         </Section>
 
-        <Section id="s-structure" title="Market Structure & Trend" accent="#3B82F6" num={3}>
+        {(data.drivers || loading.drivers) && (
+          <Section id="s-drivers" title="Stock Drivers" accent="#F97316" num={3}>
+            <StockDrivers data={data.drivers} loading={loading.drivers} />
+          </Section>
+        )}
+
+        <Section id="s-structure" title="Market Structure & Trend" accent="#3B82F6" num={4}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={7}>
               <MarketStructure data={data.regime} loading={loading.regime} />
@@ -668,73 +691,73 @@ export default function StockPage() {
           </Grid>
         </Section>
 
-        <Section id="s-rs" title="Relative Strength" accent="#22C55E" num={4}>
+        <Section id="s-rs" title="Relative Strength" accent="#22C55E" num={5}>
           <RelativeStrengthSection data={data.rs} loading={loading.rs} />
         </Section>
 
-        <Section id="s-returns" title="Return Intelligence" accent="#3B82F6" num={5}>
+        <Section id="s-returns" title="Return Intelligence" accent="#3B82F6" num={6}>
           <ReturnIntelligence data={data.returns} loading={loading.returns} />
         </Section>
 
-        <Section id="s-risk" title="Risk Intelligence" accent="#F59E0B" num={6}>
+        <Section id="s-risk" title="Risk Intelligence" accent="#F59E0B" num={7}>
           <RiskIntelligence data={data.risk} loading={loading.risk} />
         </Section>
 
-        <Section id="s-drawdown" title="Drawdown Intelligence" accent="#EF4444" num={7}>
+        <Section id="s-drawdown" title="Drawdown Intelligence" accent="#EF4444" num={8}>
           <DrawdownSection data={data.drawdown} loading={loading.drawdown} />
         </Section>
 
         {(summary || data.rs || data.risk || data.drawdown) && (
-          <Section id="s-opportunity" title="Opportunity Score" accent="#FBBF24" num={8}>
+          <Section id="s-opportunity" title="Opportunity Score" accent="#FBBF24" num={9}>
             <OpportunityDashboard summary={summary} rs={data.rs} risk={data.risk} drawdown={data.drawdown} />
           </Section>
         )}
 
-        <Section id="s-percentiles" title="Percentile Overview" accent="#3B82F6" num={9}>
+        <Section id="s-percentiles" title="Percentile Overview" accent="#3B82F6" num={10}>
           <PercentileDashboard data={data.percentiles} loading={loading.percentiles} />
         </Section>
 
-        <Section id="s-insights" title="Research Insights" accent="#8B5CF6" num={10}>
+        <Section id="s-insights" title="Research Insights" accent="#8B5CF6" num={11}>
           <ResearchInsights data={data.insights} loading={loading.insights} />
         </Section>
 
-        <Section id="s-analogs" title="Historical Analogs" accent="#14B8A6" num={11}>
+        <Section id="s-analogs" title="Historical Analogs" accent="#14B8A6" num={12}>
           <HistoricalAnalog data={data.analogs} loading={loading.analogs} />
         </Section>
 
-        <Section id="s-zscore" title="Z-Score Mean Reversion" accent="#3B82F6" num={12}>
+        <Section id="s-zscore" title="Z-Score Mean Reversion" accent="#3B82F6" num={13}>
           <ZScore data={data.zscore} loading={loading.zscore} />
         </Section>
 
-        <Section id="s-momentum" title="Dual Momentum" accent="#22C55E" num={13}>
+        <Section id="s-momentum" title="Dual Momentum" accent="#22C55E" num={14}>
           <DualMomentum data={data.dualMomentum} loading={loading.dualMomentum} />
         </Section>
 
-        <Section id="s-stat" title="Statistical Risk" accent="#8B5CF6" num={14}>
+        <Section id="s-stat" title="Statistical Risk" accent="#8B5CF6" num={15}>
           <StatisticalSignals data={data.statSignals} loading={loading.statSignals} />
         </Section>
 
-        <Section id="s-vol" title="Volatility Lab" accent="#F59E0B" num={15}>
+        <Section id="s-vol" title="Volatility Lab" accent="#F59E0B" num={16}>
           <VolatilityLab data={data.volLab} loading={loading.volLab} />
         </Section>
 
-        <Section id="s-clusters" title="Regime Clusters" accent="#14B8A6" num={16}>
+        <Section id="s-clusters" title="Regime Clusters" accent="#14B8A6" num={17}>
           <RegimeClusters data={data.regimeClusters} loading={loading.regimeClusters} />
         </Section>
 
-        <Section id="s-patterns" title="Pattern Match Engine" accent="#F59E0B" num={17}>
+        <Section id="s-patterns" title="Pattern Match Engine" accent="#F59E0B" num={18}>
           <PatternMatch data={data.patternMatch} loading={loading.patternMatch} />
         </Section>
 
-        <Section id="s-dynamics" title="Market Dynamics" accent="#22C55E" num={18}>
+        <Section id="s-dynamics" title="Market Dynamics" accent="#22C55E" num={19}>
           <MarketDynamics data={data.marketDynamics} loading={loading.marketDynamics} />
         </Section>
 
-        <Section id="s-options" title="Options & Futures Intelligence" accent="#A855F7" num={19}>
+        <Section id="s-options" title="Options & Futures Intelligence" accent="#A855F7" num={20}>
           <OptionsIntelligence data={data.oiAnalysis} loading={loading.oiAnalysis} />
         </Section>
 
-        <Section id="s-ai" title="AI Research Assistant" accent="#8B5CF6" num={20}>
+        <Section id="s-ai" title="AI Research Assistant" accent="#8B5CF6" num={21}>
           <AIResearchAssistant symbol={symbol} />
         </Section>
 

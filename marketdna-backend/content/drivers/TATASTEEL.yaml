@@ -1,0 +1,261 @@
+# Stock Drivers dossier — Tata Steel (TATASTEEL)
+# DRAFT (AI-assisted, web-researched 2026-07-14) — pending human review pass.
+
+symbol: TATASTEEL
+company: Tata Steel
+sector: Steel / Metals
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+sources:
+  - doc_type: filing
+    title: Tata Steel FY26 results and production/delivery release
+    period: FY26
+    url: https://www.tatasteel.com/newsroom/press-releases/india/2026/tata-steel-4qfy2026-and-fy2026-production-and-delivery-volumes-provisional/
+  - doc_type: concall_transcript
+    title: Tata Steel Q4 FY26 earnings call
+    period: Q4 FY26
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: India steel spread & safeguard duty
+    category: demand
+    weight: primary
+    narrative: >
+      India is the profit engine: FY26 crude steel ~23.5 Mt, deliveries ~22.5 Mt
+      (domestic >20 Mt for the first time), EBITDA margin ~24%. The Jan 2026
+      three-year safeguard-duty extension (12% to Apr 2026, 11.5% to Apr 2027, 11%
+      to Apr 2028) put a floor under domestic HRC prices — the sector re-rated on it.
+      Earnings are spread-driven: HRC realization minus iron ore / coking coal.
+    simple_english: >
+      Tata Steel's Indian mills make most of its profit. Profit = steel price minus
+      raw-material cost. Cheap imported steel (mostly from China) used to cap Indian
+      prices; the government now charges a duty on those imports for three years,
+      which keeps Indian steel prices — and Tata's profits — higher. Watch the gap
+      between steel prices and coal prices: when it widens, profits jump a few
+      months later.
+    forecast:
+      how: >
+        Spreads lead reported EBITDA by ~1 quarter (inventory lag). Domestic HRC vs
+        import parity is observable weekly; the safeguard-duty step-downs are dated
+        in advance (Apr 2027, Apr 2028) — each step-down slightly lowers the price
+        floor.
+      leading_indicators:
+        - name: Domestic HRC price vs import parity
+          source: SteelMint weekly assessments
+          cadence: weekly
+          lead: ~1 quarter ahead of reported EBITDA
+        - name: Coking coal spot (Australian HCC)
+          source: Platts / trade press
+          cadence: weekly
+          lead: input squeeze indicator, ~1 quarter
+        - name: Safeguard duty milestones / review
+          source: DGTR / Ministry of Finance notifications
+          cadence: dated (Apr 2027, Apr 2028 step-downs)
+          lead: known calendar events
+      rule_of_thumb: >
+        HRC-coking-coal spread widening 2+ months = upgrade cycle beginning; any
+        early review/dilution of the safeguard duty = immediate sector de-rating.
+    watch: Weekly domestic HRC price; spread vs coking coal
+    direction: Wider spread / duty intact → positive
+    events:
+      - event_date: "2026-01"
+        label: Three-year safeguard duty extension on steel imports
+        observed_move: "+~5% (sector-wide)"
+    verify_note: >
+      FY26 volumes/margins and the exact duty schedule (12%/11.5%/11%) are from press
+      summaries — verify against DGTR notification and the FY26 release. Event date
+      is month-precision; confirm the notification date.
+
+  - title: China exports & global steel prices
+    category: competition
+    weight: primary
+    narrative: >
+      Chinese production and export volumes set the global (and import-parity) price
+      floor. China exporting at high run-rates caps Indian realizations even with
+      duties; Chinese production discipline or stimulus does the opposite. This is
+      the biggest exogenous variable in the thesis.
+    simple_english: >
+      China makes over half the world's steel. When China's own economy is weak, its
+      mills dump surplus steel on the world at low prices, dragging everyone's
+      prices down — including India's, duty or no duty. When China cuts production
+      or its economy revives, world steel prices rise and Tata Steel earns more
+      without lifting a finger.
+    forecast:
+      how: >
+        China customs export data (monthly) and production cuts/stimulus signals lead
+        regional prices by weeks-to-months. Chinese property/infrastructure activity
+        is the underlying demand driver for their surplus math.
+      leading_indicators:
+        - name: China steel exports (monthly tonnage)
+          source: China customs data via trade press
+          cadence: monthly
+          lead: sets regional price direction ~1-2 months out
+        - name: China production-cut mandates / stimulus announcements
+          source: NBS, NDRC announcements
+          cadence: event-driven
+          lead: regime-change signal for global prices
+        - name: Chinese property new starts
+          source: NBS monthly data
+          cadence: monthly
+          lead: the root demand variable, ~2 quarters
+      rule_of_thumb: >
+        China exports above ~8-9 Mt/month = ceiling on Indian realizations;
+        credible Chinese supply reform = the big upside scenario.
+    watch: Monthly China steel export tonnage
+    direction: Lower China exports → positive
+
+  - title: Netherlands (IJmuiden) regulatory risk & green transition
+    category: policy
+    weight: primary
+    narrative: >
+      Europe is the swing factor. Netherlands EBITDA improved sharply in FY26
+      (roughly tripling to ~€267m) helped by EU import safeguards and CBAM from
+      1 Jan, but TSN paid €20m+ in environmental penalties and has received a
+      letter of intent to revoke permits at coke/gas plants — an existential
+      regulatory tail-risk for the IJmuiden site until the green-steel transition
+      deal (state support + DRI conversion) is settled.
+    simple_english: >
+      Tata Steel's big Dutch plant finally started making decent money — but the
+      Dutch government is threatening to revoke pollution permits for its dirtiest
+      units unless a clean-up deal is reached. The fix is converting the plant to
+      cleaner technology, which needs government subsidy. If the deal lands, a
+      long-standing drag disappears; if permits are revoked early, part of the
+      plant may be forced to shut.
+    forecast:
+      how: >
+        Milestone-driven negotiation. Footprints: Dutch state-aid negotiation
+        announcements, environmental agency (provincial) permit rulings, and
+        EU CBAM phase-in economics improving the local price umbrella.
+      leading_indicators:
+        - name: Dutch state-aid / green-transition deal announcements
+          source: TSN press releases; Dutch government statements
+          cadence: event-driven
+          lead: the binary catalyst
+        - name: Permit ruling timeline (coke/gas plants)
+          source: Provincial authority rulings, company disclosures
+          cadence: event-driven
+          lead: months of advance notice via legal process
+        - name: European HRC prices + CBAM phase-in
+          source: Trade press / Eurofer
+          cadence: monthly
+          lead: profitability backdrop
+      rule_of_thumb: >
+        Green-deal signature = removes the tail risk (re-rating); permit revocation
+        proceeding = provision for early closure costs — a multi-thousand-crore
+        negative scenario.
+    watch: Dutch green-transition deal headlines; permit rulings
+    direction: Deal signed → positive; permit revocation → sharply negative
+    verify_note: >
+      NL EBITDA ~€267m, €20m penalties, and permit-revocation letter are from press
+      summaries of the AGM — verify against the annual report / TSN disclosures.
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: Kalinganagar expansion & India volume growth
+    category: catalyst
+    weight: secondary
+    narrative: >
+      The 40 MTPA long-term India ambition rides on brownfield expansions
+      (Kalinganagar ramp, Neelachal, downstream). Volume growth is the compounding
+      lever that works independent of the price cycle — each ramp-up quarter adds
+      structurally to EBITDA.
+    simple_english: >
+      Beyond riding steel prices, Tata Steel is simply building more capacity in
+      India — aiming to nearly double over the long run. More tonnes sold means
+      more profit even if prices stay flat. Each time a new furnace or mill comes
+      online, the company's earnings base steps up permanently.
+    forecast:
+      how: >
+        Capex-milestone driven and disclosed: project commissioning dates in investor
+        presentations, quarterly capex run-rate, and monthly/quarterly India delivery
+        volumes tracking the ramp.
+      leading_indicators:
+        - name: Quarterly India delivery volumes
+          source: Provisional production/delivery release (pre-results)
+          cadence: quarterly
+          lead: the ramp scorecard, ~3 weeks before results
+        - name: Project commissioning milestones
+          source: Investor presentations
+          cadence: quarterly
+          lead: quarters ahead of volume step-ups
+        - name: Consolidated net debt trajectory
+          source: Half-yearly balance sheet
+          cadence: half-yearly
+          lead: funding-discipline check on the expansion
+      rule_of_thumb: >
+        Volume growth above ~5%/yr with net debt flat-to-down = expansion
+        self-funding (bullish); debt rising through a price downcycle mid-expansion
+        = the classic steel trap.
+    watch: Quarterly India delivery volumes; net debt
+    direction: On-schedule ramp with debt discipline → positive
+
+  - title: Coking coal & iron ore costs
+    category: input_costs
+    weight: secondary
+    narrative: >
+      Coking coal is imported (Australian benchmark) and the main cost swing; iron
+      ore is largely captive in India — a structural cost advantage vs peers, which
+      makes Tata's India margins the sector's most resilient in downcycles.
+    simple_english: >
+      Steel needs two ingredients: iron ore and a special coal. Tata Steel owns its
+      own Indian iron-ore mines (a huge advantage — that ingredient is nearly free
+      compared to rivals), but must import the coal from Australia. So when coal
+      prices spike, profits dip for a quarter or two until steel prices catch up.
+    forecast:
+      how: >
+        Australian HCC spot is observable weekly and hits the P&L with ~1 quarter of
+        inventory lag. Weather (Queensland cyclone season, Dec-Mar) and Chinese
+        coke demand drive spikes.
+      leading_indicators:
+        - name: Australian HCC spot price
+          source: Platts / trade press
+          cadence: weekly
+          lead: ~1 quarter ahead of P&L impact
+        - name: Queensland weather disruptions
+          source: Trade press (Dec-Mar season)
+          cadence: seasonal
+          lead: spike risk window
+      rule_of_thumb: >
+        Coal spiking >30% in a quarter compresses the next quarter's spread unless
+        HRC follows; captive ore means Tata's downcycle margin floor sits above
+        non-integrated peers.
+    watch: Australian coking coal spot
+    direction: Coal spike → transient negative
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: Shareholding structure
+    category: ownership
+    weight: background
+    narrative: >
+      Tata Sons is the stable promoter (~33% area); high retail shareholder count
+      (one of India's most widely held stocks) plus FII/DII float. Promoter stability
+      means governance comfort; the very large retail base adds beta in both
+      directions on sentiment swings.
+    simple_english: >
+      The Tata group firmly controls the company and isn't going anywhere — that's
+      reassuring. But Tata Steel is also one of the most widely owned stocks by
+      small investors in India, and crowds chase momentum: the stock tends to
+      overshoot both on the way up and on the way down.
+    forecast:
+      how: >
+        Directly observable quarterly via BSE shareholding pattern; NSDL FPI flows
+        give the between-quarters read on the FII swing factor.
+      leading_indicators:
+        - name: Quarterly shareholding pattern
+          source: BSE filings (within 21 days of quarter end)
+          cadence: quarterly
+          lead: coincident ownership read
+        - name: FII net flows into Indian equities
+          source: NSDL FPI monitor
+          cadence: daily/monthly
+          lead: pressure gauge between filings
+      rule_of_thumb: >
+        Promoter stake stable + DII rising through drawdowns = institutional floor;
+        retail share spiking after a big rally = crowding marker.
+    watch: BSE quarterly shareholding filing
+    direction: Stable promoter + rising DII → stabilizing
+    as_of: 2026-Q1
+    verify_note: Confirm exact promoter/FII/DII split from the latest BSE filing.

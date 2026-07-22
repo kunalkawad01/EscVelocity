@@ -1,0 +1,239 @@
+# Shared forecast-block library — driver archetypes reused across dossiers.
+# NOT loaded by the backend (lives in a subdirectory, outside the drivers/*.yaml glob).
+# The authoring skill copies a block into a dossier and adapts the specifics; fixes to
+# lead-lag logic happen HERE first, then propagate on each dossier's next refresh.
+# Convention: keep blocks generic — no company names inside the block body.
+
+blocks:
+
+  bank_credit_cycle:
+    applies_to: banks, NBFCs
+    how: >
+      Bank earnings follow the credit cycle: system credit growth drives loan-book
+      growth ~coincidently, while margin (NIM) moves lag RBI rate changes by 2-4
+      quarters as deposits and loans reprice at different speeds. Asset quality
+      lags the economic cycle by 2-6 quarters.
+    leading_indicators:
+      - name: RBI fortnightly bank credit / deposit growth
+        source: RBI Weekly Statistical Supplement
+        cadence: fortnightly
+        lead: coincident on growth; sets the sector backdrop
+      - name: RBI repo rate decisions and stance
+        source: RBI MPC statements (bi-monthly)
+        cadence: bi-monthly
+        lead: 2-4 quarters ahead of NIM impact
+      - name: CD ratio and deposit-rate commentary
+        source: Bank quarterly concalls
+        cadence: quarterly
+        lead: signals margin pressure ahead
+    rule_of_thumb: >
+      Rate-cut cycle beginning = 2-3 quarters of NIM compression for deposit-heavy
+      banks, then recovery; credit growth sustained >2x nominal GDP = late-cycle risk.
+
+  it_services_spend:
+    applies_to: IT services exporters
+    how: >
+      Revenue follows enterprise tech budgets in the US/EU, set annually with
+      quarterly true-ups. Deal TCV (total contract value) leads revenue by 2-4
+      quarters as bookings convert. USDINR passes through to margins near-term.
+    leading_indicators:
+      - name: Company deal TCV / bookings
+        source: Quarterly results and concalls
+        cadence: quarterly
+        lead: 2-4 quarters ahead of revenue
+      - name: US enterprise IT spend guidance (Gartner forecasts, hyperscaler capex)
+        source: Gartner press releases; US tech earnings
+        cadence: quarterly
+        lead: sets the demand backdrop 1-2 quarters out
+      - name: USDINR
+        source: RBI reference rate
+        cadence: daily
+        lead: near-coincident on margins
+    rule_of_thumb: >
+      Two consecutive quarters of TCV growth without revenue growth = conversion
+      delay, not demand loss (usually bullish deferred); guidance cuts in January
+      (US budget season) are the key negative marker.
+
+  steel_commodity_cycle:
+    applies_to: steel, metals producers
+    how: >
+      Earnings are spread-driven: realization (steel price) minus input (iron ore /
+      coking coal). Chinese production and export volumes set the price floor for
+      Indian steel; domestic demand (construction, autos) sets premium over import
+      parity. Spreads lead reported EBITDA by ~1 quarter (inventory lag).
+    leading_indicators:
+      - name: Domestic HRC price vs import parity
+        source: SteelMint weekly assessments
+        cadence: weekly
+        lead: ~1 quarter ahead of reported EBITDA
+      - name: China steel exports and production cuts
+        source: China customs monthly data; NBS
+        cadence: monthly
+        lead: sets the global price direction
+      - name: Coking coal spot (Australian HCC)
+        source: Platts / trade press
+        cadence: weekly
+        lead: input squeeze indicator, ~1 quarter
+    rule_of_thumb: >
+      HRC-coking-coal spread widening for 2+ months = upgrade cycle beginning;
+      China exports above ~8-9 Mt/month = ceiling on Indian realizations.
+
+  us_truck_cycle:
+    applies_to: CV component exporters (forgings, castings, axles)
+    how: >
+      Class 8 orders are forecastable 1-2 quarters out from the US freight cycle:
+      rising spot freight rates + aging fleet => orders; orders lead builds lead
+      component offtake by a further 1-2 quarters.
+    leading_indicators:
+      - name: ACT Class 8 net orders
+        source: ACT Research monthly press release
+        cadence: monthly (~first week)
+        lead: coincident headline; 1-2 quarters ahead of component offtake
+      - name: US spot freight rates (DAT dry van index)
+        source: DAT Freight & Analytics
+        cadence: weekly
+        lead: ~1-2 quarters ahead of orders
+      - name: OEM build-rate commentary (PACCAR, Daimler Truck)
+        source: OEM earnings calls
+        cadence: quarterly
+        lead: confirms conversion of orders to builds
+    rule_of_thumb: >
+      Orders below replacement (~250k/yr annualized) + freight rates inflecting up
+      = pre-buy setup; orders above ~30k/month sustained = cycle peaking.
+
+  defence_order_flow:
+    applies_to: defence PSUs and private defence manufacturers
+    how: >
+      Not forecastable as a series — event-driven. The procurement pipeline is the
+      earliest visible footprint: Acceptance of Necessity (AoN) => RFP => trials =>
+      contract award runs quarters-to-years. Order announcements move the stock;
+      execution (deliveries) moves earnings with multi-year lag.
+    leading_indicators:
+      - name: DAC meeting outcomes / AoN announcements
+        source: PIB defence press releases
+        cadence: event-driven (~monthly meetings)
+        lead: quarters ahead of contract award
+      - name: Defence capital outlay + domestic procurement share
+        source: Union Budget (Feb) and revised estimates
+        cadence: yearly
+        lead: sets the total award envelope
+      - name: Order book and pipeline commentary
+        source: Company quarterly concalls
+        cadence: quarterly
+        lead: signals near-term award probability
+    rule_of_thumb: >
+      Track order book / trailing revenue (book-to-bill): above ~3x = multi-year
+      visibility priced as growth; execution misses against a big book de-rate
+      harder than small-book misses.
+
+  ownership_shareholding:
+    applies_to: universal background driver
+    how: >
+      Directly observable quarterly. BSE shareholding pattern shows promoter /
+      FII / DII shifts; NSDL FPI flows give the between-quarters read. Promoter
+      pledge is the red-flag line; rising DII share cushions drawdowns.
+    leading_indicators:
+      - name: Quarterly shareholding pattern
+        source: BSE filings (within 21 days of quarter end)
+        cadence: quarterly
+        lead: coincident ownership read
+      - name: FII net flows into Indian equities
+        source: NSDL FPI monitor
+        cadence: daily/monthly
+        lead: pressure gauge between filings
+    rule_of_thumb: >
+      Any appearance of promoter pledge = immediate red flag; FII share at
+      multi-year highs = crowding risk on global risk-off.
+
+  domestic_auto_demand:
+    applies_to: OEMs and domestic auto-component makers
+    how: >
+      Monthly wholesale dispatches (SIAM/company releases) and registrations
+      (VAHAN) are near-coincident demand reads. Rural indicators (monsoon, tractor
+      sales) lead 2W demand by ~1-2 quarters; financing availability leads PV/CV.
+    leading_indicators:
+      - name: Monthly dispatch numbers
+        source: Company press releases (1st of month), SIAM
+        cadence: monthly
+        lead: coincident — the datapoint itself
+      - name: VAHAN registrations
+        source: VAHAN dashboard (public)
+        cadence: monthly
+        lead: retail truth vs channel-stuffed wholesales
+      - name: Monsoon progress / rural sentiment
+        source: IMD updates Jun-Sep
+        cadence: weekly in season
+        lead: ~1-2 quarters ahead of rural (2W, entry PV, tractor) demand
+    rule_of_thumb: >
+      Wholesale growing while registrations flat for 2+ months = channel inventory
+      building — a demand-disappointment setup.
+
+  oil_refining_marketing:
+    applies_to: refiners, OMCs, upstream
+    how: >
+      Refiners: Singapore GRM (gross refining margin) benchmarks profitability
+      near-coincidently. OMCs: marketing margin = retail price minus Brent-linked
+      cost — freezes in election/inflation windows. Upstream: Brent minus windfall
+      levies.
+    leading_indicators:
+      - name: Singapore complex GRM
+        source: Trade press / broker trackers
+        cadence: weekly
+        lead: ~1 quarter ahead of reported refining EBITDA
+      - name: Brent crude and product cracks (diesel, petrol)
+        source: Public market data
+        cadence: daily
+        lead: coincident
+      - name: Retail fuel price revisions / freeze status
+        source: OMC daily price notifications
+        cadence: daily
+        lead: marketing-margin regime indicator
+    rule_of_thumb: >
+      Brent falling with retail prices frozen = OMC marketing margins expanding —
+      the classic OMC upgrade setup; the reverse compresses silently.
+
+  pharma_us_generics:
+    applies_to: US-facing generic pharma
+    how: >
+      US revenue = volume x price erosion + new launches. Price erosion runs
+      mid-single-digit normally; USFDA inspection outcomes gate the launch
+      pipeline. ANDA approvals lead launch revenue by 1-3 quarters.
+    leading_indicators:
+      - name: USFDA inspection outcomes (483s, warning letters, OAI/VAI)
+        source: USFDA database; company disclosures
+        cadence: event-driven
+        lead: gates the pipeline 2-6 quarters out
+      - name: ANDA approvals and Para IV wins
+        source: USFDA approvals list; company releases
+        cadence: monthly
+        lead: 1-3 quarters ahead of launch revenue
+      - name: US price-erosion commentary
+        source: Sector concalls (all major generics)
+        cadence: quarterly
+        lead: sector-wide margin read
+    rule_of_thumb: >
+      A warning letter at a plant supplying >15% of US sales = multi-quarter
+      overhang regardless of the rest of the business.
+
+  epc_infra_orderbook:
+    applies_to: EPC, capital goods, infrastructure
+    how: >
+      Order inflow leads revenue by 2-6 quarters depending on project cycle.
+      Government capex budget and NHAI/railway award runs set the tender pipeline;
+      working-capital stretch (receivable days) is the quality check on growth.
+    leading_indicators:
+      - name: Order inflow and order book (book-to-bill)
+        source: Quarterly results, exchange filings for large wins
+        cadence: quarterly + event-driven
+        lead: 2-6 quarters ahead of revenue
+      - name: Central capex spend run-rate
+        source: CGA monthly accounts
+        cadence: monthly
+        lead: leads award activity ~1-2 quarters
+      - name: Receivable days / net working capital
+        source: Half-yearly balance sheet
+        cadence: half-yearly
+        lead: quality check — growth funded by WC stretch reverses
+    rule_of_thumb: >
+      Book-to-bill above ~2x with stable working capital = visibility upgrade;
+      order growth + receivables ballooning = growth you should discount.

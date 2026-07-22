@@ -405,6 +405,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `stock_health.py` | `/api/stock-health` | GET `/scan` (instant — parquet-backed), GET `/{symbol}` (on-demand, ~1-2s), POST `/scan/invalidate` (forces recompute + parquet refresh), POST `/{symbol}/invalidate`. Scan parquet at `data_lake/derived/stock_health/scan.parquet`. |
 | `edges.py` | `/api/edges` | Edge Decay Observatory (read-only over Postgres `edge_measurements`). `/observatory` (all edges: vitals + status + decay series), `/{edge_key}/history`, POST `/invalidate`. Rows written by the standalone `jobs/measure_edges.py` (see Step 4) — never by the server. |
 | `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
+| `fno_momentum.py` | `/api/fno-momentum` | F&O Momentum Radar. `/scan` — OI Gainers (futures OI up) + Short Covering (price↑ OI↓) buckets, each row must pass ≥1 momentum qualifier (±5% last session · best sector today · ±2% gap at 9:15), sorted by day change %. POST `/invalidate` (delegates to fno tactical caches). Zero extra Kite calls — piggybacks `fno_tactical_service._get_scan()`. |
 
 ---
 
@@ -604,7 +605,8 @@ $endpoints = @(
     "http://localhost:8000/api/options/em-scan/invalidate",
     "http://localhost:8000/api/options/scan/invalidate",
     "http://localhost:8000/api/fno/invalidate",
-    "http://localhost:8000/api/portfolios/invalidate"
+    "http://localhost:8000/api/portfolios/invalidate",
+    "http://localhost:8000/api/drivers/invalidate"
 )
 foreach ($url in $endpoints) {
     try {
@@ -688,6 +690,7 @@ Start-Process powershell -ArgumentList "-NoExit -Command cd 'C:\Users\amitk\EscV
 | `/api/options/em-scan/invalidate` | Expected Move page (all symbols scan) |
 | `/api/options/scan/invalidate` | OI Buildup scanner |
 | `/api/portfolios/invalidate` | Portfolios page (screen/track/live/backtest caches) |
+| `/api/drivers/invalidate` | Stock Drivers section (re-reads dossier YAML + clears the live-metric cache so IV/basis chips pick up today's ingestion) |
 
 Per-symbol options caches (`/api/options/{symbol}`) are populated on demand — they pick up
 fresh parquet automatically on first request after ingestion, no explicit invalidation needed.
@@ -838,6 +841,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/dataviz` | `page_docu/dataviz_page.md` |
 | `/delivery` | `page_docu/delivery_page.md` |
 | `/fno-tactical` | `page_docu/fno_tactical_page.md` |
+| `/fno-momentum` | `page_docu/fno_momentum_page.md` |
 | `/indicators` | `page_docu/indicators_page.md` |
 | `/markov-options` | `page_docu/markov_options_page.md` |
 | `/pattern-dna` | `page_docu/pattern_dna_page.md` |

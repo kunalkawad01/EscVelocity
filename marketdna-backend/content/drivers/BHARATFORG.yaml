@@ -1,0 +1,352 @@
+# Stock Drivers dossier — Bharat Forge (BHARATFORG)
+# Pilot dossier for the Stock Drivers feature. Schema: app/models/drivers.py
+# Facts sourced from user research 2026-07-14; items flagged verify_note need
+# confirmation from filings/concalls before this dossier is marked reviewed.
+
+symbol: BHARATFORG
+company: Bharat Forge
+sector: Auto Components / Defence
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+# Primary documents this dossier draws from. The refresh pass reads the latest
+# edition of each and diffs against the drivers below.
+sources:
+  - doc_type: filing
+    title: Bharat Forge Q4/FY26 audited results (BSE filing)
+    period: FY26
+    url: https://www.bseindia.com/xml-data/corpfiling/AttachHis/af9d0bd2-4d46-4d9a-bf64-73db891db83a.pdf
+  - doc_type: concall_transcript
+    title: Bharat Forge Q4 FY26 earnings call (FY27 ~25% India growth guidance)
+    period: Q4 FY26
+  - doc_type: annual_report
+    title: Bharat Forge Annual Report FY25 (FY26 edition pending publication)
+    period: FY25
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: US truck demand (Class 8 cycle)
+    category: demand
+    weight: primary
+    narrative: >
+      Class 8 truck orders/builds (ACT Research data) are the single most-watched
+      monthly datapoint for the stock. A large share of the standalone forging
+      business is US commercial-vehicle chassis and powertrain components, so the
+      North American truck cycle drives revenue visibility 2-3 quarters out
+      (orders lead builds lead component offtake).
+    simple_english: >
+      Bharat Forge makes heavy metal parts for big American trucks. When US
+      trucking companies order more new trucks, the truck makers order more parts
+      from Bharat Forge a few months later. So every month, when the US truck
+      order number comes out, the stock moves — more orders is good news, fewer
+      orders is bad news.
+    forecast:
+      how: >
+        Class 8 orders are themselves forecastable 1-2 quarters out from the US
+        freight cycle: when spot freight rates and truckload volumes rise while
+        the truck fleet is old, fleet operators start ordering. Watch the freight
+        cycle to anticipate the order cycle, and the order cycle to anticipate
+        Bharat Forge's export revenue.
+      leading_indicators:
+        - name: ACT Class 8 net orders
+          source: ACT Research monthly press release (free summary)
+          cadence: monthly (~first week)
+          lead: coincident — the datapoint itself
+        - name: US spot freight rates (DAT dry van index)
+          source: DAT Freight & Analytics
+          cadence: weekly
+          lead: ~1-2 quarters ahead of orders
+        - name: Fleet age / replacement-cycle commentary
+          source: PACCAR and Daimler Truck earnings calls
+          cadence: quarterly
+          lead: structural backdrop for the order cycle
+      rule_of_thumb: >
+        Sustained freight-rate uptrend with orders running below replacement
+        level (~250k/yr) = pre-buy setup building. Orders spiking above
+        ~30k/month for several months = cycle peaking.
+    watch: ACT Class 8 net orders, monthly
+    direction: Higher orders → positive
+
+  - title: US tariffs / Indo-US trade deal
+    category: policy
+    weight: primary
+    narrative: >
+      The Feb 2026 Indo-US trade deal cut tariffs on Indian auto components from
+      50% to 18% (potential path to 15%) — the stock rallied on the announcement.
+      Earlier auto-component tariff scares knocked roughly 10% off the stock.
+      Trade policy remains an ongoing headline risk on the large US export book.
+    simple_english: >
+      America charges a tax (tariff) on parts Bharat Forge ships to the US. When
+      that tax was cut from 50% to 18% in early 2026, Bharat Forge's parts became
+      much cheaper for American buyers, so the stock jumped. If tariff talk turns
+      hostile again, the stock falls — headlines about this tax move the stock
+      immediately.
+    forecast:
+      how: >
+        Not forecastable as a series — event-driven policy risk. The earliest
+        visible footprints are the negotiation calendar and official notices:
+        scheduled Indo-US trade review dates, USTR announcements, and Indian
+        Commerce Ministry statements typically precede tariff changes by weeks.
+      leading_indicators:
+        - name: Indo-US trade review calendar and ministerial meetings
+          source: USTR / Indian Ministry of Commerce press releases
+          cadence: event-driven
+          lead: weeks ahead of tariff changes
+        - name: Management commentary on tariff pass-through and US pricing
+          source: Bharat Forge quarterly concall
+          cadence: quarterly
+          lead: quantifies impact after policy moves
+      rule_of_thumb: >
+        Confirmed further cut 18% → 15% is an incremental positive already partly
+        priced; any reversal rhetoric is an outsized negative (prior scares ≈ -10%).
+    events:
+      - event_date: "2026-02-02"
+        label: Indo-US trade deal — auto-component tariff cut 50% → 18%
+        observed_move: "+15% in 3 sessions"
+      - event_date: "2025-04-03"
+        label: US reciprocal-tariff announcement selloff
+        observed_move: "~-17% in 3 sessions"
+    watch: Indo-US trade headlines; USTR notices
+    direction: Tariff cuts → positive; tariff threats → sharply negative
+    live:
+      metric: atm_iv_percentile
+      label: Headline-risk premium the options market is pricing right now
+    verify_note: >
+      Event dates and observed moves are measured from MarketDNA's own price series
+      (deal rally: +4.8%/+6.6%/+3.4% on 02-04 Feb 2026; scare: -3.1%/-8.2%/-7.3% on
+      03-07 Apr 2025). Dates mark the first trading reaction, not the announcement
+      timestamp.
+
+  - title: Defence order flow
+    category: orders
+    weight: primary
+    narrative: >
+      Defence order book ₹10,961 cr at FY26-end; FY26 defence order inflow ₹2,816 cr
+      (of ₹4,814 cr total new orders). Marquee wins: ATAGS artillery contract
+      (₹3,417 cr), the largest-ever army carbine order, Navy gas-turbine generators
+      (₹425 cr), and export wins (MArG howitzer in Europe/Middle East).
+      Announcements move the stock; execution moves earnings — order-to-revenue
+      conversion runs multi-year with lumpy delivery schedules.
+    simple_english: >
+      Bharat Forge also makes weapons — artillery guns, rifles, navy equipment.
+      When the government or a foreign buyer places a big order, the stock jumps
+      the same day on the news. But the actual money arrives slowly over years as
+      the equipment gets built and delivered. So: news moves the price now,
+      deliveries move the profits later.
+    forecast:
+      how: >
+        Not forecastable — event-driven. The earliest visible footprint is the
+        procurement pipeline: MoD Acceptance of Necessity (AoN) announcements,
+        Defence Acquisition Council meeting outcomes, and RFP issuance precede
+        contract awards by quarters. Management's order-book and pipeline
+        commentary on concalls signals which tenders are close.
+      leading_indicators:
+        - name: DAC meeting outcomes / AoN announcements
+          source: PIB (Press Information Bureau) defence releases
+          cadence: event-driven (roughly monthly meetings)
+          lead: quarters ahead of contract award
+        - name: Defence order book and pipeline commentary
+          source: Bharat Forge quarterly concall
+          cadence: quarterly
+          lead: signals near-term award probability
+        - name: Defence capital expenditure allocation
+          source: Union Budget (Feb) + revised estimates
+          cadence: yearly
+          lead: sets the total envelope for domestic awards
+      rule_of_thumb: >
+        Order announcements re-rate the stock; execution misses de-rate it.
+        Track defence revenue as % of total each quarter — the ramp is the story.
+    watch: PIB defence releases; concall order-book number
+    direction: New orders → positive on announcement; earnings follow execution
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: Aerospace qualification & OEM wins
+    category: orders
+    weight: secondary
+    narrative: >
+      New OEM contracts expected as the ring mill and landing-gear facility
+      complete qualification (CY2027). Aerospace exports have scaled ~4x in five
+      years and now account for ~15% of industrial exports. Aerospace is a
+      long-qualification, high-margin annuity business — wins are slow to arrive
+      but sticky once won.
+    simple_english: >
+      Bharat Forge is building factories to make airplane parts. Airplane makers
+      test suppliers for years before trusting them (a plane part can't fail).
+      Once approved — expected around 2027 — the orders that follow tend to be
+      large and last many years. Until then, watch for progress updates.
+    forecast:
+      how: >
+        Qualification milestones are the leading indicator: each stage completion
+        announced on concalls precedes contract wins. OEM build-rate increases
+        (Airbus/Boeing) expand the addressable pie independent of qualification.
+      leading_indicators:
+        - name: Ring mill / landing-gear qualification milestones
+          source: Bharat Forge concalls and investor presentations
+          cadence: quarterly
+          lead: quarters ahead of first contracts
+        - name: Airbus / Boeing production-rate announcements
+          source: OEM press releases and earnings calls
+          cadence: quarterly
+          lead: sets demand backdrop for new suppliers
+      rule_of_thumb: >
+        First serial-production aerospace contract post-qualification (~CY2027)
+        would be the re-rating trigger; delays past CY2027 are the risk marker.
+    watch: Qualification progress commentary, quarterly concall
+    direction: Qualification on-track / first OEM win → positive
+
+  - title: Steel prices & INR
+    category: input_costs
+    weight: secondary
+    narrative: >
+      Steel is the core input with a pass-through lag — sharp steel rallies
+      squeeze margins for 1-2 quarters before contract resets catch up. Rupee
+      depreciation aids the ~40%+ export book (revenue in USD/EUR, costs largely
+      in INR).
+    simple_english: >
+      Bharat Forge buys steel, shapes it, and sells the parts abroad. If steel
+      gets expensive suddenly, profits shrink for a few months until it can raise
+      prices. And because nearly half its sales are in dollars while its costs
+      are in rupees, a weaker rupee actually helps — it earns more rupees for the
+      same dollar sale.
+    forecast:
+      how: >
+        Both inputs are directly observable weekly. Domestic HRC steel prices
+        lead the margin impact by the pass-through lag (~1-2 quarters). USDINR
+        trend maps almost mechanically to export realizations.
+      leading_indicators:
+        - name: Domestic HRC steel price
+          source: SteelMint / JSW-Tata list prices
+          cadence: weekly
+          lead: ~1-2 quarters ahead of margin impact
+        - name: USDINR
+          source: RBI reference rate (already in-platform candidate)
+          cadence: daily
+          lead: near-coincident on export realizations
+      rule_of_thumb: >
+        Steel up >15% in a quarter = next 1-2 quarters' margins at risk. INR
+        depreciation of 1% ≈ tailwind on the ~40% export book (verify elasticity
+        from concall disclosures).
+    watch: HRC steel price trend; USDINR
+    direction: Steel up → negative (lagged); INR weaker → positive
+    verify_note: >
+      Export share (~40%+) and pass-through lag length should be confirmed from
+      the latest annual report / concall before marking reviewed.
+
+  - title: FY27 growth setup
+    category: catalyst
+    weight: secondary
+    narrative: >
+      Management guided for ~25% revenue growth in FY27 for the Indian
+      manufacturing operations (Q4 FY26 commentary) — a defence execution ramp
+      plus recovering exports, with a possible US truck pre-buy on top. If both
+      land together, FY27 becomes a double-engine year; the market will start
+      pricing this 2-3 quarters early. FY26 base: consolidated revenue ₹16,812 cr
+      (+11.2%), standalone ₹8,396 cr with Q4 EBITDA margin at 27%.
+    simple_english: >
+      The company's own bosses are saying next year (FY27) should be a big year:
+      weapons deliveries speed up, and American truckers may rush to buy trucks
+      early. Stock markets don't wait for the good year to arrive — they start
+      betting on it months in advance. So the stock may move on FY27 hopes well
+      before FY27 begins.
+    forecast:
+      how: >
+        Composite of the other drivers: track defence execution ramp (quarterly
+        defence revenue) and US pre-buy signals (Class 8 orders, EPA emission
+        regulation timeline driving pre-buy behavior). Guidance language on
+        concalls is the direct read.
+      leading_indicators:
+        - name: Defence segment revenue trajectory
+          source: Quarterly results — segment disclosures
+          cadence: quarterly
+          lead: confirms/denies the ramp
+        - name: US 2027 EPA emissions rule status (pre-buy trigger)
+          source: EPA announcements, OEM commentary
+          cadence: event-driven
+          lead: pre-buy typically starts 2-4 quarters before rule effect
+        - name: Management FY27 guidance language
+          source: Quarterly concall
+          cadence: quarterly
+          lead: direct signal
+      rule_of_thumb: >
+        Guidance upgrades + Class 8 orders inflecting in the same quarter =
+        FY27 thesis strengthening; guidance softening is the early warning.
+    watch: Concall guidance language on FY27
+    direction: Ramp confirmation → positive
+    live:
+      metric: futures_basis
+      label: Leveraged positioning into the FY27 growth story (futures vs spot)
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: EV penetration (threat and hedge)
+    category: competition
+    weight: background
+    narrative: >
+      EV penetration is slow in trucks (protects the core forging business —
+      heavy-duty electrification is hard) but fast in passenger vehicles, where
+      the aluminium-forging business is the hedge: EVs need lightweight aluminium
+      structural and chassis parts.
+    simple_english: >
+      Electric vehicles need fewer of the old engine parts Bharat Forge makes.
+      The good news: big trucks are very hard to electrify, so that business is
+      safe for years. And for electric cars, Bharat Forge makes lightweight
+      aluminium parts instead — so it profits from the switch rather than just
+      losing to it.
+    forecast:
+      how: >
+        Slow-moving structural driver. Track e-truck penetration in US/EU Class 8
+        sales (currently minimal) and the aluminium-forging order book growth as
+        the hedge indicator.
+      leading_indicators:
+        - name: US/EU electric Class 8 sales share
+          source: ACT Research / EU ACEA registrations
+          cadence: quarterly
+          lead: multi-year structural signal
+        - name: Aluminium forging / e-mobility order wins
+          source: Bharat Forge concalls, investor presentations
+          cadence: quarterly
+          lead: hedge progress
+      rule_of_thumb: >
+        E-trucks above ~10% of Class 8 sales would start pressuring the core;
+        aluminium order wins growing faster than core = hedge working.
+    watch: E-truck share of Class 8 sales; aluminium order wins
+    direction: Slow truck EV adoption → protective; aluminium wins → positive
+
+  - title: Shareholding structure
+    category: ownership
+    weight: background
+    narrative: >
+      Promoters ~44%, DII ~33%, FII ~12-14%, public ~9-11% (sources differ
+      slightly on the FII/DII split). No significant promoter pledge reported.
+      Rising DII ownership provides a domestic floor; FII share is the swing
+      factor on global risk sentiment.
+    simple_english: >
+      Who owns the stock matters. The founding family holds about 44% and hasn't
+      pawned their shares (a good sign). Indian funds own about a third — they
+      tend to buy dips, which cushions falls. Foreign funds own a smaller slice —
+      when they sell India broadly, this stock feels it too.
+    forecast:
+      how: >
+        Directly observable quarterly. The BSE shareholding pattern filing shows
+        FII/DII shifts; monthly FII flow data gives the between-quarters read on
+        the swing factor.
+      leading_indicators:
+        - name: Quarterly shareholding pattern
+          source: BSE filings (within 21 days of quarter end)
+          cadence: quarterly
+          lead: coincident ownership read
+        - name: FII net flows into Indian equities
+          source: NSDL FPI monitor
+          cadence: daily/monthly
+          lead: pressure gauge between filings
+      rule_of_thumb: >
+        Any appearance of promoter pledge = immediate red flag. FII share rising
+        toward historical highs = crowding risk on global risk-off.
+    watch: BSE quarterly shareholding filing; promoter pledge line
+    direction: Pledge-free promoter + rising DII → stabilizing
+    verify_note: >
+      FII/DII split varies by source — verify from the latest BSE shareholding
+      filing. Promoter pledge status must be re-verified every quarter.
+    as_of: 2026-Q1

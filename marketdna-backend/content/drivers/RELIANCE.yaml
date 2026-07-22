@@ -1,0 +1,239 @@
+# Stock Drivers dossier — Reliance Industries (RELIANCE)
+# DRAFT (AI-assisted, web-researched 2026-07-14) — pending human review pass.
+
+symbol: RELIANCE
+company: Reliance Industries
+sector: Conglomerate (Energy / Telecom / Retail / New Energy)
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+sources:
+  - doc_type: filing
+    title: RIL Q4/FY26 results (announced 24 Apr 2026; FY26 revenue ~₹11.7 lakh cr, ₹6 dividend)
+    period: FY26
+  - doc_type: concall_transcript
+    title: RIL Q4 FY26 earnings call
+    period: Q4 FY26
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: Jio — ARPU trajectory & IPO expectation
+    category: catalyst
+    weight: primary
+    narrative: >
+      Jio ARPU reached ~₹214 in Q4 FY26 (+₹18 YoY) with JioAirFiber past 13m
+      subscribers — the monetization phase is on. The dominant catalyst narrative is
+      a Jio listing: every credible IPO-timeline signal re-prices the SOTP. Tariff
+      hikes (industry-wide, periodic) are the earnings lever in between.
+    simple_english: >
+      Jio is India's biggest mobile network. For years it fought for users with cheap
+      plans; now it's slowly raising prices, so each user pays more every month. The
+      bigger prize: Reliance is expected to list Jio on the stock market as its own
+      company — and every hint about when that happens moves Reliance's stock, because
+      a listing would put a clear price tag on its most valuable business.
+    forecast:
+      how: >
+        ARPU is disclosed quarterly and stair-steps on tariff hikes, which are
+        telegraphed by industry commentary (all three telcos move together). IPO
+        timing footprints: banker appointments, corporate restructuring filings,
+        pre-IPO stake-sale news.
+      leading_indicators:
+        - name: Quarterly ARPU and subscriber adds
+          source: RIL quarterly results (Jio segment)
+          cadence: quarterly
+          lead: coincident scorecard
+        - name: Industry tariff-hike signals
+          source: Telco commentary, TRAI data, Airtel moves
+          cadence: event-driven (~yearly cycles)
+          lead: weeks ahead of the ARPU step-up
+        - name: Jio IPO structural steps
+          source: Exchange filings, banker-appointment news
+          cadence: event-driven
+          lead: quarters ahead of listing
+      rule_of_thumb: >
+        Tariff hike announced = next 2-3 quarters of ARPU step-up largely locked in;
+        concrete IPO filing = the major SOTP re-rating event.
+    watch: Quarterly ARPU; Jio IPO headlines
+    direction: ARPU up / IPO progress → positive
+    verify_note: ARPU ₹214 and AirFiber 13m figures — verify against the Q4 FY26 presentation.
+
+  - title: O2C — refining & petchem margins
+    category: demand
+    weight: primary
+    narrative: >
+      O2C delivered double-digit EBITDA growth in FY26 on volumes, though Q4 margins
+      were hit by Middle East disruption. Earnings track Singapore GRM and petchem
+      spreads near-coincidently; crude sourcing spreads (Russian discounts, OPEC
+      policy) swing the delta vs benchmark.
+    simple_english: >
+      Reliance runs one of the world's largest oil refineries: it buys crude oil,
+      turns it into fuels and plastics, and earns the processing margin. When the
+      world pays more to refine oil (strong fuel demand, tight supply), Reliance
+      profits — and this margin is published weekly, so you can watch Reliance's
+      biggest cash machine speed up or slow down in near-real time.
+    forecast:
+      how: >
+        Singapore complex GRM (weekly) leads reported O2C EBITDA by ~1 quarter.
+        Product cracks (diesel/petrol) and petchem spreads (PE/PP over naphtha) are
+        the two sub-dials. Geopolitical supply shocks pass through within weeks.
+      leading_indicators:
+        - name: Singapore complex GRM
+          source: Trade press / broker trackers
+          cadence: weekly
+          lead: ~1 quarter ahead of reported O2C EBITDA
+        - name: Diesel and petrol cracks
+          source: Public market data
+          cadence: daily
+          lead: coincident
+        - name: PE/PP-naphtha petchem spreads
+          source: Trade press (ICIS/Platts)
+          cadence: weekly
+          lead: petchem leg, ~1 quarter
+      rule_of_thumb: >
+        GRM sustained above ~$8-10/bbl = O2C upgrade cycle; petchem spreads at
+        multi-year lows cap the upside — both dials must turn for a big O2C beat.
+    watch: Weekly Singapore GRM
+    direction: Higher GRM / spreads → positive
+
+  - title: Retail — growth normalization & value unlocking
+    category: demand
+    weight: primary
+    narrative: >
+      Retail growth slowed in FY26 amid consumer caution, but the machine keeps
+      scaling: 20,000+ stores, ~387m registered customers, hyper-local daily orders
+      up ~300%. Like Jio, a Retail listing is the eventual SOTP catalyst; near-term,
+      same-store growth and quick-commerce traction are the dials.
+    simple_english: >
+      Reliance Retail is India's largest retailer — groceries, electronics, fashion,
+      plus fast home delivery. Lately Indians have been spending cautiously, so
+      growth cooled. But the store network and customer base keep compounding, and
+      this business too is expected to list separately one day. Until then, watch
+      whether shoppers' spending mood recovers.
+    forecast:
+      how: >
+        Quarterly segment revenue/EBITDA is the scorecard. India consumption
+        indicators (GST collections, FMCG volume growth, festive-season sales) lead
+        retail prints by ~1 quarter. Quick-commerce competitive intensity is the
+        margin watch item.
+      leading_indicators:
+        - name: Retail segment revenue/EBITDA growth
+          source: RIL quarterly results
+          cadence: quarterly
+          lead: coincident
+        - name: GST collections and FMCG volume commentary
+          source: Monthly GST data; FMCG-sector concalls
+          cadence: monthly/quarterly
+          lead: ~1 quarter ahead of retail prints
+      rule_of_thumb: >
+        Retail EBITDA growth re-accelerating past ~15% = consumption thesis back on;
+        listing announcement = SOTP event, same logic as Jio.
+    watch: Retail segment growth rate each quarter
+    direction: Consumption recovery / listing progress → positive
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: New Energy execution
+    category: catalyst
+    weight: secondary
+    narrative: >
+      Giga-complex build-out (solar modules, cells, batteries, green hydrogen)
+      continues with heavy capex. The market currently assigns modest value;
+      commissioning milestones converting capex into revenue are what would change
+      that — or sustained capex without revenue becomes a drag narrative.
+    simple_english: >
+      Reliance is building giant factories for solar panels, batteries and green
+      hydrogen. Right now it's mostly money going out. If the factories start
+      producing and selling at scale, investors will start valuing this as a whole
+      new business; if spending drags on without output, it becomes a worry instead.
+    forecast:
+      how: >
+        Milestone-driven: commissioning announcements per giga-factory, PLI-scheme
+        deliverables, and first external revenue disclosures. Capex run-rate vs
+        segment revenue is the drag/payoff ratio to track.
+      leading_indicators:
+        - name: Giga-factory commissioning milestones
+          source: RIL announcements, AGM (usually Aug)
+          cadence: event-driven; AGM yearly
+          lead: quarters ahead of revenue
+        - name: New Energy segment capex vs revenue
+          source: Quarterly results
+          cadence: quarterly
+          lead: the payoff scorecard
+      rule_of_thumb: >
+        First quarter of meaningful external New Energy revenue = the narrative
+        flip; AGM announcements are the scheduled catalyst window each August.
+    watch: AGM announcements; commissioning news
+    direction: Execution milestones → positive
+
+  - title: Middle East / crude geopolitics
+    category: policy
+    weight: secondary
+    narrative: >
+      Q4 FY26 O2C was hurt by Middle East unrest — supply-chain and freight
+      disruption cuts both ways (GRM spikes help, feedstock/logistics disruption
+      hurts). Crude price spikes also squeeze working capital.
+    simple_english: >
+      Reliance buys huge amounts of crude oil, much of it shipped through the Middle
+      East. When conflict flares there, oil prices and shipping costs jump. Sometimes
+      that actually raises refining profits, but it can also disrupt Reliance's
+      supplies and raise its costs — so war headlines move the stock in ways that
+      need a look at the details.
+    forecast:
+      how: >
+        Not forecastable — event risk. Tradeable footprints: freight/insurance rates
+        on Gulf routes, crude structure (backwardation spikes), and GRM response —
+        which tells you whether the shock is net positive or negative for a complex
+        refiner.
+      leading_indicators:
+        - name: Gulf shipping freight and war-risk premia
+          source: Trade press
+          cadence: event-driven
+          lead: immediate stress gauge
+        - name: GRM response to the shock
+          source: Weekly GRM trackers
+          cadence: weekly
+          lead: determines net earnings impact
+      rule_of_thumb: >
+        Supply shock + GRM spiking = net positive for RIL within a quarter;
+        demand-destruction shocks (global recession fears) = net negative.
+    watch: GRM reaction to geopolitical headlines
+    direction: Depends — margin spikes positive, disruption negative
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: Ownership & index weight
+    category: ownership
+    weight: background
+    narrative: >
+      Promoter family holds ~50%; the stock is the single largest NIFTY weight, so
+      index flows and FII positioning swing it independent of fundamentals.
+      Succession planning across the three next-generation leaders is a slow-burn
+      governance watch item.
+    simple_english: >
+      The Ambani family owns about half the company, and Reliance is the biggest
+      stock in India's main index — every index fund must buy it. That gives the
+      stock a steady floor, but also means it moves with overall India flows. The
+      gradual handover to the next generation of the family is worth watching but
+      has been smooth so far.
+    forecast:
+      how: >
+        Quarterly shareholding for promoter/FII levels; NSDL flows between filings;
+        index-weight caps and rebalances are dated events.
+      leading_indicators:
+        - name: Quarterly shareholding pattern
+          source: BSE filings
+          cadence: quarterly
+          lead: coincident
+        - name: FII net flows into Indian equities
+          source: NSDL FPI monitor
+          cadence: daily/monthly
+          lead: the swing factor between filings
+      rule_of_thumb: >
+        Promoter stake creeping up (creeping acquisition windows) = confidence
+        signal; FII India outflows hit RELIANCE mechanically — separate that from
+        company news before reacting.
+    watch: BSE shareholding; NSDL FPI flows
+    direction: Promoter buying / FII inflows → positive
+    as_of: 2026-Q1
+    verify_note: Confirm promoter ~50% and FII/DII split from the latest BSE filing.

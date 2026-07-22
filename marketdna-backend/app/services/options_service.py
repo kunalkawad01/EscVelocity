@@ -248,6 +248,22 @@ def _iv_history_series(symbol: str, tail: int = 90) -> list[IVHistoryPoint]:
     return [IVHistoryPoint(date=d, atm_iv=v) for d, v in _iv_hist.get(symbol, [])[-tail:]]
 
 
+def get_atm_iv_snapshot(symbol: str) -> Optional[dict]:
+    """Latest ATM IV + rank/percentile vs trailing history for one symbol.
+
+    Public accessor for other services (e.g. drivers live-metrics). Returns
+    {date, atm_iv, iv_rank, iv_percentile, n_days} or None if no series exists.
+    """
+    ensure_fo_views()
+    _ensure_iv_history(get_connection())
+    series = (_iv_hist or {}).get(symbol.upper(), [])
+    if not series:
+        return None
+    d, iv = series[-1]
+    rank, pct, n = _iv_rank_for(symbol.upper(), iv)
+    return {"date": d, "atm_iv": iv, "iv_rank": rank, "iv_percentile": pct, "n_days": n}
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _compute_max_pain(strikes: list[StrikeData]) -> tuple[float, list[MaxPainPoint]]:

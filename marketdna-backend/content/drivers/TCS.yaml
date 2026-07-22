@@ -1,0 +1,229 @@
+# Stock Drivers dossier — Tata Consultancy Services (TCS)
+# DRAFT (AI-assisted, web-researched 2026-07-14) — pending human review pass.
+
+symbol: TCS
+company: Tata Consultancy Services
+sector: IT Services
+last_reviewed: 2026-07-14
+review_cadence: quarterly
+
+sources:
+  - doc_type: filing
+    title: TCS Q1 FY27 results (9 Jul 2026 — revenue ₹72,275 cr, TCV $9.5bn, margin 24.0%)
+    period: Q1 FY27
+    url: https://www.tcs.com/who-we-are/newsroom/press-release/tcs-financial-results-q1-fy-2027
+  - doc_type: concall_transcript
+    title: TCS Q1 FY27 earnings call
+    period: Q1 FY27
+
+drivers:
+  # ── PRIMARY ────────────────────────────────────────────────────────────────
+
+  - title: Enterprise IT spend & deal bookings
+    category: demand
+    weight: primary
+    narrative: >
+      Q1 FY27 (Jul 2026): revenue ₹72,275 cr (+13.9% YoY INR but only +0.4% QoQ cc —
+      growth is still grinding), TCV $9.5bn (North America $4.7bn, BFSI $2.5bn).
+      Bookings lead revenue by 2-4 quarters; the cc growth number, not the INR one,
+      is the true demand read.
+    simple_english: >
+      TCS does technology work for the world's biggest companies, mostly American
+      banks and corporations. Contracts signed today become revenue over the next
+      year, so the value of new contracts each quarter is tomorrow's growth. Right
+      now clients keep signing big deals, but actual quarterly growth is crawling —
+      companies are spending carefully, not generously.
+    forecast:
+      how: >
+        Quarterly TCV converts over 2-4 quarters. US enterprise budget health
+        (set Dec-Feb, trued-up quarterly) leads bookings; BFSI (TCS's biggest
+        vertical) tracks US bank profitability and rate environment.
+      leading_indicators:
+        - name: Quarterly TCV and its NA/BFSI mix
+          source: TCS quarterly results
+          cadence: quarterly
+          lead: 2-4 quarters ahead of revenue
+        - name: US bank/enterprise earnings commentary on tech budgets
+          source: US Q-earnings season
+          cadence: quarterly
+          lead: 1-2 quarters ahead of bookings
+        - name: Constant-currency QoQ growth
+          source: TCS quarterly results
+          cadence: quarterly
+          lead: the demand truth-teller (ignore INR optics)
+      rule_of_thumb: >
+        TCV sustained above ~$9-10bn/quarter with cc growth re-accelerating past
+        ~1.5% QoQ = upgrade cycle; TCV holding but cc flat = deals cannibalizing
+        legacy revenue (the AI-deflation signature).
+    watch: Quarterly TCV; cc QoQ growth
+    direction: Bookings + cc acceleration → positive
+    verify_note: Q1 FY27 figures — verify against the TCS press release.
+
+  - title: AI transformation — deflation vs new revenue
+    category: competition
+    weight: primary
+    narrative: >
+      AI revenue crossed a ~$2.6bn annualized run-rate in Q1 FY27 (+13.6% QoQ), with
+      AI-led mega-deals (e.g. ~$800m SKF). The sector's existential question:
+      does GenAI productivity deflate legacy time-and-materials revenue faster than
+      AI programs add? TCS's AI run-rate vs total growth is the cleanest scoreboard.
+    simple_english: >
+      AI lets the same software work be done with fewer people — which threatens a
+      company that bills for people's time. TCS's answer is to sell AI projects
+      instead. Its AI business is now over $2.5 billion a year and growing fast. The
+      race: new AI revenue must grow faster than old work shrinks. Watch both
+      numbers together, not either alone.
+    forecast:
+      how: >
+        Disclosed quarterly: AI run-rate growth vs total cc growth. Client-side AI
+        budget commentary (US software/hyperscaler earnings) leads provider AI
+        bookings ~1-2 quarters. Headcount vs revenue divergence is the productivity
+        tell.
+      leading_indicators:
+        - name: AI annualized run-rate (disclosed)
+          source: TCS quarterly results
+          cadence: quarterly
+          lead: the scoreboard
+        - name: Revenue-per-employee / headcount vs revenue divergence
+          source: Quarterly factsheet
+          cadence: quarterly
+          lead: structural productivity signal
+        - name: Enterprise AI adoption commentary
+          source: US enterprise software & hyperscaler earnings
+          cadence: quarterly
+          lead: 1-2 quarters ahead of bookings
+      rule_of_thumb: >
+        AI run-rate compounding >10% QoQ while total cc growth stays ≥ flat =
+        transition being won; total cc shrinking while AI grows = cannibalization
+        running ahead — de-rating risk for the whole sector.
+    watch: AI run-rate vs total cc growth, each quarter
+    direction: AI growth without total shrinkage → positive
+
+  - title: Margins & USDINR
+    category: input_costs
+    weight: primary
+    narrative: >
+      Q1 FY27 operating margin 24.0% — compressed vs TCS's historical 25%+ band.
+      Levers: pricing, utilization, pyramid; USDINR depreciation is the perennial
+      tailwind (USD revenue, INR costs). BSNL-type low-margin domestic deals mix
+      down the average when they ramp.
+    simple_english: >
+      TCS is famous for the fattest profit margins in the industry, but they've
+      slipped below their usual level. It earns dollars and pays rupee salaries, so
+      a weaker rupee automatically boosts profits. Watch whether margins climb back
+      toward 25% or stay stuck — stuck margins mean pricing power is eroding.
+    forecast:
+      how: >
+        USDINR passes through near-coincidently. Utilization/attrition (quarterly
+        factsheet) lead margin flexibility by ~1 quarter. Management's stated 26%+
+        aspiration vs delivery is the credibility gap to track.
+      leading_indicators:
+        - name: USDINR
+          source: RBI reference rate
+          cadence: daily
+          lead: near-coincident on margins
+        - name: Utilization and attrition
+          source: Quarterly factsheet
+          cadence: quarterly
+          lead: ~1 quarter ahead of margin room
+      rule_of_thumb: >
+        1% INR depreciation ≈ ~25-35bps margin tailwind (verify stated sensitivity);
+        margins below 24% for 2+ quarters despite INR help = structural pricing
+        pressure, not noise.
+    watch: Quarterly operating margin vs 25% band; USDINR
+    direction: Margin recovery / weaker INR → positive
+
+  # ── SECONDARY ──────────────────────────────────────────────────────────────
+
+  - title: US immigration & outsourcing policy
+    category: policy
+    weight: secondary
+    narrative: >
+      H-1B costs/rules and US outsourcing-tax rhetoric are recurring sector
+      headline risks. Real cost impact is modest (high localization); the multiple
+      takes the hit when rhetoric escalates.
+    simple_english: >
+      When American politics turns against sending tech work overseas, headlines
+      alone can knock IT stocks down, even though the actual business damage is
+      usually small. Treat these dips as sentiment events unless an actual law
+      changes.
+    forecast:
+      how: >
+        Not forecastable — event-driven. Footprints: USCIS rule/fee notices, H-1B
+        lottery statistics (Mar-Apr), legislative proposals, election-year rhetoric.
+      leading_indicators:
+        - name: USCIS notices; H-1B lottery data
+          source: USCIS
+          cadence: annual + event-driven
+          lead: weeks-to-months ahead of cost impact
+      rule_of_thumb: >
+        Visa cost hikes = bps-level margin nuisance; proposed outsourcing taxes =
+        multiple compression even if never enacted.
+    watch: US policy headlines in election cycles
+    direction: Restrictive headlines → negative (sentiment)
+
+  - title: Capital returns
+    category: catalyst
+    weight: secondary
+    narrative: >
+      The most consistent capital-return machine in India: high dividend payout
+      (₹12 interim declared with Q1 FY27) plus periodic buybacks. Announcements
+      cushion drawdowns; the payout policy makes total return partly bond-like.
+    simple_english: >
+      TCS hands nearly all its spare cash back to shareholders — steady dividends
+      four times a year plus occasional share buybacks. This steady cash stream
+      puts a floor under the stock: when the price falls, the effective yield rises
+      and buyers step in.
+    forecast:
+      how: >
+        Board-calendar driven; policy is ~80-100% of FCF returned. Buyback windows
+        follow board meetings, roughly every 18-24 months historically.
+      leading_indicators:
+        - name: Board meeting notices
+          source: Exchange filings
+          cadence: event-driven
+          lead: days ahead
+        - name: Months since last buyback + cash build
+          source: Balance sheet
+          cadence: half-yearly
+          lead: tells you when one is "due"
+      rule_of_thumb: >
+        ~2 years since the last buyback with cash building = high probability of the
+        next announcement.
+    watch: Board meeting notices
+    direction: Buyback announcement → supportive
+
+  # ── BACKGROUND ─────────────────────────────────────────────────────────────
+
+  - title: Tata Sons ownership
+    category: ownership
+    weight: background
+    narrative: >
+      Tata Sons holds ~72% — TCS dividends fund the group holding company, which
+      guarantees the payout culture but caps float. Any Tata Sons stake sale
+      (group funding needs, RBI upper-layer NBFC rules) is a supply event.
+    simple_english: >
+      The Tata group's parent company owns nearly three-quarters of TCS and lives
+      substantially off its dividends — which is why those dividends are so
+      dependable. The flip side: when the parent occasionally sells a small slice
+      of TCS to raise money, the extra shares temporarily push the price down.
+    forecast:
+      how: >
+        Observable: Tata Sons stake in quarterly filings; group-level funding news
+        (new ventures capex) flags potential supply quarters in advance.
+      leading_indicators:
+        - name: Quarterly shareholding pattern (promoter %)
+          source: BSE filings
+          cadence: quarterly
+          lead: coincident
+        - name: Tata group funding needs newsflow
+          source: Financial press
+          cadence: event-driven
+          lead: quarters ahead of stake sales
+      rule_of_thumb: >
+        Block-deal rumors from the promoter = short-term supply overhang; the
+        dividend policy itself is safe as long as Tata Sons owns TCS.
+    watch: Promoter stake changes; block-deal news
+    direction: Stake-sale supply → transient negative
+    as_of: 2026-Q1
+    verify_note: Confirm Tata Sons ~72% from the latest BSE filing.
