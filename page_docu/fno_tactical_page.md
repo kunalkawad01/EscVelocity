@@ -21,6 +21,19 @@ Four stacked filters, one screen, refreshing every 5 seconds while the market is
 - **Graded Signals table.** Server-side `grade()` output — only trend-aligned, gate-approved, non-extended
   setups with aligned relative-strength + VWAP side. A-grade = fresh conviction (OI rising your way);
   B-grade = other side capitulating (half size). When the stack produces nothing, that *is* the signal.
+- **AI Trading Desk.** Tool-use chat over the live dashboard data — market state, breadth verdict, graded
+  signals/top movers, per-symbol option chain, a single-aggregate stat tool (mean/std dev/z-score/
+  annualized vol via NumPy), a general-purpose composable series tool (pick a source field, optionally a
+  rolling transform or a cross-symbol comparison — correlation/beta/ratio/diff — then choose series/
+  latest/summary output; covers "show me the last N days of X", "rolling volatility over time",
+  "correlation with symbol Y" without needing a new narrow tool per question shape), TA-Lib indicators
+  (RSI/SMA/EMA/ATR/ADX/MACD/BBANDS/STOCH), VectorBT backtests of whitelisted strategy templates (SMA
+  crossover, RSI mean-reversion, Bollinger breakout — win rate/Sharpe/max drawdown/trade count), and a
+  read-only Kite live-quote reader. Same architecture as the stock page's AI Research Assistant (LLM
+  never invents a number, always calls a tool first). Every tool — including the composable series tool
+  and the backtests — is a typed, parameterized function; the LLM never supplies code, a SQL string, or a
+  formula, and no Kite order-placement is exposed anywhere. Routed through a third-party proxy instead of
+  the official Anthropic API — see Tech Stack below.
 
 ## Optimization
 
@@ -50,6 +63,13 @@ Four stacked filters, one screen, refreshing every 5 seconds while the market is
   only runs while `state === 'LIVE'`.
 - Market state is resolved from the **NSE trading calendar** (`_NSE_HOLIDAYS` + weekday), never the clock
   alone — refresh the holiday set annually from the NSE circular.
+- **aicredits.in is OpenAI-compatible, not Anthropic-Messages-API-compatible** — confirmed against their
+  docs (`chat/completions`, `choices`/`tool_calls`, `Authorization: Bearer`). Despite serving a Claude model,
+  the backend must use the `openai` SDK (pointed at `AICREDIT_BASE_URL`) with OpenAI-shaped
+  `{"type": "function", "function": {...}}` tool definitions — the `anthropic` SDK's `input_schema` shape and
+  `x-api-key` header will not work against this proxy. If the proxy is ever swapped for the official Anthropic
+  API, switch back to the `anthropic` SDK and Anthropic's native tool/content-block shapes; don't just change
+  the base URL.
 
 ## Business Logic
 
@@ -69,6 +89,23 @@ Four stacked filters, one screen, refreshing every 5 seconds while the market is
   `app/models/fno.py`. Reuses `live_trading_service` + `kite_client` + `duckdb_client` (`futures_chain`).
 - **Frontend:** `src/pages/FnoTacticalPage.tsx` · `src/api/fnoApi.ts` · `src/types/fno.ts`. Highcharts
   (scatter + line + dual-axis), design-system tokens via `usePalette()` / `useTokens()`.
+- **AI Desk:** `app/services/fno_assistant.py` — 9 tools: `market_state`, `breadth`, `universe_summary`,
+  `optionchain`, `quant_calc` (single aggregate stat via NumPy), `series_calc` (general-purpose composable
+  tool — source field -> optional rolling transform or cross-symbol compare -> series/latest/summary
+  output; reuses `equities_prices` via `duckdb_client`), `ta_indicator` (TA-Lib), `backtest` (VectorBT
+  strategy templates), `live_quote` (read-only, reuses `live_trading_service._get_hist` / `_get_quotes` —
+  no order-placement methods called anywhere) · `POST /api/fno/chat`. Uses the `openai` SDK against
+  `AICREDIT_BASE_URL` (default `https://api.aicredits.in/v1`), model from `AICREDIT_MODEL` (default
+  `claude-sonnet-5`). Config in `marketdna-backend/.env` (`AICREDIT_API_KEY` / `AICREDIT_BASE_URL` /
+  `AICREDIT_MODEL`) — blank key returns a clean config error, no crash. Every tool is a narrow, typed,
+  parameterized function — the LLM never supplies code, SQL, or a math expression for this desk
+  (deliberately, to keep the same safety profile as every other tool in the app, even the general-purpose
+  `series_calc`). No Kite order-placement is exposed, and won't be — MarketDNA's mission is explicitly not
+  a trading bot.
+- **Security note:** hardened the pre-existing `query_raw_data` tool (`mcp_server/tool_handlers.py`, used
+  by the stock-page AI Research Assistant) while adding this — it previously ran any SQL string the LLM
+  produced with no guard, including `COPY`/`ATTACH`/`PRAGMA`. Now rejects anything but a single, plain
+  `SELECT` (`_sql_guard_error`).
 - **Tests:** `tests/test_fno_tactical_service.py` — market-state boundaries, quadrant truth table, trend,
   breadth, grade (24 cases).
 

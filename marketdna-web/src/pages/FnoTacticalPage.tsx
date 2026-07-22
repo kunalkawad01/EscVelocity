@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Grid, Typography } from '@mui/material'
+import { Box, Grid, Typography, TextField, IconButton, Collapse } from '@mui/material'
+import SendIcon from '@mui/icons-material/Send'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import Navbar from '../components/Navbar'
@@ -10,6 +13,7 @@ import { fnoApi } from '../api/fnoApi'
 import type {
   MarketState, FnoUniverseResponse, FnoUniverseRow, BreadthVerdict,
   NormalizedSeries, OptionChainResponse, StrikeChartResponse, Quadrant, Verdict,
+  FnoToolCall,
 } from '../types/fno'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
@@ -440,6 +444,150 @@ function GradedSignals({ rows, onPick }: { rows: FnoUniverseRow[]; onPick: (s: s
   )
 }
 
+// ── AI Desk — chat over live F&O data ─────────────────────────────────────────
+interface DeskMessage {
+  id: number
+  role: 'user' | 'assistant' | 'error'
+  content: string
+  queries?: FnoToolCall[]
+}
+
+const DESK_SUGGESTIONS = [
+  'Is it risk-on or risk-off right now, and why?',
+  'What are the best graded signals on the board?',
+  'Which symbols are in long buildup?',
+]
+
+let deskMsgId = 0
+
+function AiDesk() {
+  const { INK, INK2, INK3, PAPER2, BORDER, CYAN } = usePalette()
+  const [messages, setMessages] = useState<DeskMessage[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  const send = async (question: string) => {
+    const q = question.trim()
+    if (!q || loading) return
+    setInput('')
+    setMessages(prev => [...prev, { id: ++deskMsgId, role: 'user', content: q }])
+    setLoading(true)
+    try {
+      const res = await fnoApi.chat(q)
+      setMessages(prev => [...prev, { id: ++deskMsgId, role: 'assistant', content: res.answer, queries: res.queries }])
+    } catch (e: any) {
+      setMessages(prev => [...prev, { id: ++deskMsgId, role: 'error', content: String(e?.message ?? e) }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggle = (id: number) => setExpanded(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  return (
+    <Box>
+      {messages.length === 0 && (
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+          {DESK_SUGGESTIONS.map(s => (
+            <Box
+              key={s} onClick={() => send(s)}
+              sx={{
+                px: 1.25, py: 0.5, borderRadius: 1.5, cursor: 'pointer',
+                bgcolor: `${CYAN}0F`, border: `1px solid ${CYAN}30`,
+                transition: 'all 0.15s ease',
+                '&:hover': { bgcolor: `${CYAN}1E`, borderColor: `${CYAN}55` },
+              }}
+            >
+              <Typography sx={{ ...SANS, fontSize: '0.7rem', color: INK2 }}>{s}</Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {(messages.length > 0 || loading) && (
+        <Box sx={{ maxHeight: 420, overflowY: 'auto', mb: 2, pr: 0.5 }}>
+          {messages.map(msg => (
+            <Box key={msg.id} sx={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', mb: 1.25 }}>
+              {msg.role === 'user' ? (
+                <Box sx={{ px: 1.5, py: 0.8, maxWidth: '75%', bgcolor: `${CYAN}18`, border: `1px solid ${CYAN}30`, borderRadius: '14px 14px 3px 14px' }}>
+                  <Typography sx={{ ...SANS, fontSize: '0.75rem', color: INK }}>{msg.content}</Typography>
+                </Box>
+              ) : (
+                <Box sx={{ maxWidth: '88%', px: 1.5, py: 1.1, bgcolor: PAPER2, border: `1px solid ${BORDER}`, borderLeft: '3px solid #a78bfa55', borderRadius: '3px 14px 14px 14px' }}>
+                  <Typography sx={{ ...SANS, fontSize: '0.75rem', color: msg.role === 'error' ? RED : INK2, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {msg.content}
+                  </Typography>
+                  {msg.queries && msg.queries.length > 0 && (
+                    <Box sx={{ mt: 0.75, pt: 0.75, borderTop: `1px solid ${BORDER}` }}>
+                      <Box onClick={() => toggle(msg.id)} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', color: INK3, '&:hover': { color: INK2 } }}>
+                        <Typography sx={{ ...MONO, fontSize: '0.62rem' }}>
+                          {msg.queries.length} tool {msg.queries.length === 1 ? 'call' : 'calls'}
+                        </Typography>
+                        {expanded.has(msg.id) ? <ExpandLessIcon sx={{ fontSize: 13 }} /> : <ExpandMoreIcon sx={{ fontSize: 13 }} />}
+                      </Box>
+                      <Collapse in={expanded.has(msg.id)}>
+                        <Box sx={{ mt: 0.5 }}>
+                          {msg.queries.map((q, i) => (
+                            <Box key={i} sx={{ mb: 0.5, p: 0.75, borderRadius: 1, bgcolor: `${INK3}0F`, fontSize: '0.62rem' }}>
+                              <Typography sx={{ ...MONO, fontSize: '0.62rem', color: CYAN }}>{q.tool}({JSON.stringify(q.input)})</Typography>
+                              <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK3, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{q.result_preview}</Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Collapse>
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
+          ))}
+          {loading && (
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', px: 0.5 }}>
+              {[0, 1, 2].map(i => (
+                <Box key={i} sx={{
+                  width: 5, height: 5, borderRadius: '50%', bgcolor: '#a78bfa',
+                  animation: 'deskPulse 1.2s ease-in-out infinite', animationDelay: `${i * 0.2}s`,
+                  '@keyframes deskPulse': { '0%,80%,100%': { opacity: 0.2 }, '40%': { opacity: 1 } },
+                }} />
+              ))}
+              <Typography sx={{ ...SANS, fontSize: '0.68rem', color: INK3, ml: 0.75 }}>Analysing the board…</Typography>
+            </Box>
+          )}
+          <div ref={bottomRef} />
+        </Box>
+      )}
+
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+        <TextField
+          fullWidth multiline maxRows={3} size="small"
+          placeholder="Ask about breadth, a symbol's quadrant, or its option chain…"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
+          disabled={loading}
+          sx={{ '& .MuiOutlinedInput-root': { bgcolor: PAPER2, '& fieldset': { borderColor: BORDER }, '&.Mui-focused fieldset': { borderColor: `${CYAN}80 !important` } } }}
+        />
+        <IconButton
+          onClick={() => send(input)} disabled={loading || !input.trim()} size="medium"
+          sx={{ bgcolor: CYAN, color: '#00131a', '&:hover': { bgcolor: CYAN, opacity: 0.85 }, '&.Mui-disabled': { bgcolor: BORDER, color: INK3 }, flexShrink: 0 }}
+        >
+          <SendIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    </Box>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function FnoTacticalPage() {
   const { INK, INK2, INK3, CYAN, BG, PAPER, BORDER } = usePalette()
@@ -541,6 +689,12 @@ export default function FnoTacticalPage() {
         <Box sx={{ ...CARD, p: 2, mt: 2.5 }}>
           <SectionHead title="Graded Signals — trend-aligned, gate-approved" accent="#f59e0b" meta={`${gradedCount} live`} />
           <GradedSignals rows={rows} onPick={setFocus} />
+        </Box>
+
+        {/* AI Desk */}
+        <Box sx={{ ...CARD, p: 2, mt: 2.5 }}>
+          <SectionHead title="AI Trading Desk" accent="#a78bfa" meta="Sonnet 5 · via aicredits.in" />
+          <AiDesk />
         </Box>
       </Box>
 

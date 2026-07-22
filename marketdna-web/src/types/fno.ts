@@ -126,3 +126,15 @@ export interface StrikeChartResponse {
   ce_oi_now: number
   pe_oi_now: number
 }
+
+// ── AI Desk (chat assistant) ──────────────────────────────────────────────────
+export interface FnoToolCall {
+  tool: string
+  input: Record<string, unknown>
+  result_preview: string
+}
+
+export interface FnoChatResponse {
+  answer: string
+  queries: FnoToolCall[]
+}

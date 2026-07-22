@@ -8,11 +8,47 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 import numpy as np
 
 log = logging.getLogger(__name__)
+
+# ─── query_raw_data SQL guard ──────────────────────────────────────────────────
+# query_raw_data runs whatever SQL string the LLM produces. DuckDB supports
+# statements far beyond SELECT (COPY ... TO <file>, ATTACH <file>, PRAGMA, INSTALL/
+# LOAD extensions) that can write files or open other databases — none of which
+# this tool should ever be able to trigger. Reject anything but a single, plain
+# read-only SELECT before it reaches the connection.
+_SQL_BLOCKLIST = re.compile(
+    r"\b(ATTACH|DETACH|COPY|PRAGMA|INSTALL|LOAD|EXPORT|IMPORT|CREATE|DROP|ALTER|"
+    r"INSERT|UPDATE|DELETE|CALL|SET|GRANT|REVOKE|CHECKPOINT|VACUUM|ANALYZE)\b",
+    re.IGNORECASE,
+)
+_SQL_STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'")
+_SQL_LINE_COMMENT = re.compile(r"--[^\n]*")
+_SQL_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+
+def _sql_guard_error(sql: str) -> str | None:
+    """Return an error message if `sql` is not a single, plain SELECT statement."""
+    no_comments = _SQL_BLOCK_COMMENT.sub(" ", sql)
+    no_comments = _SQL_LINE_COMMENT.sub(" ", no_comments)
+    # Blank out string literal contents so a legitimate filter value (e.g. a
+    # symbol) can't trip the semicolon/keyword checks below.
+    no_strings = _SQL_STRING_LITERAL.sub("''", no_comments)
+
+    body = no_strings.strip().rstrip(";").strip()
+    if not body:
+        return "Empty query"
+    if ";" in body:
+        return "Only a single SQL statement is allowed (no ';'-separated statements)"
+    if not re.match(r"(?is)^select\b", body):
+        return "Only SELECT statements are allowed"
+    if _SQL_BLOCKLIST.search(body):
+        return "Query contains a disallowed keyword — only read-only SELECT queries are allowed"
+    return None
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -397,7 +433,10 @@ def calculate_market_dna() -> dict[str, Any]:
 # ─── Tool 8: query_raw_data ───────────────────────────────────────────────────
 
 def query_raw_data(sql: str) -> dict[str, Any]:
-    """Execute a DuckDB SQL query against equities_prices. Fallback for ad-hoc analysis."""
+    """Execute a read-only SELECT against equities_prices. Fallback for ad-hoc analysis."""
+    guard_error = _sql_guard_error(sql)
+    if guard_error:
+        return {"error": guard_error}
     try:
         from app.services.duckdb_client import get_connection
         con = get_connection()

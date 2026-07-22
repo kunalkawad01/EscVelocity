@@ -136,3 +136,19 @@ class StrikeChartResponse(BaseModel):
     futures_oi_now: int = 0
     ce_oi_now: int = 0
     pe_oi_now: int = 0
+
+
+# ── AI Desk (chat assistant, Zone 4) ───────────────────────────────────────────
+class FnoToolCall(BaseModel):
+    tool: str
+    input: dict
+    result_preview: str
+
+
+class FnoChatRequest(BaseModel):
+    question: str
+
+
+class FnoChatResponse(BaseModel):
+    answer: str
+    queries: list[FnoToolCall]

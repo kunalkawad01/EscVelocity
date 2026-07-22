@@ -9,9 +9,10 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 
 from app.services import fno_tactical_service as svc
+from app.services.fno_assistant import answer_fno_question
 from app.models.fno import (
     MarketState, FnoUniverseResponse, BreadthVerdict, NormalizedSeries,
-    OptionChainResponse, StrikeChartResponse,
+    OptionChainResponse, StrikeChartResponse, FnoChatRequest, FnoChatResponse,
 )
 
 router = APIRouter(prefix="/api/fno", tags=["fno-tactical"])
@@ -67,3 +68,12 @@ def invalidate():
     """Flush scan + futures-meta caches (run after post-market ingestion)."""
     svc.invalidate()
     return {"status": "invalidated"}
+
+
+@router.post("/chat", response_model=FnoChatResponse)
+async def chat(body: FnoChatRequest):
+    """AI Desk — tool-use Q&A over live F&O data (breadth, universe, option chain)."""
+    if not body.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    result = await answer_fno_question(body.question)
+    return FnoChatResponse(**result)

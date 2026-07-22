@@ -1,6 +1,6 @@
 import type {
   MarketState, FnoUniverseResponse, BreadthVerdict, NormalizedSeries,
-  OptionChainResponse, StrikeChartResponse,
+  OptionChainResponse, StrikeChartResponse, FnoChatResponse,
 } from '../types/fno'
 
 // Relative path so requests go through Vite's dev proxy (→ 127.0.0.1:8000) like every
@@ -37,4 +37,11 @@ export const fnoApi = {
 
   invalidate: (): Promise<void> =>
     fetch(`${BASE}/invalidate`, { method: 'POST' }).then(() => undefined),
+
+  chat: (question: string): Promise<FnoChatResponse> =>
+    fetch(`${BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    }).then(json<FnoChatResponse>),
 }
