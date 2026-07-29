@@ -20,6 +20,9 @@ export interface MomentumRow {
   oi_chg_pct?: number
   quadrant?: string
   volume?: number
+  open_0915?: number
+  day_high?: number
+  day_low?: number
   criteria: MomentumCriterion[]
 }
 
@@ -40,6 +43,8 @@ export interface FnoMomentumResponse {
   top_sectors: SectorPerf[]
   oi_gainers: MomentumRow[]
   short_covering: MomentumRow[]
+  open_eq_high: MomentumRow[]
+  open_eq_low: MomentumRow[]
   movers_up: MomentumRow[]
   movers_down: MomentumRow[]
 }

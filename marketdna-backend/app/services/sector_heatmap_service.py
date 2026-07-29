@@ -393,6 +393,27 @@ def _build_sector_list(universe: str) -> list[dict[str, Any]]:
     return result
 
 
+def get_symbol_sector(symbol: str) -> str | None:
+    """Sector name for a symbol under the nifty500 taxonomy, or None if unmapped."""
+    for sec in _build_sector_list("nifty500"):
+        if any(s["symbol"] == symbol for s in sec["stocks"]):
+            return sec["name"]
+    return None
+
+
+def get_universe_symbols(universe: str) -> list[str]:
+    """Flat symbol list for a universe layer: nifty50 | nifty200 | nifty500."""
+    return list({s["symbol"] for sec in _build_sector_list(universe) for s in sec["stocks"]})
+
+
+def get_sector_symbols(sector_name: str) -> list[str]:
+    """All symbols belonging to a named sector (nifty500 taxonomy)."""
+    for sec in _build_sector_list("nifty500"):
+        if sec["name"] == sector_name:
+            return [s["symbol"] for s in sec["stocks"]]
+    return []
+
+
 # ─── DuckDB helpers ────────────────────────────────────────────────────────────
 
 def _fetch_closes_bulk(symbols: list[str]) -> dict[str, list[float]]:

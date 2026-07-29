@@ -33,7 +33,26 @@
       "Bash(python3 -c ' *)",
       "PowerShell(\\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }; Write-Output \"Backend stopped\")",
       "PowerShell(Start-Process powershell -ArgumentList \"-NoExit -Command cd 'C:\\\\Users\\\\amitk\\\\EscVel\\\\marketdna-backend'; .\\\\.venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000\"; Write-Output \"Backend starting...\")",
-      "PowerShell($procs = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($procs\\) { $procs.OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Killed existing process on port 8000\" } else { Write-Output \"No process on port 8000\" })"
+      "PowerShell($procs = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($procs\\) { $procs.OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Killed existing process on port 8000\" } else { Write-Output \"No process on port 8000\" })",
+      "Bash(powershell.exe -Command \"Start-Process powershell -ArgumentList '-NoExit -Command \\\\\"cd ''C:\\\\Users\\\\amitk\\\\EscVel''; .\\\\start-marketdna.ps1\\\\\"'\")",
+      "Bash(powershell.exe *)",
+      "Bash(\".venv/Scripts/python.exe\" -m uvicorn app.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/docs)",
+      "Bash(curl *)",
+      "Bash(\"./.venv/Scripts/python.exe\" -m ingestion.download_nse500)",
+      "Bash(\"./.venv/Scripts/python.exe\" -m ingestion.ingest_option_chain)",
+      "Bash(\"./.venv/Scripts/python.exe\" -m ingestion.ingest_futures)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(Start-Process powershell -ArgumentList \"-NoExit -Command cd 'C:\\\\Users\\\\amitk\\\\EscVel'; .\\\\start-marketdna.ps1\")",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Get-CimInstance *)",
+      "Bash(mkdir *)",
+      "Bash(./.venv/Scripts/python.exe -m ingestion.download_nse500)",
+      "Bash(./.venv/Scripts/python.exe -m ingestion.ingest_delivery)",
+      "Bash(./.venv/Scripts/python.exe -m ingestion.ingest_option_chain)",
+      "Bash(./.venv/Scripts/python.exe -m ingestion.ingest_futures)",
+      "Bash(./.venv/Scripts/python.exe -m jobs.measure_edges --if-new-month)"
     ]
   }
 }

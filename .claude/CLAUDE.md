@@ -823,6 +823,13 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - Force refresh after ingest: `POST /api/stock-health/scan/invalidate` → deletes parquet → triggers background recompute.
 - API: `stockHealthApi.getScan()` → GET `/api/stock-health/scan`; `stockHealthApi.getReport(symbol)` → GET `/api/stock-health/{symbol}`
 
+### `/stock-eda/:symbol` — StockEDAPage
+- **Chart-first EDA**, sibling to StockPage — distributions/structure, not model scores. 10 sections: Price & Volume, Return Distribution, Volatility Clustering, Drawdown (+ worst-10 episodes table), Seasonality (day-of-week × month heatmap), Gap Analysis, Volume Profile, Autocorrelation, Extreme Days, Benchmark Comparison (last 5 days: stock vs sector vs Nifty 50/200/500).
+- Reuses existing `/api/stock/*` endpoints (ohlcv, returns, drawdown) where they already cover the need — only genuinely new stats got new `/api/stock-eda/*` endpoints (`stock_eda_service.py`, pure NumPy/Polars, one bulk fetch per symbol, `@_day_cached`).
+- Benchmark Comparison reuses `sector_heatmap_service`'s nifty50/200/500 taxonomy via `get_symbol_sector`/`get_universe_symbols`/`get_sector_symbols` — never duplicate the sector maps.
+- Same sticky 2-row nav + `Section` wrapper pattern as StockPage. No global lookback control yet (each endpoint has a sensible default) — noted as a fast-follow in the doc.
+- API: `stockApi` (symbols, summary, ohlcv, returns, drawdown) + `stockEdaApi` (volatility-series, drawdown-history, seasonality, gaps, volume-profile, autocorrelation, extreme-days, benchmark-comparison).
+
 ### `/stock/:symbol` — StockPage (~461 lines shell + sub-components)
 - **URL param** `:symbol` — pages are linkable to specific stocks.
 - **19+ sections**, sticky 2-row nav (Row 1: symbol/price/regime/selector; Row 2: jump strip with CYAN active underline).
@@ -849,6 +856,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/quant-strategies` | `page_docu/quant_strategies_page.md` |
 | `/short` | `page_docu/short_page.md` |
 | `/stock` | `page_docu/stock_page.md` |
+| `/stock-eda` | `page_docu/stock_eda_page.md` |
 | `/stock-health` | `page_docu/stock_health_page.md` |
 
 ---

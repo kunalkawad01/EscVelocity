@@ -29,10 +29,23 @@ A **Download PDF** button in the hero exports both lists as a landscape PDF (`js
 line, both tables with sign-colored % columns, per-row criteria, and a qualifier legend.
 Filename: `fno-momentum_<session>_<HHMM>.pdf`.
 
-A third section, **Live Movers**, is independent of the OI/momentum buckets above: it lists
+A third pair of lists, **Open = High** and **Open = Low**, slices the union of the two buckets
+above (names already qualifying on OI addition or short covering, plus a momentum chip) by
+intraday positioning:
+
+- **Open = High** — the 9:15 open still equals the day's high so far (price has never traded
+  above the open) — sellers held the line; a weak/resistance read.
+- **Open = Low** — the 9:15 open still equals the day's low so far (price has never traded
+  below the open) — buyers held the line; a strong/support read.
+
+Rows show the same OI/change columns plus **9:15 Open · Day High · Day Low** so the qualifying
+level is visible directly (the matching column is bold/colored). Equality uses a `±0.005`
+tolerance since both values are independently rounded to 2dp from the same Kite quote.
+
+A fourth section, **Live Movers**, is independent of all of the above: it lists
 every F&O stock currently trading beyond **±2%** vs previous close (live), split into a
 gainers table and a losers table, sorted by day change %. No momentum qualifier required —
-this is a plain live-move screen. Included in the PDF export alongside the two bucket tables.
+this is a plain live-move screen. Included in the PDF export alongside the other tables.
 
 ## Optimization
 
@@ -55,6 +68,10 @@ this is a plain live-move screen. Included in the PDF export alongside the two b
 - Short-covering rows by definition have falling OI, so the two buckets are naturally
   disjoint (`elif` on `oi_chg_pct > 0`); SHORT_BUILDUP names (price down, OI up) land in
   OI Gainers, which is intended — "OI gainers" is direction-agnostic.
+- Open=High and Open=Low are derived, not independently gated — they read `open_0915`,
+  `day_high`, `day_low` off the already-filtered `oi_gainers + short_covering` rows rather
+  than re-running the momentum/OI criteria. A stock can appear in neither, one, or (in
+  principle, if high==low intraday) both new lists.
 
 ## Business Logic
 
@@ -70,6 +87,10 @@ this is a plain live-move screen. Included in the PDF export alongside the two b
   universe), gated only on `abs(change_pct) ≥ _LIVE_MOVE_PCT` — no relation to the
   OI/quadrant criteria used by `oi_gainers`/`short_covering`. `movers_up` sorts desc,
   `movers_down` sorts asc (most negative first).
+- `open_eq_high` / `open_eq_low` — `open_0915 == day_high` / `== day_low` within
+  `_OPEN_EQ_TOL = 0.005`, evaluated only over `oi_gainers + short_covering`. Both `day_high`
+  and `day_low` come from the live Kite quote (`fno_tactical_service`), same substrate as
+  the rest of the row.
 
 ## Tech Stack
 

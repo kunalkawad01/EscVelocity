@@ -6,7 +6,7 @@ import os
 API_KEY = "2xbeidvrouv0nwv3"
 API_SECRET = "m3ni9uwnvbys4zhnfu5v8jloypswuarv"
 
-REQUEST_TOKEN = "to8iNJLH2GrprpUbPJ2sJl1u0GN9OJQL"
+REQUEST_TOKEN = "PS1zOD7zzDQE5BQ2q1zQco4WLwx6T2VB"
 
 kite = KiteConnect(api_key=API_KEY)
 

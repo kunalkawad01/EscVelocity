@@ -1,0 +1,52 @@
+# MarketDNA edge config — TLS (auto Let's Encrypt), basic auth, static frontend, reverse proxy.
+#
+# Bind-mounted read-only into the caddy container by docker-compose.yml, so editing auth
+# credentials or the domain does NOT require a rebuild — just `docker compose restart caddy`.
+#
+# Fill in before first deploy:
+#   1. Replace marketdna.yourdomain.com with your real domain (DNS A/AAAA record must already
+#      point at this VPS's public IP before Caddy can issue a cert).
+#   2. Replace you@example.com with a real email (Let's Encrypt expiry notices).
+#   3. Replace the username/hash below with your own:
+#        docker run --rm caddy:2 caddy hash-password --plaintext '<your password>'
+{
+    email you@example.com
+}
+
+marketdna.yourdomain.com {
+    # Caddy sorts directives into a fixed global order regardless of where they're written in
+    # this file — a bare `basic_auth` (no matcher) applies site-wide BEFORE routing/handle
+    # blocks are evaluated, so textually placing /health in an earlier handle block would NOT
+    # exempt it. Scope basic_auth explicitly to "everything except /health" via a named matcher
+    # instead — this is the only reliable way to carve out one path.
+    @needs_auth {
+        not path /health
+    }
+    basic_auth @needs_auth {
+        # username bcrypt_hash
+        kunal $2a$14$REPLACE_WITH_REAL_HASH
+    }
+
+    encode zstd gzip
+
+    handle /health {
+        reverse_proxy backend:8000
+    }
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+    handle /docs* {
+        reverse_proxy backend:8000
+    }
+    handle /openapi.json {
+        reverse_proxy backend:8000
+    }
+
+    # SPA fallback — frontend uses react-router-dom's BrowserRouter, so deep-link refreshes
+    # (e.g. a hard-refresh on /fno-momentum) need to resolve to index.html, not a Caddy 404.
+    handle {
+        root * /srv
+        file_server
+        try_files {path} /index.html
+    }
+}

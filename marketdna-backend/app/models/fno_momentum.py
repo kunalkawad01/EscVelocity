@@ -5,6 +5,10 @@ stocks that additionally qualify on at least one of three momentum criteria:
   BIG_MOVE_PREV  — last completed session move beyond ±5%
   TOP_SECTOR     — stock belongs to one of today's top-3 performing sectors
   GAP_0915       — 9:15 open gapped beyond ±2% vs previous close
+
+Open=High / Open=Low slice the union of those two buckets by whether the
+9:15 open equals the day's high (weak — never traded above open) or day's
+low (strong — never traded below open) so far.
 """
 from typing import Optional
 from pydantic import BaseModel
@@ -28,6 +32,9 @@ class MomentumRow(BaseModel):
     oi_chg_pct: Optional[float] = None         # futures OI change vs prior session %
     quadrant: Optional[str] = None    # LONG_BUILDUP|SHORT_COVERING|SHORT_BUILDUP|LONG_UNWINDING
     volume: Optional[float] = None
+    open_0915: Optional[float] = None
+    day_high: Optional[float] = None
+    day_low: Optional[float] = None
     criteria: list[str]               # subset of [BIG_MOVE_PREV, TOP_SECTOR, GAP_0915]
 
 
@@ -48,5 +55,7 @@ class FnoMomentumResponse(BaseModel):
     top_sectors: list[SectorPerf]
     oi_gainers: list[MomentumRow]     # futures OI up vs prior session, sorted by change_pct desc
     short_covering: list[MomentumRow] # price up + futures OI down, sorted by change_pct desc
+    open_eq_high: list[MomentumRow]   # oi_gainers ∪ short_covering, open_0915 == day_high
+    open_eq_low: list[MomentumRow]    # oi_gainers ∪ short_covering, open_0915 == day_low
     movers_up: list[MomentumRow]      # whole F&O universe, live change_pct ≥ live_move_pct, desc
     movers_down: list[MomentumRow]    # whole F&O universe, live change_pct ≤ -live_move_pct, asc

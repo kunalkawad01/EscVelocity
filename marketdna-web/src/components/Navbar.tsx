@@ -10,9 +10,17 @@ const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
 // ── Nav groups (15 items → 4 groups + 1 direct link) ─────────────────────────
 const NAV_GROUPS = [
   {
+    label: 'Copilot',
+    items: [
+      { to: '/research-copilot', label: 'Research Copilot', desc: 'LLM quant research over OHLCV — screen, EDA, backtest' },
+      { to: '/live-agent',       label: 'Live Agent',       desc: 'Read-only market observer — what changed that matters' },
+    ],
+  },
+  {
     label: 'Analysis',
     items: [
       { to: '/stock',        label: 'Stock DNA',    desc: 'Per-stock regime & DNA scores'  },
+      { to: '/stock-eda',    label: 'Stock EDA',    desc: 'Visual exploration — distributions, seasonality, vol'  },
       { to: '/stock-health', label: 'Stock Health', desc: 'Behavioral archetype scanner'   },
       { to: '/pattern-dna',  label: 'Pattern DNA',  desc: 'Formation detection & history'  },
       { to: '/randomness',           label: 'Randomness',   desc: 'Luck vs skill decomposition'    },

@@ -17,6 +17,7 @@ import {
   TableRow, Tooltip, Typography,
 } from '@mui/material'
 import DownloadIcon from '@mui/icons-material/Download'
+import ShareIcon from '@mui/icons-material/Share'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import Navbar from '../components/Navbar'
@@ -54,7 +55,11 @@ const CRIT_SHORT: Record<MomentumCriterion, string> = {
   GAP_0915: '±2% @9:15',
 }
 
-function downloadPdf(data: FnoMomentumResponse) {
+function pdfFileName(data: FnoMomentumResponse): string {
+  return `fno-momentum_${data.session_date}_${data.as_of.slice(11, 16).replace(':', '')}.pdf`
+}
+
+function buildPdf(data: FnoMomentumResponse): jsPDF {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' })
   const pageW = doc.internal.pageSize.getWidth()
   const green: [number, number, number] = [22, 163, 74]
@@ -122,6 +127,8 @@ function downloadPdf(data: FnoMomentumResponse) {
 
   addSection('OI Gainers — Futures Open Interest Rising', 'Fresh futures positions added vs prior session; sorted by live day change %.', data.oi_gainers)
   addSection('Short Covering — Price Up, OI Falling', 'Shorts buying back (price up while futures OI falls); sorted by live day change %.', data.short_covering)
+  addSection('Open = High — Weak Open', '9:15 open equals the day\'s high so far (never traded above open); from OI Gainers + Short Covering.', data.open_eq_high)
+  addSection('Open = Low — Strong Open', '9:15 open equals the day\'s low so far (never traded below open); from OI Gainers + Short Covering.', data.open_eq_low)
   addSection(`Live Movers — Above +${data.thresholds.live_move_pct}%`, 'Whole F&O universe, unrelated to OI/quadrant buckets; sorted by live day change %.', data.movers_up)
   addSection(`Live Movers — Below -${data.thresholds.live_move_pct}%`, 'Whole F&O universe, unrelated to OI/quadrant buckets; sorted by live day change %.', data.movers_down)
 
@@ -131,7 +138,44 @@ function downloadPdf(data: FnoMomentumResponse) {
     40, Math.min(y + 6, doc.internal.pageSize.getHeight() - 24), { maxWidth: pageW - 80 },
   )
 
-  doc.save(`fno-momentum_${data.session_date}_${data.as_of.slice(11, 16).replace(':', '')}.pdf`)
+  return doc
+}
+
+function downloadPdf(data: FnoMomentumResponse) {
+  buildPdf(data).save(pdfFileName(data))
+}
+
+/**
+ * Hands the PDF to the OS/browser share sheet (Web Share API Level 2, files)
+ * so the user can pick WhatsApp, Mail, or any other installed app. Falls back
+ * to a plain download when the browser/OS doesn't support file sharing.
+ */
+async function sharePdf(data: FnoMomentumResponse) {
+  const doc = buildPdf(data)
+  const fileName = pdfFileName(data)
+  const blob = doc.output('blob') as Blob
+  const file = new File([blob], fileName, { type: 'application/pdf' })
+
+  const nav = navigator as Navigator & {
+    canShare?: (data?: ShareData & { files?: File[] }) => boolean
+    share?: (data: ShareData & { files?: File[] }) => Promise<void>
+  }
+
+  if (nav.canShare?.({ files: [file] }) && nav.share) {
+    try {
+      await nav.share({
+        files: [file],
+        title: 'F&O Momentum Radar',
+        text: `F&O Momentum Radar — session ${data.session_date}`,
+      })
+      return
+    } catch (err) {
+      // AbortError = user cancelled the share sheet — not a failure, do nothing.
+      if (err instanceof Error && err.name === 'AbortError') return
+      // Any other failure (or no matching app) — fall back to download below.
+    }
+  }
+  doc.save(fileName)
 }
 
 function SectionHead({ title, accent, meta }: { title: string; accent: string; meta?: string }) {
@@ -247,6 +291,104 @@ function BucketTable({ rows, emptyNote }: { rows: MomentumRow[]; emptyNote: stri
       </Table>
       <Typography sx={{ fontSize: '0.62rem', color: INK3, fontFamily: SANS, mt: 1, px: 0.5 }}>
         Sorted by live % change vs previous close. OI from current-month futures.{' '}
+        <Box component="span" sx={{ color: CYAN }}>{rows.length}</Box> stocks qualified.
+      </Typography>
+    </Box>
+  )
+}
+
+function OpenLevelTable({ rows, emptyNote, level }: { rows: MomentumRow[]; emptyNote: string; level: 'high' | 'low' }) {
+  const { INK, INK2, INK3, CYAN } = usePalette()
+  const { TH, TD } = useTokens()
+  const levelColor = level === 'high' ? RED : GREEN
+  if (rows.length === 0) {
+    return (
+      <Box sx={{ py: 5, textAlign: 'center' }}>
+        <Typography sx={{ fontSize: '0.78rem', color: INK3, fontFamily: SANS }}>
+          {emptyNote}
+        </Typography>
+      </Box>
+    )
+  }
+  return (
+    <Box sx={{ overflowX: 'auto' }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell sx={TH}>Stock</TableCell>
+            <TableCell sx={TH} align="right">LTP</TableCell>
+            <TableCell sx={TH} align="right">Chg %</TableCell>
+            <TableCell sx={TH} align="right">OI Chg %</TableCell>
+            <TableCell sx={TH} align="right">9:15 Open</TableCell>
+            <TableCell sx={TH} align="right">Day High</TableCell>
+            <TableCell sx={TH} align="right">Day Low</TableCell>
+            <TableCell sx={TH}>Criteria</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map(r => (
+            <TableRow key={r.symbol} hover>
+              <TableCell sx={TD}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: INK, fontFamily: MONO }}>
+                  {r.symbol}
+                </Typography>
+                {r.sector && (
+                  <Typography sx={{ fontSize: '0.62rem', color: INK3, fontFamily: SANS }}>
+                    {r.sector}
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell sx={TD} align="right">
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: MONO }}>
+                  {r.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </Typography>
+              </TableCell>
+              <TableCell sx={TD} align="right">
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: MONO, color: pctColor(r.change_pct) }}>
+                  {fmtPct(r.change_pct)}
+                </Typography>
+              </TableCell>
+              <TableCell sx={TD} align="right">
+                <Typography sx={{ fontSize: '0.74rem', fontFamily: MONO, color: pctColor(r.oi_chg_pct) }}>
+                  {fmtPct(r.oi_chg_pct)}
+                </Typography>
+              </TableCell>
+              <TableCell sx={TD} align="right">
+                <Typography sx={{
+                  fontSize: '0.74rem', fontFamily: MONO,
+                  color: level === 'high' ? levelColor : INK2,
+                  fontWeight: level === 'high' ? 700 : 400,
+                }}>
+                  {r.open_0915?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}
+                </Typography>
+              </TableCell>
+              <TableCell sx={TD} align="right">
+                <Typography sx={{
+                  fontSize: '0.74rem', fontFamily: MONO,
+                  color: level === 'high' ? levelColor : INK3,
+                  fontWeight: level === 'high' ? 700 : 400,
+                }}>
+                  {r.day_high?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}
+                </Typography>
+              </TableCell>
+              <TableCell sx={TD} align="right">
+                <Typography sx={{
+                  fontSize: '0.74rem', fontFamily: MONO,
+                  color: level === 'low' ? levelColor : INK3,
+                  fontWeight: level === 'low' ? 700 : 400,
+                }}>
+                  {r.day_low?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}
+                </Typography>
+              </TableCell>
+              <TableCell sx={TD}>
+                <CriteriaChips criteria={r.criteria} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Typography sx={{ fontSize: '0.62rem', color: INK3, fontFamily: SANS, mt: 1, px: 0.5 }}>
+        From OI Gainers + Short Covering, filtered to open = day {level}.{' '}
         <Box component="span" sx={{ color: CYAN }}>{rows.length}</Box> stocks qualified.
       </Typography>
     </Box>
@@ -387,10 +529,23 @@ export default function FnoMomentumPage() {
               </Typography>
               <Button
                 size="small"
+                startIcon={<ShareIcon sx={{ fontSize: '0.9rem !important' }} />}
+                onClick={() => sharePdf(data)}
+                sx={{
+                  ml: { sm: 'auto' }, height: 28, px: 1.5, borderRadius: 2,
+                  fontSize: '0.68rem', fontWeight: 700, fontFamily: SANS, textTransform: 'none',
+                  color: GREEN, border: `1px solid ${GREEN}55`, bgcolor: `${GREEN}0D`,
+                  '&:hover': { bgcolor: `${GREEN}1F`, borderColor: GREEN },
+                }}
+              >
+                Share (WhatsApp / Email)
+              </Button>
+              <Button
+                size="small"
                 startIcon={<DownloadIcon sx={{ fontSize: '0.9rem !important' }} />}
                 onClick={() => downloadPdf(data)}
                 sx={{
-                  ml: { sm: 'auto' }, height: 28, px: 1.5, borderRadius: 2,
+                  height: 28, px: 1.5, borderRadius: 2,
                   fontSize: '0.68rem', fontWeight: 700, fontFamily: SANS, textTransform: 'none',
                   color: CYAN, border: `1px solid ${CYAN}55`, bgcolor: `${CYAN}0D`,
                   '&:hover': { bgcolor: `${CYAN}1F`, borderColor: CYAN },
@@ -461,6 +616,38 @@ export default function FnoMomentumPage() {
           </Grid>
         </Grid>
 
+        {/* Open=High / Open=Low — intraday positioning slice of the two buckets above */}
+        <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+          <Grid item xs={12} lg={6}>
+            <Box sx={{ ...CARD, p: 2.5 }}>
+              <SectionHead
+                title="Open = High — Weak Open"
+                accent={RED}
+                meta={data ? `${data.open_eq_high.length} qualified` : ''}
+              />
+              <OpenLevelTable
+                level="high"
+                rows={data?.open_eq_high ?? []}
+                emptyNote="No qualified stock has opened at the day's high so far."
+              />
+            </Box>
+          </Grid>
+          <Grid item xs={12} lg={6}>
+            <Box sx={{ ...CARD, p: 2.5 }}>
+              <SectionHead
+                title="Open = Low — Strong Open"
+                accent={GREEN}
+                meta={data ? `${data.open_eq_low.length} qualified` : ''}
+              />
+              <OpenLevelTable
+                level="low"
+                rows={data?.open_eq_low ?? []}
+                emptyNote="No qualified stock has opened at the day's low so far."
+              />
+            </Box>
+          </Grid>
+        </Grid>
+
         {/* Live movers (unfiltered by OI/momentum criteria) */}
         <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
           <Grid item xs={12} lg={6}>
@@ -501,7 +688,12 @@ export default function FnoMomentumPage() {
             one momentum criterion — <b>±5% PREV</b> (last completed session beyond ±5%),{' '}
             <b>TOP SECTOR</b> (its sector is today's single best-performing F&O sector by average
             change), or <b>±2% @ 9:15</b> (opening print gapped beyond ±2% vs previous
-            close). Chips on each row show exactly which criteria fired. The <b>Live Movers</b>{' '}
+            close). Chips on each row show exactly which criteria fired.{' '}
+            <b>Open = High</b> and <b>Open = Low</b> slice that same qualified set further: a
+            stock lands in Open = High if its 9:15 open still equals the day's high (it has
+            never traded above the open — sellers held the line, a weak/resistance read), and
+            in Open = Low if its open still equals the day's low (never traded below the open —
+            buyers held the line, a strong/support read). The <b>Live Movers</b>{' '}
             section below is independent of these buckets — it simply lists every F&O stock
             currently trading beyond ±{data?.thresholds.live_move_pct ?? 2}% vs previous close, split
             into gainers and losers. Live during market hours via Kite; EOD-settled data otherwise.

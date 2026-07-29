@@ -20,6 +20,7 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [quant_strategies_page.md](quant_strategies_page.md) | `/quant-strategies` | Momentum · mean-reversion · vol rank · sector rotation |
 | [randomness_page.md](randomness_page.md) | `/randomness` | Luck vs Skill · Return Concentration · Fragility — Monte Carlo 10k shuffles |
 | [short_page.md](short_page.md) | `/short` | Short candidate screener + squeeze watch |
+| [stock_eda_page.md](stock_eda_page.md) | `/stock-eda` | Chart-first EDA — distributions, seasonality, vol clustering, gaps, benchmark comparison |
 | [stock_health_page.md](stock_health_page.md) | `/stock-health` | 20-metric behavioural profile + 7-archetype scanner for NSE 500 |
 | [stock_page.md](stock_page.md) | `/stock` | Comprehensive per-stock research profile (19 sections) |
 

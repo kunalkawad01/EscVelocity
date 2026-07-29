@@ -10,6 +10,14 @@ momentum criteria (each row reports exactly which ones fired):
   TOP_SECTOR    — stock belongs to today's single best-performing F&O sector
   GAP_0915      — 9:15 open gapped beyond ±2% vs previous close
 
+Two further lists — Open=High and Open=Low — slice the union of the two
+buckets above (i.e. names already qualifying on OI addition or short
+covering) by intraday positioning:
+  OPEN_EQ_HIGH — 9:15 open equals the day's high so far (never traded above
+                 the open — sellers held the high, a weak/resistance read).
+  OPEN_EQ_LOW  — 9:15 open equals the day's low so far (never traded below
+                 the open — buyers held the low, a strong/support read).
+
 Also exposes a third, independent list — Live Movers — the whole F&O universe
 split into movers_up / movers_down by live day change beyond ±2%, unrelated to
 the OI/quadrant buckets above.
@@ -34,6 +42,7 @@ _BIG_MOVE_PCT = 5.0      # |last completed session return| beyond this
 _GAP_PCT = 2.0           # |9:15 open vs prev close| beyond this
 _TOP_SECTORS_N = 1       # "best performing sector" = top N by mean day change
 _LIVE_MOVE_PCT = 2.0     # |live day change| beyond this qualifies for the Live Movers section
+_OPEN_EQ_TOL = 0.005     # tolerance for open_0915 == day_high/day_low (both rounded to 2dp)
 
 
 def _last_session_ret(h: dict[str, Any]) -> Optional[float]:
@@ -105,6 +114,9 @@ def get_scan() -> dict[str, Any]:
             "oi_chg_pct": r.get("oi_chg_pct"),
             "quadrant": r.get("quadrant"),
             "volume": r.get("volume"),
+            "open_0915": open0,
+            "day_high": r.get("day_high"),
+            "day_low": r.get("day_low"),
         })
 
     sector_perf = _sector_perf(enriched)
@@ -125,6 +137,23 @@ def get_scan() -> dict[str, Any]:
 
     oi_gainers.sort(key=lambda x: x["change_pct"], reverse=True)
     short_covering.sort(key=lambda x: x["change_pct"], reverse=True)
+
+    # Open=High / Open=Low: slice the union of the two qualified buckets above
+    # (already gated on OI addition or short covering + a momentum criterion)
+    # by whether the 9:15 open equals the day's high/low so far.
+    open_eq_high: list[dict[str, Any]] = []
+    open_eq_low: list[dict[str, Any]] = []
+    for r in oi_gainers + short_covering:
+        open0, hi, lo = r.get("open_0915"), r.get("day_high"), r.get("day_low")
+        if open0 is None:
+            continue
+        if hi is not None and abs(open0 - hi) <= _OPEN_EQ_TOL:
+            open_eq_high.append(r)
+        if lo is not None and abs(open0 - lo) <= _OPEN_EQ_TOL:
+            open_eq_low.append(r)
+
+    open_eq_high.sort(key=lambda x: x["change_pct"], reverse=True)
+    open_eq_low.sort(key=lambda x: x["change_pct"], reverse=True)
 
     # Live movers: whole F&O universe, gated only on |live day change| ≥ threshold —
     # independent of the OI/quadrant buckets above.
@@ -152,6 +181,8 @@ def get_scan() -> dict[str, Any]:
         "top_sectors": sector_perf[:_TOP_SECTORS_N],
         "oi_gainers": oi_gainers,
         "short_covering": short_covering,
+        "open_eq_high": open_eq_high,
+        "open_eq_low": open_eq_low,
         "movers_up": movers_up,
         "movers_down": movers_down,
     }

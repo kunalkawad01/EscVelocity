@@ -4,6 +4,7 @@ import { theme } from './theme'
 import { ThemeModeProvider } from './contexts/ThemeModeContext'
 import LandingPage from './pages/LandingPage'
 import StockPage from './pages/StockPage'
+import StockEDAPage from './pages/StockEDAPage'
 import PatternDNAPage from './pages/PatternDNAPage'
 import PatternDNAGuidePage from './pages/PatternDNAGuidePage'
 import MarkovOptionsPage from './pages/MarkovOptionsPage'
@@ -31,6 +32,8 @@ import PortfoliosPage from './pages/PortfoliosPage'
 import PortfolioDetailPage from './pages/PortfolioDetailPage'
 import PortfolioBuilderPage from './pages/PortfolioBuilderPage'
 import EdgeObservatoryPage from './pages/EdgeObservatoryPage'
+import ResearchCopilotPage from './pages/ResearchCopilotPage'
+import LiveAgentPage from './pages/LiveAgentPage'
 
 export default function App() {
   return (
@@ -44,6 +47,8 @@ export default function App() {
           <Route path="/pattern-guide"     element={<PatternDNAGuidePage />} />
           <Route path="/stock"             element={<StockPage />} />
           <Route path="/stock/:symbol"     element={<StockPage />} />
+          <Route path="/stock-eda"             element={<StockEDAPage />} />
+          <Route path="/stock-eda/:symbol"     element={<StockEDAPage />} />
           <Route path="/markov-options"    element={<MarkovOptionsPage />} />
           <Route path="/quant-strategies"  element={<QuantStrategiesPage />} />
           <Route path="/indicators"        element={<IndicatorsPage />} />
@@ -72,6 +77,8 @@ export default function App() {
           <Route path="/portfolios/edit/:key"           element={<PortfolioBuilderPage />} />
           <Route path="/portfolios/:key"                element={<PortfolioDetailPage />} />
           <Route path="/edge-observatory"               element={<EdgeObservatoryPage />} />
+          <Route path="/research-copilot"               element={<ResearchCopilotPage />} />
+          <Route path="/live-agent"                     element={<LiveAgentPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

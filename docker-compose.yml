@@ -1,0 +1,72 @@
+# MarketDNA — VPS deployment (Docker Compose + Caddy)
+#
+# Topology:
+#   caddy      — TLS (auto Let's Encrypt) + basic auth + static frontend + reverse proxy. Only
+#                service with published ports.
+#   backend    — FastAPI/uvicorn. No published ports — reachable only as backend:8000 on the
+#                compose network.
+#   postgres   — app-layer persistence (custom portfolios, forward tracker). No published ports.
+#   ingestion  — one-off ingestion scripts. profiles-gated so `docker compose up -d` never starts
+#                it; invoke via `docker compose run --rm ingestion python -m ingestion.<module>`.
+#
+# marketdna-backend/ and marketdna-data/ are bind-mounted (not COPYed into images) as siblings
+# at /marketdna-backend and /marketdna-data — several modules (jobs/extract_iv.py, app/config.py's
+# data_path default, drivers_service.py) hardcode that sibling-directory relationship. This also
+# means routine updates are `git pull && docker compose restart backend` with no rebuild, except
+# when requirements.txt changes.
+#
+# Secrets: root .env (this directory) holds MARKETDNA_PG_*, CORS, ANTHROPIC_*, AICREDIT_*,
+# RESEARCH_MODEL — env_file'd into backend AND used by docker compose itself for the postgres
+# service's POSTGRES_* substitution. Kite credentials live ONLY in marketdna-data/.env (a
+# physical file read directly by app/services/kite_client.py's dotenv_values() and
+# ingestion/kite/client.py's load_dotenv() — both bypass container env vars entirely, see
+# ops/daily-post-market.sh).
+
+services:
+  caddy:
+    build: ./marketdna-web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: ./marketdna-backend
+    env_file: .env
+    volumes:
+      - ./marketdna-backend:/marketdna-backend
+      - ./marketdna-data:/marketdna-data
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    # No "ports:" — intentionally unreachable except via caddy's reverse_proxy.
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${MARKETDNA_PG_USER}
+      POSTGRES_PASSWORD: ${MARKETDNA_PG_PASSWORD}
+      POSTGRES_DB: ${MARKETDNA_PG_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    # No "ports:" — internal only.
+
+  ingestion:
+    build: ./marketdna-data
+    profiles: ["ingestion"]
+    working_dir: /marketdna-data
+    volumes:
+      - ./marketdna-data:/marketdna-data
+    command: ["python", "--version"]  # no-op; real work invoked via `docker compose run --rm ingestion ...`
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
