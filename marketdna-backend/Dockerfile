@@ -7,6 +7,15 @@
 FROM python:3.12-slim
 WORKDIR /marketdna-backend
 
+# NSE trading hours and every naive datetime.now() call in the codebase (live_trading_service.py
+# etc.) assume the host's local wall clock is IST — true on the Windows dev machine, false on a
+# UTC-default Linux container. Bake IST in at the image level so intraday tick timestamps,
+# session-state labels, and chart x-axes all line up with market hours (9:15-15:30 IST).
+ENV TZ=Asia/Kolkata
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 
 # TA-Lib==0.7.1 ships prebuilt manylinux wheels (cp312, x86_64 and aarch64) with the C library
