@@ -662,9 +662,11 @@ export default function FnoTacticalPage() {
         {/* Zone 0 */}
         <BreadthGate b={breadth} disabled={!isLive} />
 
-        {/* Zones 1 + 2 (left) / Zone 3 (right) */}
+        {/* Zones 1 + 2 (left) / Zone 3 (right) — scatter goes full-width until a
+            symbol is picked, then the option chain panel appears and the layout
+            settles into its 7/5 split. */}
         <Grid container spacing={2.5}>
-          <Grid item xs={12} lg={7}>
+          <Grid item xs={12} lg={focus ? 7 : 12}>
             <Box sx={{ ...CARD, p: 2, mb: 2.5 }}>
               <SectionHead title="OI Positioning — Returns vs OI Change" accent="#6366f1" meta={universe ? `nifty ${pct(universe.nifty_ret)}` : ''} />
               <PositioningScatter rows={rows} onPick={setFocus} mode={mode} />
@@ -674,11 +676,13 @@ export default function FnoTacticalPage() {
               <NormalizedLines data={normalized} mode={mode} />
             </Box>
           </Grid>
-          <Grid item xs={12} lg={5}>
-            <Box sx={{ position: { lg: 'sticky' }, top: 60 }}>
-              <OptionChainPanel symbol={focus} live={isLive} mode={mode} onClose={() => setFocus(null)} />
-            </Box>
-          </Grid>
+          {focus && (
+            <Grid item xs={12} lg={5}>
+              <Box sx={{ position: { lg: 'sticky' }, top: 60 }}>
+                <OptionChainPanel symbol={focus} live={isLive} mode={mode} onClose={() => setFocus(null)} />
+              </Box>
+            </Grid>
+          )}
         </Grid>
 
         {/* Graded signals */}
