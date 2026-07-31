@@ -142,7 +142,7 @@ function PositioningScatter({ rows, onPick, mode }: { rows: FnoUniverseRow[]; on
     rows.forEach(r => {
       if (!r.quadrant) return
       grouped[r.quadrant as Quadrant].push({
-        x: r.ret_per_atr, y: r.ret_pct, name: r.symbol,
+        x: r.oi_chg_pct, y: r.ret_pct, name: r.symbol,
         marker: { radius: 6, fillColor: `${QUAD_COLOR[r.quadrant as Quadrant]}CC`, lineColor: QUAD_COLOR[r.quadrant as Quadrant], lineWidth: 1 },
         custom: r,
       })
@@ -165,14 +165,10 @@ function PositioningScatter({ rows, onPick, mode }: { rows: FnoUniverseRow[]; on
         itemHiddenStyle: { color: mode === 'dark' ? '#475569' : '#cbd5e1' },
       },
       xAxis: {
-        title: { text: 'Risk-adjusted move (ATRs)', style: { color: INK3, fontSize: '0.62rem' } },
+        title: { text: 'OI change (%)', style: { color: INK3, fontSize: '0.62rem' } },
         gridLineWidth: 0, lineColor: BORDER, tickColor: BORDER,
         labels: { style: { color: INK3, fontSize: '0.6rem' } },
         plotLines: [{ value: 0, color: axisColor, width: 1, dashStyle: 'Dash', zIndex: 2 }],
-        plotBands: [
-          { from: 1.5, to: 99, color: mode === 'dark' ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.04)' },
-          { from: -99, to: -1.5, color: mode === 'dark' ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.04)' },
-        ],
       },
       yAxis: {
         title: { text: 'Intraday return from 9:15 (%)', style: { color: INK3, fontSize: '0.62rem' } },
@@ -189,8 +185,8 @@ function PositioningScatter({ rows, onPick, mode }: { rows: FnoUniverseRow[]; on
           const g = r.grade
           return `<b>${r.symbol}</b> · ${r.trend}<br/>
             ${QUAD_LABEL[r.quadrant as Quadrant]}<br/>
-            Ret ${pct(r.ret_pct)} · ${num(r.ret_per_atr)} ATR<br/>
             OIΔ ${pct(r.oi_chg_pct)}<br/>
+            Ret ${pct(r.ret_pct)} · ${num(r.ret_per_atr)} ATR<br/>
             ${g.grade !== 'NONE' ? `<b style="color:${g.direction === 'long' ? GREEN : RED}">${g.grade}-grade ${g.direction} (${g.size})</b>` : '<span style="opacity:.6">no signal</span>'}`
         },
       },
@@ -213,7 +209,7 @@ function PositioningScatter({ rows, onPick, mode }: { rows: FnoUniverseRow[]; on
         {!hasData && (
           <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3 }}>No positioning data yet</Typography>
         )}
-        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, ml: 'auto', fontStyle: 'italic' }}>click legend to toggle · shaded = extended (&gt;1.5 ATR)</Typography>
+        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, ml: 'auto', fontStyle: 'italic' }}>click legend to toggle</Typography>
       </Box>
       <HighchartsReact highcharts={Highcharts} options={options} />
     </>
@@ -670,7 +666,7 @@ export default function FnoTacticalPage() {
         <Grid container spacing={2.5}>
           <Grid item xs={12} lg={7}>
             <Box sx={{ ...CARD, p: 2, mb: 2.5 }}>
-              <SectionHead title="OI Positioning — Returns vs ATR" accent="#6366f1" meta={universe ? `nifty ${pct(universe.nifty_ret)}` : ''} />
+              <SectionHead title="OI Positioning — Returns vs OI Change" accent="#6366f1" meta={universe ? `nifty ${pct(universe.nifty_ret)}` : ''} />
               <PositioningScatter rows={rows} onPick={setFocus} mode={mode} />
             </Box>
             <Box sx={{ ...CARD, p: 2 }}>
