@@ -8,6 +8,15 @@
 FROM python:3.12-slim
 WORKDIR /marketdna-data
 
+# ingest_futures.py / ingest_option_chain.py partition their output by date.today() —
+# on a UTC-default container that date can lag or lead the true IST trading date
+# depending on time of day, mislabeling snapshots. Bake IST in, same fix as the
+# backend Dockerfile.
+ENV TZ=Asia/Kolkata
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
