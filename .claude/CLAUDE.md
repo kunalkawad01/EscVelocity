@@ -784,6 +784,14 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - Transition matrix Dirichlet prior: α=0.20. Cells with n<3 shown in yellow.
 - API: `markovOptionsApi.getSymbol(symbol)`, `markovOptionsApi.getMarket()`
 
+### `/nifty50-live` — Nifty50LivePage
+- **Live index tick** via a persistent Kite WebSocket (`/ws/nifty50`, one combined message/sec: index + all 50 constituent ticks). REST fallback seeds the page pre-connect.
+- **10 sections**: hero+tick, candlestick chart (14 TF buttons, click-a-stock to re-target), All 50 Constituents board, Market Breadth strip (Nifty-50-scoped, NOT `/api/regime/breadth` which is NSE-500-wide), India VIX (live+chart), Contributors & Detractors, Sector Heatmap (reuses `sector_heatmap_service` `universe=nifty50`), Option Chain (ATM±20 ladder + OI/change-in-OI charts), PCR & Max Pain Trend (live full-chain `kite.quote()` snapshot every 30s, NOT the EOD-cached `options_service.get_oi_analysis`), Strike Charts (ATM±3, 7 Call + 7 Put dual-axis price-vs-OI), Top Gainers & Losers (6 periods, bar charts, placed last).
+- **Shared option-chain state**: `useNiftyOptionChain()` hook feeds Option Chain + Strike Charts + PCR Trend off one 5s-refreshed fetch.
+- **Movers + SMA breadth share one DuckDB query** (`_compute_movers_history`, 400-day closes for the 50 constituents, cached per calendar date); only the `daily` movers leg and advance/decline are live off ticks.
+- Points-contribution is a broker-style approximation (`weight% × index_prev_close × change_pct%`), not NSE's true divisor methodology — see `marketdna-data/nifty50_weights.csv` for per-row source/confidence.
+- API: `nifty50Api` (`state`, `contributors`, `constituents`, `history`, `movers`, `breadth`, `vix-state`, `pcr-history`, `option-chain/expiries`, ws) + reuses `optionsApi.getOIAnalysis`, `fnoApi.getStrikeChart`, `sectorHeatmapApi.getHeatmap`.
+
 ### `/pattern-dna` — PatternDNAPage (~2,364 lines — largest page, do not add inline)
 - **9 patterns**, 4-step validation suite (occurrence check → OOS split → decile analysis → confidence calibration).
 - 4 sections: `PatternScanner` (multi-filter), `PatternScreener` (ranking per pattern), `ConfirmedFormingScreener` (Run Scan gate — slow), `ValidationSection`.
@@ -851,6 +859,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/fno-momentum` | `page_docu/fno_momentum_page.md` |
 | `/indicators` | `page_docu/indicators_page.md` |
 | `/markov-options` | `page_docu/markov_options_page.md` |
+| `/nifty50-live` | `page_docu/nifty50_live_page.md` |
 | `/pattern-dna` | `page_docu/pattern_dna_page.md` |
 | `/pattern-dna-guide` | `page_docu/pattern_dna_guide_page.md` |
 | `/quant-strategies` | `page_docu/quant_strategies_page.md` |

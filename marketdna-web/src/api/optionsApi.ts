@@ -5,11 +5,17 @@ import type { OIAnalysis, OIScannerResponse, ExpectedMoveHistory, EMScanResponse
 const BASE = '/api/options'
 
 export const optionsApi = {
-  getOIAnalysis: (symbol: string): Promise<OIAnalysis> =>
-    fetch(`${BASE}/${symbol}`).then(r => {
+  getOIAnalysis: (symbol: string, expiry?: string): Promise<OIAnalysis> =>
+    fetch(`${BASE}/${symbol}${expiry ? `?expiry=${expiry}` : ''}`).then(r => {
       if (!r.ok) throw new Error(r.statusText)
       return r.json()
     }),
+
+  getExpiries: (symbol: string): Promise<string[]> =>
+    fetch(`${BASE}/${symbol}/expiries`).then(r => {
+      if (!r.ok) throw new Error(r.statusText)
+      return r.json()
+    }).then((d: { expiries: string[] }) => d.expiries),
 
   invalidateSymbol: (symbol: string): Promise<void> =>
     fetch(`${BASE}/${symbol}/invalidate`, { method: 'POST' }).then(() => undefined),

@@ -18,7 +18,7 @@ from app.models.options import (
 
 log = logging.getLogger(__name__)
 
-_symbol_cache: dict[str, OIAnalysis] = {}
+_symbol_cache: dict[tuple[str, Optional[str]], OIAnalysis] = {}
 _scanner_cache: Optional[OIScannerResponse] = None
 _em_cache: dict[str, ExpectedMoveHistory] = {}  # keyed by symbol
 _em_scan_cache: Optional[EMScanResponse] = None
@@ -356,13 +356,21 @@ def _build_signal(
 
 # ── Per-symbol OI Analysis ────────────────────────────────────────────────────
 
-def get_oi_analysis(symbol: str, invalidate: bool = False) -> Optional[OIAnalysis]:
+def get_oi_analysis(
+    symbol: str, invalidate: bool = False, expiry: Optional[str] = None,
+) -> Optional[OIAnalysis]:
+    """expiry=None resolves to the nearest expiry for the symbol (existing behavior).
+
+    Pass an explicit expiry (YYYY-MM-DD) to select among symbols with multiple
+    expiries live at once (currently only NIFTY, via the index-options ingestion path).
+    """
     ensure_fo_views()
     con = get_connection()
     _refresh_if_new_day(con)
 
-    if not invalidate and symbol in _symbol_cache:
-        return _symbol_cache[symbol]
+    cache_key = (symbol, expiry)
+    if not invalidate and cache_key in _symbol_cache:
+        return _symbol_cache[cache_key]
 
     # Check view exists
     try:
@@ -380,13 +388,24 @@ def get_oi_analysis(symbol: str, invalidate: bool = False) -> Optional[OIAnalysi
             return None
         latest_date = str(row[0])
 
-        # Pull all rows for this symbol on latest date
-        rows = con.execute("""
+        resolved_expiry = expiry
+        if resolved_expiry is None:
+            exp_row = con.execute(
+                "SELECT MIN(expiry) FROM options_chain WHERE symbol = ? AND date = ?",
+                [symbol, latest_date],
+            ).fetchone()
+            resolved_expiry = str(exp_row[0]) if exp_row and exp_row[0] else None
+
+        # Pull rows for this symbol/date, scoped to one expiry (matters once a
+        # symbol has multiple expiries live on the same day -- currently NIFTY only)
+        expiry_filter = "AND expiry = ?" if resolved_expiry else ""
+        params = [symbol, latest_date] + ([resolved_expiry] if resolved_expiry else [])
+        rows = con.execute(f"""
             SELECT strike, option_type, oi, oi_change, volume, iv, ltp, underlying_price, expiry
             FROM options_chain
-            WHERE symbol = ? AND date = ?
+            WHERE symbol = ? AND date = ? {expiry_filter}
             ORDER BY strike
-        """, [symbol, latest_date]).fetchall()
+        """, params).fetchall()
 
         if not rows:
             return None
@@ -496,7 +515,7 @@ def get_oi_analysis(symbol: str, invalidate: bool = False) -> Optional[OIAnalysi
             futures_ltp=futures_ltp,
             basis_pct=basis_pct,
         )
-        _symbol_cache[symbol] = result
+        _symbol_cache[cache_key] = result
         return result
 
     except Exception as e:
@@ -505,7 +524,30 @@ def get_oi_analysis(symbol: str, invalidate: bool = False) -> Optional[OIAnalysi
 
 
 def invalidate_symbol(symbol: str) -> None:
-    _symbol_cache.pop(symbol, None)
+    for key in [k for k in _symbol_cache if k[0] == symbol]:
+        _symbol_cache.pop(key, None)
+
+
+def get_expiries(symbol: str) -> list[str]:
+    """All distinct expiry dates currently live for a symbol, ascending."""
+    ensure_fo_views()
+    con = get_connection()
+    _refresh_if_new_day(con)
+    try:
+        row = con.execute(
+            "SELECT MAX(date) FROM options_chain WHERE symbol = ?", [symbol]
+        ).fetchone()
+        if not row or not row[0]:
+            return []
+        latest_date = str(row[0])
+        rows = con.execute(
+            "SELECT DISTINCT expiry FROM options_chain WHERE symbol = ? AND date = ? ORDER BY expiry",
+            [symbol, latest_date],
+        ).fetchall()
+        return [str(r[0]) for r in rows if r[0]]
+    except Exception as exc:
+        log.warning("get_expiries(%s): %s", symbol, exc)
+        return []
 
 
 # ── Scanner ───────────────────────────────────────────────────────────────────

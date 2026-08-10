@@ -57,6 +57,30 @@ SECTOR_MAP: dict[str, list[str]] = _load_sector_map()
 _SECTOR_MAPS: dict[str, dict[str, list[str]]] = {"nifty500": SECTOR_MAP, "nifty200": SECTOR_MAP}
 
 
+# ── Nifty 50 constituent weights (loaded from nifty50_weights.csv) ───────────
+def _load_nifty50_weights() -> dict[str, float]:
+    csv_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..",
+        "marketdna-data", "nifty50_weights.csv",
+    )
+    csv_path = os.path.normpath(csv_path)
+    weights: dict[str, float] = {}
+    try:
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("source") == "unconfirmed":
+                    continue
+                weights[row["symbol"].strip()] = float(row["weight_pct"])
+        log.info("Loaded NIFTY50_WEIGHTS: %d symbols", len(weights))
+    except Exception as exc:
+        log.error("Failed to load nifty50_weights.csv: %s", exc)
+    return weights
+
+
+NIFTY50_WEIGHTS: dict[str, float] = _load_nifty50_weights()
+NIFTY50_INDEX_SYMBOL = "NIFTY 50"
+
+
 
 # ── Historical context cache (daily refresh) ──────────────────────────────────
 _hist_date: str = ""
@@ -1776,10 +1800,122 @@ def get_stock_options(symbol: str) -> dict:
     }
 
 
-# ── Kite WebSocket ticker (stub — polling fallback used until WS is implemented) ─
+# ── Kite WebSocket ticker — NIFTY 50 index + constituents ────────────────────
+_nifty_lock = threading.Lock()
+_nifty_index_tick: dict = {}                    # {ltp, prev_close, change, change_pct, ts}
+_nifty_constituent_ticks: dict[str, dict] = {}  # symbol -> {ltp, prev_close, change_pct, ts}
+_nifty_token_symbol: dict[int, str] = {}        # instrument_token -> "__INDEX__" or equity symbol
+_ticker = None  # KiteTicker instance, module singleton
+
+
+def _on_nifty_ticks(ws, ticks: list[dict]) -> None:
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    with _nifty_lock:
+        for t in ticks:
+            sym = _nifty_token_symbol.get(t.get("instrument_token"))
+            if sym is None:
+                continue
+            ltp = float(t.get("last_price") or 0)
+            prev_close = float((t.get("ohlc") or {}).get("close") or 0)
+            change = ltp - prev_close if prev_close else 0.0
+            change_pct = (change / prev_close * 100) if prev_close else 0.0
+            payload = {
+                "ltp": round(ltp, 2),
+                "prev_close": round(prev_close, 2),
+                "change": round(change, 2),
+                "change_pct": round(change_pct, 3),
+                "ts": now_iso,
+            }
+            if sym == "__INDEX__":
+                _nifty_index_tick.clear()
+                _nifty_index_tick.update(payload)
+            else:
+                _nifty_constituent_ticks[sym] = payload
+
+
 def start_ticker() -> None:
-    """No-op stub. Intraday data is currently sourced via REST polling every 5s."""
-    log.info("start_ticker: WebSocket not yet implemented — using REST polling fallback")
+    """Connect a persistent KiteTicker for the NIFTY 50 index + its constituents.
+
+    Runs on the _background_prewarm daemon thread; KiteTicker.connect(threaded=True)
+    spawns its own internal thread for the socket loop, so this call returns immediately.
+    Any failure (stale access token, no network) is logged and swallowed -- every other
+    live page already falls back to REST polling (_quotes) and is unaffected by this.
+    """
+    global _ticker
+    try:
+        from kiteconnect import KiteTicker
+        from dotenv import dotenv_values
+        from app.config import settings
+
+        env = dotenv_values(settings.data_path / ".env")
+        api_key = env.get("KITE_API_KEY", "")
+        access_token = env.get("KITE_ACCESS_TOKEN", "")
+        if not api_key or not access_token:
+            log.warning("start_ticker: missing Kite credentials, skipping WS connect")
+            return
+
+        symbols = [NIFTY50_INDEX_SYMBOL] + list(NIFTY50_WEIGHTS.keys())
+        kite = get_kite()
+        ltp_resp = kite.ltp([f"NSE:{s}" for s in symbols])
+
+        token_symbol: dict[int, str] = {}
+        for key, val in ltp_resp.items():
+            sym = key.replace("NSE:", "")
+            tok = int(val["instrument_token"])
+            token_symbol[tok] = "__INDEX__" if sym == NIFTY50_INDEX_SYMBOL else sym
+
+        if "__INDEX__" not in token_symbol.values():
+            log.warning("start_ticker: could not resolve NIFTY 50 index token, skipping WS connect")
+            return
+
+        with _nifty_lock:
+            _nifty_token_symbol.clear()
+            _nifty_token_symbol.update(token_symbol)
+
+        def _on_connect(ws, response):
+            tokens = list(token_symbol.keys())
+            ws.subscribe(tokens)
+            ws.set_mode(ws.MODE_FULL, tokens)
+            log.info("NIFTY 50 ticker connected, subscribed to %d instruments", len(tokens))
+
+        def _on_close(ws, code, reason):
+            log.warning("NIFTY 50 ticker closed: %s %s", code, reason)
+
+        def _on_error(ws, code, reason):
+            log.warning("NIFTY 50 ticker error: %s %s", code, reason)
+
+        kws = KiteTicker(api_key, access_token)
+        kws.on_ticks = _on_nifty_ticks
+        kws.on_connect = _on_connect
+        kws.on_close = _on_close
+        kws.on_error = _on_error
+        kws.connect(threaded=True)
+        _ticker = kws
+    except Exception as exc:
+        log.warning("start_ticker: failed to start Kite WebSocket -- %s", exc)
+
+
+def stop_ticker() -> None:
+    """Close the KiteTicker connection cleanly (called on FastAPI shutdown)."""
+    global _ticker
+    if _ticker is not None:
+        try:
+            _ticker.close()
+        except Exception as exc:
+            log.debug("stop_ticker: close failed -- %s", exc)
+        _ticker = None
+
+
+def get_nifty_index_tick() -> dict:
+    """Latest NIFTY 50 index tick, or {} if the WS hasn't received one yet."""
+    with _nifty_lock:
+        return dict(_nifty_index_tick)
+
+
+def get_nifty_constituent_ticks() -> dict[str, dict]:
+    """Latest per-constituent ticks, keyed by symbol."""
+    with _nifty_lock:
+        return dict(_nifty_constituent_ticks)
 
 
 # ── Market breadth (StockSessionDrawer — advance/decline strip) ───────────────

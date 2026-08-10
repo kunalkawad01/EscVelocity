@@ -49,6 +49,12 @@ BATCH_SIZE  = 500           # max tokens per kite.quote() call
 STRIKES_EACH_SIDE = 20      # ATM ± N strikes
 RISK_FREE_RATE    = 0.065   # India 10Y approx
 
+# Index options: FO.csv is stock-only, so index underlyings are handled as a
+# separate path. Maps the NFO instrument `name` (option underlying) to the
+# NSE tradingsymbol used for the index's own spot quote.
+INDEX_SYMBOLS: dict[str, str] = {"NIFTY": "NIFTY 50"}
+INDEX_EXPIRIES = 8   # weekly expiries to capture for index options (vs 1 for stocks)
+
 # ── IV computation (pure Black-Scholes, no external library needed) ───────────
 
 def _bs_price(S: float, K: float, T: float, r: float, sigma: float, opt: str) -> float:
@@ -110,9 +116,30 @@ def _atm_strike(spot: float, interval: float) -> float:
 
 
 def _load_prev_oi_map(ref_date: date) -> dict[tuple[str, float, str, str], int]:
-    """Load the prior trading day's OI (relative to ref_date) once into a lookup dict."""
-    yesterday = date.fromordinal(ref_date.toordinal() - 1)
-    prev_path = LAKE_ROOT / f"date={yesterday}" / "data.parquet"
+    """Load the prior trading day's OI (relative to ref_date) once into a lookup dict.
+
+    Scans existing date=* partitions for the latest one strictly before ref_date,
+    rather than assuming ref_date - 1 calendar day is a trading day. A fixed
+    1-day lookback misses the prior session across weekends/holidays (e.g. on a
+    Monday, "yesterday" is Sunday — no partition — so oi_change would come back
+    NULL even though Friday's data exists). Mirrors the ranked-session join
+    fno_tactical_service.py uses for futures_chain.
+    """
+    if not LAKE_ROOT.exists():
+        return {}
+    candidates: list[date] = []
+    for p in LAKE_ROOT.iterdir():
+        if not p.is_dir() or not p.name.startswith("date="):
+            continue
+        try:
+            d = date.fromisoformat(p.name[len("date="):])
+        except ValueError:
+            continue
+        if d < ref_date:
+            candidates.append(d)
+    if not candidates:
+        return {}
+    prev_path = LAKE_ROOT / f"date={max(candidates)}" / "data.parquet"
     if not prev_path.exists():
         return {}
     try:
@@ -154,9 +181,9 @@ def ingest_option_chain(label_date: date | None = None) -> None:
             continue
         nfo_by_name.setdefault(inst["name"], []).append(inst)
 
-    # Step 2 — Get spot prices for all FO symbols in one batch quote call
-    nse_keys = [f"NSE:{sym}" for sym in fo_symbols]
-    log.info("Fetching spot prices for %d symbols …", len(fo_symbols))
+    # Step 2 — Get spot prices for all FO symbols, plus index underlyings, in one batch
+    nse_keys = [f"NSE:{sym}" for sym in fo_symbols] + [f"NSE:{v}" for v in INDEX_SYMBOLS.values()]
+    log.info("Fetching spot prices for %d symbols …", len(nse_keys))
     spot_quotes = kite.quote(nse_keys)
     time.sleep(CALL_SLEEP)
     spot_price: dict[str, float] = {
@@ -164,13 +191,21 @@ def ingest_option_chain(label_date: date | None = None) -> None:
         for sym in fo_symbols
         if f"NSE:{sym}" in spot_quotes
     }
+    for idx_sym, nse_tradingsymbol in INDEX_SYMBOLS.items():
+        key = f"NSE:{nse_tradingsymbol}"
+        if key in spot_quotes:
+            spot_price[idx_sym] = spot_quotes[key]["last_price"]
     log.info("  -> spot prices obtained for %d symbols", len(spot_price))
 
-    # Step 3 — Build token -> instrument map for ATM ± 20 strikes per symbol
+    # Step 3 — Build token -> instrument map for ATM ± 20 strikes per symbol.
+    # Stocks get their single nearest expiry; index underlyings get their next
+    # INDEX_EXPIRIES weekly expiries (each treated the same way from here on).
     token_to_meta: dict[int, dict] = {}   # token -> {symbol, expiry, strike, option_type}
     missing_symbols: list[str] = []
+    all_symbols = fo_symbols + list(INDEX_SYMBOLS.keys())
 
-    for sym in fo_symbols:
+    for sym in all_symbols:
+        is_index = sym in INDEX_SYMBOLS
         if sym not in nfo_by_name:
             log.warning("  %s: no NFO instruments found — skipping", sym)
             missing_symbols.append(sym)
@@ -182,37 +217,42 @@ def ingest_option_chain(label_date: date | None = None) -> None:
 
         insts = nfo_by_name[sym]
         expiries = list({inst["expiry"] for inst in insts if isinstance(inst["expiry"], date)})
-        expiry = _nearest_monthly_expiry(expiries)
-        if expiry is None:
+        if is_index:
+            today_ = date.today()
+            selected_expiries = sorted(e for e in expiries if e >= today_)[:INDEX_EXPIRIES]
+        else:
+            nearest = _nearest_monthly_expiry(expiries)
+            selected_expiries = [nearest] if nearest else []
+        if not selected_expiries:
             log.warning("  %s: no current expiry found — skipping", sym)
             continue
 
-        # Filter to current expiry only
-        curr = [i for i in insts if i["expiry"] == expiry]
-        strikes = sorted({i["strike"] for i in curr})
-        if not strikes:
-            log.warning("  %s: no strikes for expiry %s — skipping", sym, expiry)
-            continue
+        for expiry in selected_expiries:
+            curr = [i for i in insts if i["expiry"] == expiry]
+            strikes = sorted({i["strike"] for i in curr})
+            if not strikes:
+                log.warning("  %s: no strikes for expiry %s — skipping", sym, expiry)
+                continue
 
-        interval = _detect_strike_interval(strikes)
-        atm = _atm_strike(spot_price[sym], interval)
+            interval = _detect_strike_interval(strikes)
+            atm = _atm_strike(spot_price[sym], interval)
 
-        # Select ATM ± 20 strikes (both CE and PE)
-        lo = atm - STRIKES_EACH_SIDE * interval
-        hi = atm + STRIKES_EACH_SIDE * interval
-        selected = [i for i in curr if lo <= i["strike"] <= hi]
+            # Select ATM ± 20 strikes (both CE and PE)
+            lo = atm - STRIKES_EACH_SIDE * interval
+            hi = atm + STRIKES_EACH_SIDE * interval
+            selected = [i for i in curr if lo <= i["strike"] <= hi]
 
-        for inst in selected:
-            token_to_meta[inst["instrument_token"]] = {
-                "symbol":      sym,
-                "expiry":      expiry.isoformat(),
-                "strike":      float(inst["strike"]),
-                "option_type": inst["instrument_type"],
-                "lot_size":    int(inst["lot_size"]),
-            }
+            for inst in selected:
+                token_to_meta[inst["instrument_token"]] = {
+                    "symbol":      sym,
+                    "expiry":      expiry.isoformat(),
+                    "strike":      float(inst["strike"]),
+                    "option_type": inst["instrument_type"],
+                    "lot_size":    int(inst["lot_size"]),
+                }
 
     log.info("Selected %d option instruments across %d symbols",
-             len(token_to_meta), len(fo_symbols) - len(missing_symbols))
+             len(token_to_meta), len(all_symbols) - len(missing_symbols))
 
     # Step 4 — Batch quote all tokens (500 per call)
     all_tokens = list(token_to_meta.keys())
@@ -321,8 +361,8 @@ def ingest_option_chain(label_date: date | None = None) -> None:
 
     # Summary
     syms_written = df["symbol"].n_unique()
-    atm_missing  = [s for s in fo_symbols if s not in {r["symbol"] for r in rows}]
-    log.info("Symbols with data: %d / %d", syms_written, len(fo_symbols))
+    atm_missing  = [s for s in all_symbols if s not in {r["symbol"] for r in rows}]
+    log.info("Symbols with data: %d / %d", syms_written, len(all_symbols))
     if atm_missing:
         log.warning("Symbols with no data written: %s", ", ".join(atm_missing))
 

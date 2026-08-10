@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
@@ -76,6 +76,8 @@ app.include_router(drivers.router)
 app.include_router(research_copilot.router)
 app.include_router(live_agent.router)
 app.include_router(stock_eda.router)
+app.include_router(nifty50.router)
+app.include_router(nifty50.ws_router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -141,6 +143,11 @@ async def startup():
     from app.services import portfolios_tracker_service
     _run_task("portfolio tracker store", portfolios_tracker_service.init_store)
     threading.Thread(target=_background_prewarm, daemon=True).start()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    live_trading_service.stop_ticker()
 
 
 @app.get("/health")

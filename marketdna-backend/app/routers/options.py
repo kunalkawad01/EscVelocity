@@ -1,5 +1,6 @@
 """Options OI Analysis router."""
 import logging
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from app.services import options_service
@@ -82,10 +83,19 @@ def invalidate_iv_smile(symbol: str):
     return {"status": "invalidated", "symbol": symbol.upper()}
 
 
+@router.get("/{symbol}/expiries")
+def get_expiries(symbol: str):
+    """Distinct expiry dates currently live for a symbol (only >1 for index options today)."""
+    return {"symbol": symbol.upper(), "expiries": options_service.get_expiries(symbol.upper())}
+
+
 @router.get("/{symbol}", response_model=OIAnalysis)
-def get_oi_analysis(symbol: str):
-    """Full OI chain for a symbol — max pain, CE/PE walls, strike breakdown."""
-    result = options_service.get_oi_analysis(symbol.upper())
+def get_oi_analysis(symbol: str, expiry: Optional[str] = None):
+    """Full OI chain for a symbol — max pain, CE/PE walls, strike breakdown.
+
+    expiry (YYYY-MM-DD) selects among multiple live expiries; omit for the nearest.
+    """
+    result = options_service.get_oi_analysis(symbol.upper(), expiry=expiry)
     if result is None:
         raise HTTPException(status_code=404, detail=f"No options data for {symbol}")
     return result
