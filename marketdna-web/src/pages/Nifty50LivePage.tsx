@@ -241,8 +241,8 @@ function VixSection() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
         <Box sx={{ width: 3, height: 18, borderRadius: 2, bgcolor: '#a78bfa' }} />
         <Typography sx={{ ...SANS, fontSize: '0.8rem', fontWeight: 800, color: INK }}>India VIX</Typography>
-        <Typography sx={{ ...MONO, fontSize: '1.1rem', fontWeight: 800, color: INK, ml: 1 }}>{vix ? vix.ltp.toFixed(2) : '—'}</Typography>
-        {vix && (
+        <Typography sx={{ ...MONO, fontSize: '1.1rem', fontWeight: 800, color: INK, ml: 1 }}>{vix?.ltp != null ? vix.ltp.toFixed(2) : '—'}</Typography>
+        {vix?.change != null && (
           <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: changeColor }}>
             {vix.change >= 0 ? '+' : ''}{vix.change.toFixed(2)} ({pct(vix.change_pct)})
           </Typography>

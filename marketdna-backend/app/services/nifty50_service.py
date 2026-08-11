@@ -12,6 +12,7 @@ import logging
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import Optional
 
 from app.services import live_trading_service
 from app.services.duckdb_client import get_connection
@@ -115,8 +116,12 @@ def get_history(tf: str, symbol: str | None = None) -> dict:
         return {"tf": tf, "symbol": symbol, "candles": [], "error": str(exc)}
 
 
-def get_index_state() -> dict:
-    """Live NIFTY 50 index tick: WebSocket if connected, else a one-off REST fallback."""
+def get_index_state() -> Optional[dict]:
+    """Live NIFTY 50 index tick: WebSocket if connected, else a one-off REST fallback.
+
+    Returns None (not {}) when neither source has data -- see get_vix_state's
+    docstring for why an empty dict is dangerous for a frontend truthy-guard.
+    """
     tick = live_trading_service.get_nifty_index_tick()
     if tick:
         return {**tick, "source": "ws"}
@@ -126,7 +131,7 @@ def get_index_state() -> dict:
         resp = kite.quote([f"NSE:{live_trading_service.NIFTY50_INDEX_SYMBOL}"])
         q = next(iter(resp.values()), None)
         if not q:
-            return {}
+            return None
         ltp = float(q["last_price"])
         prev_close = float(q["ohlc"]["close"])
         change = ltp - prev_close if prev_close else 0.0
@@ -141,7 +146,7 @@ def get_index_state() -> dict:
         }
     except Exception as exc:
         log.warning("get_index_state: REST fallback failed -- %s", exc)
-        return {}
+        return None
 
 
 def _all_rows(idx: dict) -> list[dict]:
@@ -362,15 +367,20 @@ def get_breadth() -> dict:
 VIX_SYMBOL = "INDIA VIX"
 
 
-def get_vix_state() -> dict:
+def get_vix_state() -> Optional[dict]:
     """Latest India VIX tick via REST (no persistent websocket for VIX -- it's
-    polled on demand, unlike the NIFTY 50 index/constituent tick stream)."""
+    polled on demand, unlike the NIFTY 50 index/constituent tick stream).
+
+    Returns None (not {}) on any failure -- an empty dict is truthy in JS, so a
+    frontend guard like `vix ? vix.ltp.toFixed(2) : '-'` would still try to read
+    `.ltp` off it and crash the whole page on an undefined access.
+    """
     try:
         kite = get_kite()
         resp = kite.quote([f"NSE:{VIX_SYMBOL}"])
         q = next(iter(resp.values()), None)
         if not q:
-            return {}
+            return None
         ltp = float(q["last_price"])
         prev_close = float(q["ohlc"]["close"])
         change = ltp - prev_close if prev_close else 0.0
@@ -384,7 +394,7 @@ def get_vix_state() -> dict:
         }
     except Exception as exc:
         log.warning("get_vix_state failed: %s", exc)
-        return {}
+        return None
 
 
 # ── PCR / max-pain intraday trend (in-memory accumulator) ─────────────────────
