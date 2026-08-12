@@ -76,6 +76,21 @@ export interface MoversResponse {
   n_tracked: number
 }
 
+export interface AdvDecPoint {
+  time: string
+  advances: number
+  declines: number
+  unchanged: number
+}
+
+export interface SmaTrendPoint {
+  date: string
+  pct_above_sma20: number
+  pct_above_sma50: number
+  pct_above_sma200: number
+  is_live?: boolean
+}
+
 export interface AdvanceDeclineResponse {
   advances: number
   declines: number
@@ -92,6 +107,8 @@ export interface AdvanceDeclineResponse {
   total_symbols: number
   breadth_score: number
   breadth_label: string
+  adv_dec_history: { points: AdvDecPoint[] }
+  sma_trend: { points: SmaTrendPoint[] }
 }
 
 export interface VixState {

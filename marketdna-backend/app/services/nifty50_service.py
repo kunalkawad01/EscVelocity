@@ -259,6 +259,68 @@ def _sma_breadth_from_series(sym_series: dict[str, list[tuple[str, float]]]) -> 
     }
 
 
+_SMA_TREND_DAYS = 7
+
+
+def _sma_breadth_history_from_series(sym_series: dict[str, list[tuple[str, float]]]) -> list[dict]:
+    """Daily % above SMA20/50/200 for the last _SMA_TREND_DAYS trading days,
+    same 'closes as of that day' math as _sma_breadth_from_series but repeated
+    at each historical index instead of just the latest one. Powers the Market
+    Breadth 'lookback 1 week to live' SMA trend charts -- the live/today point
+    is appended separately in get_breadth() since it needs tick prices, not
+    another EOD close."""
+    ref_dates: list[str] = []
+    for series in sym_series.values():
+        if len(series) > len(ref_dates):
+            ref_dates = [d for d, _ in series]
+    if not ref_dates:
+        return []
+
+    n = len(ref_dates)
+    points: list[dict] = []
+    for i in range(max(0, n - _SMA_TREND_DAYS), n):
+        count20 = count50 = count200 = total = 0
+        for series in sym_series.values():
+            if i >= len(series):
+                continue
+            closes_upto = [c for _, c in series[: i + 1]]
+            if len(closes_upto) < 20:
+                continue
+            total += 1
+            latest = closes_upto[-1]
+            if latest > sum(closes_upto[-20:]) / 20:
+                count20 += 1
+            if len(closes_upto) >= 50 and latest > sum(closes_upto[-50:]) / 50:
+                count50 += 1
+            if len(closes_upto) >= 200 and latest > sum(closes_upto[-200:]) / 200:
+                count200 += 1
+        points.append({
+            "date": ref_dates[i],
+            "pct_above_sma20": round(count20 / total * 100, 1) if total else 0.0,
+            "pct_above_sma50": round(count50 / total * 100, 1) if total else 0.0,
+            "pct_above_sma200": round(count200 / total * 100, 1) if total else 0.0,
+        })
+    return points
+
+
+def _per_symbol_smas(sym_series: dict[str, list[tuple[str, float]]]) -> dict[str, dict[str, float]]:
+    """{symbol: {"sma20", "sma50"?, "sma200"?}} from each symbol's latest closes --
+    lets get_breadth() compare today's live tick price against trailing SMAs
+    without re-fetching or re-walking the full close series on every 30s poll."""
+    out: dict[str, dict[str, float]] = {}
+    for sym, series in sym_series.items():
+        closes = [c for _, c in series]
+        if len(closes) < 20:
+            continue
+        smas = {"sma20": sum(closes[-20:]) / 20}
+        if len(closes) >= 50:
+            smas["sma50"] = sum(closes[-50:]) / 50
+        if len(closes) >= 200:
+            smas["sma200"] = sum(closes[-200:]) / 200
+        out[sym] = smas
+    return out
+
+
 def _compute_movers_history() -> dict:
     """{"periods": {period: {symbol: change_pct}}, "sma_breadth": {...}} --
     everything derivable from one batch fetch of Nifty 50 EOD closes."""
@@ -297,7 +359,12 @@ def _compute_movers_history() -> dict:
             if base and base > 0:
                 period_pct[period][sym] = round((latest_close - base) / base * 100, 3)
 
-    return {"periods": period_pct, "sma_breadth": _sma_breadth_from_series(sym_series)}
+    return {
+        "periods": period_pct,
+        "sma_breadth": _sma_breadth_from_series(sym_series),
+        "sma_breadth_history": _sma_breadth_history_from_series(sym_series),
+        "sma_lookup": _per_symbol_smas(sym_series),
+    }
 
 
 def _get_movers_hist() -> dict:
@@ -331,11 +398,29 @@ def get_period_movers() -> dict:
 
 
 # ── Advance/decline among the 50 constituents (live) ──────────────────────────
+# In-memory intraday accumulator for the Adv/Dec line chart (9:15 -> live). Same
+# non-persistent, reset-on-restart/date-change tradeoff as _pcr_history -- see
+# that global's docstring in get_pcr_history.
+_adv_dec_history: list[dict] = []
+_adv_dec_history_date: str = ""
+
+
 def get_breadth() -> dict:
     """Live advances/declines/unchanged (from ticks) + % of the 50 above SMA20/50/200
     (from EOD closes, cached alongside movers) -- everything the breadth strip needs
     in one call, all scoped to the 50 constituents rather than the NSE-500-wide
-    /api/regime/breadth."""
+    /api/regime/breadth.
+
+    Also returns two chart series for the Market Breadth section:
+      - adv_dec_history: intraday advances/declines sampled once per call (the
+        frontend polls this every 30s), reset at 9:15/date rollover.
+      - sma_trend: % above SMA20/50/200 for the last _SMA_TREND_DAYS trading
+        days plus one 'live' point comparing today's tick prices against each
+        symbol's trailing SMA (not another EOD close, which doesn't exist yet
+        intraday).
+    """
+    global _adv_dec_history, _adv_dec_history_date
+
     ticks = live_trading_service.get_nifty_constituent_ticks()
     advances = declines = unchanged = 0
     for sym in live_trading_service.NIFTY50_WEIGHTS:
@@ -351,7 +436,44 @@ def get_breadth() -> dict:
             unchanged += 1
     total = advances + declines + unchanged
 
+    today_str = datetime.now().date().isoformat()
+    if _adv_dec_history_date != today_str:
+        _adv_dec_history = []
+        _adv_dec_history_date = today_str
+    if total > 0:
+        _adv_dec_history.append({
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "advances": advances,
+            "declines": declines,
+            "unchanged": unchanged,
+        })
+
     hist = _get_movers_hist()
+    sma_trend = list(hist.get("sma_breadth_history", []))
+
+    sma_lookup = hist.get("sma_lookup", {})
+    count20 = count50 = count200 = live_total = 0
+    for sym, smas in sma_lookup.items():
+        t = ticks.get(sym)
+        if not t or not t.get("ltp"):
+            continue
+        live_total += 1
+        ltp = t["ltp"]
+        if ltp > smas["sma20"]:
+            count20 += 1
+        if "sma50" in smas and ltp > smas["sma50"]:
+            count50 += 1
+        if "sma200" in smas and ltp > smas["sma200"]:
+            count200 += 1
+    if live_total > 0:
+        sma_trend.append({
+            "date": today_str,
+            "pct_above_sma20": round(count20 / live_total * 100, 1),
+            "pct_above_sma50": round(count50 / live_total * 100, 1),
+            "pct_above_sma200": round(count200 / live_total * 100, 1),
+            "is_live": True,
+        })
+
     return {
         "advances": advances,
         "declines": declines,
@@ -360,6 +482,8 @@ def get_breadth() -> dict:
         "total": total,
         "n_total": len(live_trading_service.NIFTY50_WEIGHTS),
         **hist["sma_breadth"],
+        "adv_dec_history": {"points": list(_adv_dec_history)},
+        "sma_trend": {"points": sma_trend},
     }
 
 

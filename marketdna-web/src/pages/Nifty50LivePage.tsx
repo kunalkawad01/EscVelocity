@@ -13,6 +13,7 @@ import { sectorHeatmapApi } from '../api/sectorHeatmapApi'
 import type {
   NiftyIndexTick, ContributorRow, ContributorsResponse, NiftyWsMessage, NiftyTf, NiftyHistoryResponse,
   MoversPeriod, PeriodMovers, MoversResponse, AdvanceDeclineResponse, VixState, PcrPoint,
+  AdvDecPoint, SmaTrendPoint,
 } from '../types/nifty50'
 import type { OIAnalysis, StrikeData } from '../types/options'
 import type { StrikeChartResponse } from '../types/fno'
@@ -133,6 +134,96 @@ function MiniBar({ label, value, color }: { label: string; value: number; color:
   )
 }
 
+function AdvDecChart({ points }: { points: AdvDecPoint[] }) {
+  const { INK, INK3, BORDER } = usePalette()
+  const { mode } = useThemeMode()
+
+  const options = useMemo<Highcharts.Options>(() => {
+    const cats = points.map(p => p.time.slice(0, 5))
+    return {
+      chart: { backgroundColor: 'transparent', height: 200, spacing: [6, 10, 6, 2] },
+      title: { text: undefined },
+      credits: { enabled: false },
+      legend: { enabled: true, itemStyle: { color: INK3, fontSize: '0.58rem' } },
+      xAxis: {
+        categories: cats,
+        labels: { style: { color: INK3, fontSize: '0.54rem' }, step: Math.ceil(Math.max(cats.length, 1) / 8) },
+        lineColor: BORDER, tickColor: BORDER,
+      },
+      yAxis: {
+        title: { text: undefined },
+        labels: { style: { color: INK3, fontSize: '0.54rem' } },
+        gridLineColor: mode === 'dark' ? '#1e293b' : '#eef2f7',
+      },
+      tooltip: { shared: true, backgroundColor: mode === 'dark' ? '#0B1020' : '#fff', borderColor: BORDER, style: { color: INK, fontSize: '0.62rem' } },
+      series: [
+        { type: 'line', name: 'Advances', data: points.map(p => p.advances), color: GREEN, lineWidth: 1.5, marker: { enabled: false } },
+        { type: 'line', name: 'Declines', data: points.map(p => p.declines), color: RED, lineWidth: 1.5, marker: { enabled: false } },
+      ],
+    }
+  }, [points, mode, INK, INK3, BORDER])
+
+  return (
+    <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 1, p: 1 }}>
+      <Typography sx={{ ...SANS, fontSize: '0.66rem', fontWeight: 700, color: INK, mb: 0.5 }}>Adv / Dec — 9:15 to live</Typography>
+      {!points.length ? (
+        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, textAlign: 'center', py: 4 }}>Waiting for today's first snapshot…</Typography>
+      ) : (
+        <HighchartsReact highcharts={Highcharts} options={options} />
+      )}
+    </Box>
+  )
+}
+
+function SmaTrendChart({ title, field, points, color }: {
+  title: string
+  field: 'pct_above_sma20' | 'pct_above_sma50' | 'pct_above_sma200'
+  points: SmaTrendPoint[]
+  color: string
+}) {
+  const { INK, INK3, BORDER } = usePalette()
+  const { mode } = useThemeMode()
+
+  const options = useMemo<Highcharts.Options>(() => {
+    const cats = points.map(p => (p.is_live ? 'Live' : p.date.slice(5)))
+    return {
+      chart: { backgroundColor: 'transparent', height: 200, spacing: [6, 10, 6, 2] },
+      title: { text: undefined },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        categories: cats,
+        labels: { style: { color: INK3, fontSize: '0.56rem' } },
+        lineColor: BORDER, tickColor: BORDER,
+      },
+      yAxis: {
+        title: { text: undefined }, min: 0, max: 100,
+        labels: { style: { color: INK3, fontSize: '0.54rem' }, formatter: function () { return `${this.value}%` } },
+        gridLineColor: mode === 'dark' ? '#1e293b' : '#eef2f7',
+      },
+      tooltip: {
+        backgroundColor: mode === 'dark' ? '#0B1020' : '#fff', borderColor: BORDER, style: { color: INK, fontSize: '0.62rem' },
+        formatter: function () { return `<b>${this.x}</b><br/>${(this.y as number).toFixed(1)}%` },
+      },
+      series: [{
+        type: 'area', name: title, data: points.map(p => p[field]), color, lineWidth: 1.5, fillOpacity: 0.12,
+        marker: { enabled: true, radius: 2 },
+      }],
+    }
+  }, [points, field, color, title, mode, INK, INK3, BORDER])
+
+  return (
+    <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 1, p: 1 }}>
+      <Typography sx={{ ...SANS, fontSize: '0.66rem', fontWeight: 700, color: INK, mb: 0.5 }}>{title} — 1 week to live</Typography>
+      {!points.length ? (
+        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, textAlign: 'center', py: 4 }}>No history yet.</Typography>
+      ) : (
+        <HighchartsReact highcharts={Highcharts} options={options} />
+      )}
+    </Box>
+  )
+}
+
 function BreadthStrip() {
   const { INK, INK3, CYAN } = usePalette()
   const { CARD } = useTokens()
@@ -148,9 +239,9 @@ function BreadthStrip() {
   const advPct = breadth && breadth.total > 0 ? (breadth.advances / breadth.total) * 100 : 0
 
   return (
-    <Box sx={{ ...CARD, p: 2, height: '100%' }}>
+    <Box sx={{ ...CARD, p: 2 }}>
       <SectionHead title="Market Breadth (Nifty 50)" accent={CYAN} meta={breadth ? breadth.breadth_label : ''} />
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', mb: 2 }}>
         <Box sx={{ minWidth: 160 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
             <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 700, color: GREEN }}>{breadth ? `${breadth.advances} adv` : '—'}</Typography>
@@ -174,6 +265,12 @@ function BreadthStrip() {
             </Box>
           </>
         )}
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+        <AdvDecChart points={breadth?.adv_dec_history.points ?? []} />
+        <SmaTrendChart title="Above SMA20" field="pct_above_sma20" points={breadth?.sma_trend.points ?? []} color={CYAN} />
+        <SmaTrendChart title="Above SMA50" field="pct_above_sma50" points={breadth?.sma_trend.points ?? []} color="#a78bfa" />
+        <SmaTrendChart title="Above SMA200" field="pct_above_sma200" points={breadth?.sma_trend.points ?? []} color="#f59e0b" />
       </Box>
     </Box>
   )
@@ -237,7 +334,7 @@ function VixSection() {
   }, [hist, INK, INK3, BORDER, CYAN, mode])
 
   return (
-    <Box sx={{ ...CARD, p: 2, height: '100%' }}>
+    <Box sx={{ ...CARD, p: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
         <Box sx={{ width: 3, height: 18, borderRadius: 2, bgcolor: '#a78bfa' }} />
         <Typography sx={{ ...SANS, fontSize: '0.8rem', fontWeight: 800, color: INK }}>India VIX</Typography>
@@ -1128,14 +1225,8 @@ export default function Nifty50LivePage() {
             />
           </Grid>
         </Grid>
-        <Grid container spacing={2.5}>
-          <Grid item xs={12} lg={6}>
-            <BreadthStrip />
-          </Grid>
-          <Grid item xs={12} lg={6}>
-            <VixSection />
-          </Grid>
-        </Grid>
+        <BreadthStrip />
+        <VixSection />
         <ContributorsPanel />
         <SectorHeatmapStrip />
         <OptionChainSection
