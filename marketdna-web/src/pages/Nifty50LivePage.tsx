@@ -134,12 +134,28 @@ function MiniBar({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-function AdvDecChart({ points }: { points: AdvDecPoint[] }) {
+// Full session grid, 09:15 -> 15:30 at 1-minute steps -- gives the chart a fixed
+// x-axis spanning the whole trading day instead of stretching to fit whatever's
+// been sampled so far, and lets Advances/Declines just stop drawing at 'now'
+// (via connectNulls) rather than the axis rescaling every poll.
+const SESSION_MINUTES: string[] = (() => {
+  const out: string[] = []
+  for (let h = 9, m = 15; h < 15 || (h === 15 && m <= 30); m++) {
+    if (m === 60) { m = 0; h++ }
+    out.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+  }
+  return out
+})()
+
+function AdvDecChart({ points, marketOpen }: { points: AdvDecPoint[]; marketOpen: boolean }) {
   const { INK, INK3, BORDER } = usePalette()
   const { mode } = useThemeMode()
 
   const options = useMemo<Highcharts.Options>(() => {
-    const cats = points.map(p => p.time.slice(0, 5))
+    const byMinute = new Map(points.map(p => [p.time.slice(0, 5), p]))
+    const cats = SESSION_MINUTES
+    const advData = cats.map(t => byMinute.get(t)?.advances ?? null)
+    const decData = cats.map(t => byMinute.get(t)?.declines ?? null)
     return {
       chart: { backgroundColor: 'transparent', height: 200, spacing: [6, 10, 6, 2] },
       title: { text: undefined },
@@ -147,7 +163,7 @@ function AdvDecChart({ points }: { points: AdvDecPoint[] }) {
       legend: { enabled: true, itemStyle: { color: INK3, fontSize: '0.58rem' } },
       xAxis: {
         categories: cats,
-        labels: { style: { color: INK3, fontSize: '0.54rem' }, step: Math.ceil(Math.max(cats.length, 1) / 8) },
+        labels: { style: { color: INK3, fontSize: '0.54rem' }, step: Math.ceil(cats.length / 8) },
         lineColor: BORDER, tickColor: BORDER,
       },
       yAxis: {
@@ -157,17 +173,21 @@ function AdvDecChart({ points }: { points: AdvDecPoint[] }) {
       },
       tooltip: { shared: true, backgroundColor: mode === 'dark' ? '#0B1020' : '#fff', borderColor: BORDER, style: { color: INK, fontSize: '0.62rem' } },
       series: [
-        { type: 'line', name: 'Advances', data: points.map(p => p.advances), color: GREEN, lineWidth: 1.5, marker: { enabled: false } },
-        { type: 'line', name: 'Declines', data: points.map(p => p.declines), color: RED, lineWidth: 1.5, marker: { enabled: false } },
+        { type: 'line', name: 'Advances', data: advData, color: GREEN, lineWidth: 1.5, marker: { enabled: false }, connectNulls: true },
+        { type: 'line', name: 'Declines', data: decData, color: RED, lineWidth: 1.5, marker: { enabled: false }, connectNulls: true },
       ],
     }
   }, [points, mode, INK, INK3, BORDER])
 
   return (
     <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 1, p: 1 }}>
-      <Typography sx={{ ...SANS, fontSize: '0.66rem', fontWeight: 700, color: INK, mb: 0.5 }}>Adv / Dec — 9:15 to live</Typography>
+      <Typography sx={{ ...SANS, fontSize: '0.66rem', fontWeight: 700, color: INK, mb: 0.5 }}>
+        Adv / Dec — 9:15 to {marketOpen ? 'live' : '3:30'}
+      </Typography>
       {!points.length ? (
-        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, textAlign: 'center', py: 4 }}>Waiting for today's first snapshot…</Typography>
+        <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, textAlign: 'center', py: 4 }}>
+          {marketOpen ? "Waiting for today's first snapshot…" : 'No snapshots recorded today.'}
+        </Typography>
       ) : (
         <HighchartsReact highcharts={Highcharts} options={options} />
       )}
@@ -267,7 +287,7 @@ function BreadthStrip() {
         )}
       </Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
-        <AdvDecChart points={breadth?.adv_dec_history.points ?? []} />
+        <AdvDecChart points={breadth?.adv_dec_history.points ?? []} marketOpen={breadth?.market_open ?? false} />
         <SmaTrendChart title="Above SMA20" field="pct_above_sma20" points={breadth?.sma_trend.points ?? []} color={CYAN} />
         <SmaTrendChart title="Above SMA50" field="pct_above_sma50" points={breadth?.sma_trend.points ?? []} color="#a78bfa" />
         <SmaTrendChart title="Above SMA200" field="pct_above_sma200" points={breadth?.sma_trend.points ?? []} color="#f59e0b" />

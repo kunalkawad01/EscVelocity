@@ -107,6 +107,7 @@ export interface AdvanceDeclineResponse {
   total_symbols: number
   breadth_score: number
   breadth_label: string
+  market_open: boolean
   adv_dec_history: { points: AdvDecPoint[] }
   sma_trend: { points: SmaTrendPoint[] }
 }

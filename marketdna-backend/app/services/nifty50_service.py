@@ -411,12 +411,13 @@ def get_breadth() -> dict:
     in one call, all scoped to the 50 constituents rather than the NSE-500-wide
     /api/regime/breadth.
 
-    Also returns two chart series for the Market Breadth section:
-      - adv_dec_history: intraday advances/declines sampled once per call (the
-        frontend polls this every 30s), reset at 9:15/date rollover. Stops
-        accumulating at market close (15:30 IST) -- ticks are frozen on the
-        last traded price after that, so further points would just repeat
-        the closing snapshot under a misleading 'live' framing.
+    Also returns market_open plus two chart series for the Market Breadth section:
+      - adv_dec_history: intraday advances/declines, throttled to at most one
+        point per calendar minute regardless of how often the frontend polls
+        (every 30s), reset at 9:15/date rollover. Stops accumulating at market
+        close (15:30 IST) -- ticks are frozen on the last traded price after
+        that, so further points would just repeat the closing snapshot under
+        a misleading 'live' framing.
       - sma_trend: % above SMA20/50/200 for the last _SMA_TREND_DAYS trading
         days plus one 'live' point comparing today's tick prices against each
         symbol's trailing SMA (not another EOD close, which doesn't exist yet
@@ -448,9 +449,12 @@ def get_breadth() -> dict:
     if _adv_dec_history_date != today_str:
         _adv_dec_history = []
         _adv_dec_history_date = today_str
-    if total > 0 and market_open:
+    now = datetime.now()
+    this_minute = now.strftime("%H:%M")
+    last_minute = _adv_dec_history[-1]["time"][:5] if _adv_dec_history else None
+    if total > 0 and market_open and this_minute != last_minute:
         _adv_dec_history.append({
-            "time": datetime.now().strftime("%H:%M:%S"),
+            "time": now.strftime("%H:%M:%S"),
             "advances": advances,
             "declines": declines,
             "unchanged": unchanged,
@@ -490,6 +494,7 @@ def get_breadth() -> dict:
         "total": total,
         "n_total": len(live_trading_service.NIFTY50_WEIGHTS),
         **hist["sma_breadth"],
+        "market_open": market_open,
         "adv_dec_history": {"points": list(_adv_dec_history)},
         "sma_trend": {"points": sma_trend},
     }
