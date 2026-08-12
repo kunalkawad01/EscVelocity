@@ -1573,6 +1573,25 @@ def _get_nfo_instrument(symbol: str, expiry: str, strike: float, opt_type: str) 
     return _nfo_cache.get(key)
 
 
+def get_live_expiries(symbol: str, limit: int = 8) -> list[str]:
+    """Distinct expiry dates (ascending, today or later) live on the NFO
+    instrument list right now.
+
+    Deliberately NOT sourced from the last ingested options_chain parquet
+    partition: that list is only as fresh as the last ingestion run, so once
+    its nearest expiry rolls off (e.g. mid-session the day after a weekly
+    expiry, before that evening's post-market ingestion), every live-quote
+    lookup keyed off it silently returns nothing -- see the Nifty 50 Live page
+    doc's Lessons Learnt. _nfo_cache is rebuilt once per calendar day and
+    always reflects Kite's current instrument list, so reading expiries off
+    it here stays correct all session without depending on ingestion timing.
+    """
+    _ensure_nfo_cache()
+    today = date.today().isoformat()
+    expiries = sorted({k[1] for k in _nfo_cache if k[0] == symbol.upper() and k[1] >= today})
+    return expiries[:limit]
+
+
 def get_strike_chart_data(symbol: str, strike: float, expiry: str) -> dict:
     """1-min price + OI bars for futures, CE, and PE of a given strike.
 

@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.services import nifty50_service, options_service
+from app.services import live_trading_service, nifty50_service
 
 log = logging.getLogger(__name__)
 
@@ -70,8 +70,13 @@ def get_pcr_history(expiry: Optional[str] = None):
 
 @router.get("/option-chain/expiries")
 def get_option_chain_expiries():
-    """The (up to 8) weekly expiries currently ingested for NIFTY index options."""
-    return {"expiries": options_service.get_expiries(NIFTY_OPTIONS_SYMBOL)}
+    """The (up to 8) weekly expiries currently live on NFO for NIFTY index options.
+
+    Reads Kite's live instrument list (via live_trading_service's daily NFO
+    cache), not the last ingested options_chain partition -- so this stays
+    correct all session even before that evening's post-market ingestion runs.
+    """
+    return {"expiries": live_trading_service.get_live_expiries(NIFTY_OPTIONS_SYMBOL)}
 
 
 # Mounted without the /api prefix -- kept as its own router so the path is a
