@@ -413,13 +413,21 @@ def get_breadth() -> dict:
 
     Also returns two chart series for the Market Breadth section:
       - adv_dec_history: intraday advances/declines sampled once per call (the
-        frontend polls this every 30s), reset at 9:15/date rollover.
+        frontend polls this every 30s), reset at 9:15/date rollover. Stops
+        accumulating at market close (15:30 IST) -- ticks are frozen on the
+        last traded price after that, so further points would just repeat
+        the closing snapshot under a misleading 'live' framing.
       - sma_trend: % above SMA20/50/200 for the last _SMA_TREND_DAYS trading
         days plus one 'live' point comparing today's tick prices against each
         symbol's trailing SMA (not another EOD close, which doesn't exist yet
-        intraday).
+        intraday). The live point is likewise only added while the market is
+        open; after close, today isn't a completed EOD day yet (that lands in
+        the historical series once tonight's ingestion runs), so there's
+        nothing genuinely 'live' left to show.
     """
     global _adv_dec_history, _adv_dec_history_date
+
+    market_open = live_trading_service._market_is_open()
 
     ticks = live_trading_service.get_nifty_constituent_ticks()
     advances = declines = unchanged = 0
@@ -440,7 +448,7 @@ def get_breadth() -> dict:
     if _adv_dec_history_date != today_str:
         _adv_dec_history = []
         _adv_dec_history_date = today_str
-    if total > 0:
+    if total > 0 and market_open:
         _adv_dec_history.append({
             "time": datetime.now().strftime("%H:%M:%S"),
             "advances": advances,
@@ -465,7 +473,7 @@ def get_breadth() -> dict:
             count50 += 1
         if "sma200" in smas and ltp > smas["sma200"]:
             count200 += 1
-    if live_total > 0:
+    if live_total > 0 and market_open:
         sma_trend.append({
             "date": today_str,
             "pct_above_sma20": round(count20 / live_total * 100, 1),
