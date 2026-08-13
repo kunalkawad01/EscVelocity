@@ -130,4 +130,5 @@ export interface PcrPoint {
 export interface PcrHistoryResponse {
   expiry: string
   points: PcrPoint[]
+  market_open: boolean
 }

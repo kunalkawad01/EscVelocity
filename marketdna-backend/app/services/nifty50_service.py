@@ -8,17 +8,78 @@ methodology (which needs live free-float share counts we don't have access to):
 See marketdna-data/nifty50_weights.csv for the weight table and its per-row
 source/confidence (official NSE top-10 vs cross-referenced estimate).
 """
+import json
 import logging
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
+from app.config import settings
 from app.services import live_trading_service
 from app.services.duckdb_client import get_connection
 from app.services.kite_client import get_kite
 
 log = logging.getLogger(__name__)
+
+# ── Intraday accumulator persistence ───────────────────────────────────────────
+# adv_dec_history and pcr_history are sampled once per minute during market
+# hours, held in-process, and would normally reset to empty on every backend
+# restart -- which happens often in this deployment (daily Kite token refresh,
+# feature deploys), so without this a same-day restart after close would wipe
+# the very session the user wants to keep looking at. Persisted as one small
+# JSON file per (series, date) under data_lake/derived/nifty50/ and reloaded
+# into the in-memory list the first time each series is touched after a
+# restart, keyed by calendar date so a new day still starts empty.
+_NIFTY50_DERIVED_DIR = settings.data_path / "data_lake" / "derived" / "nifty50"
+
+
+def _history_path(series: str, date_str: str) -> Path:
+    return _NIFTY50_DERIVED_DIR / series / f"{date_str}.json"
+
+
+def _load_history(series: str, date_str: str) -> list[dict]:
+    path = _history_path(series, date_str)
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text())
+    except Exception as exc:
+        log.warning("_load_history(%s, %s) failed: %s", series, date_str, exc)
+        return []
+
+
+def _save_history(series: str, date_str: str, points: list[dict]) -> None:
+    path = _history_path(series, date_str)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(points))
+    except Exception as exc:
+        log.warning("_save_history(%s, %s) failed: %s", series, date_str, exc)
+
+
+def _load_pcr_history(date_str: str) -> tuple[str, list[dict]]:
+    """PCR history additionally carries the expiry it was recorded against,
+    so it's stored as {"expiry", "points"} rather than a bare list."""
+    path = _history_path("pcr_history", date_str)
+    if not path.exists():
+        return "", []
+    try:
+        d = json.loads(path.read_text())
+        return d.get("expiry", ""), d.get("points", [])
+    except Exception as exc:
+        log.warning("_load_pcr_history(%s) failed: %s", date_str, exc)
+        return "", []
+
+
+def _save_pcr_history(date_str: str, expiry: str, points: list[dict]) -> None:
+    path = _history_path("pcr_history", date_str)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"expiry": expiry, "points": points}))
+    except Exception as exc:
+        log.warning("_save_pcr_history(%s) failed: %s", date_str, exc)
 
 # ── Historical chart ──────────────────────────────────────────────────────────
 # label -> (Kite interval, lookback days). The three intraday-range buttons
@@ -398,9 +459,9 @@ def get_period_movers() -> dict:
 
 
 # ── Advance/decline among the 50 constituents (live) ──────────────────────────
-# In-memory intraday accumulator for the Adv/Dec line chart (9:15 -> live). Same
-# non-persistent, reset-on-restart/date-change tradeoff as _pcr_history -- see
-# that global's docstring in get_pcr_history.
+# In-memory accumulator for the Adv/Dec line chart (9:15 -> 15:30), mirrored to
+# disk via _save_history/_load_history so a same-day restart (frequent here --
+# daily Kite token refresh, deploys) restores the session instead of wiping it.
 _adv_dec_history: list[dict] = []
 _adv_dec_history_date: str = ""
 
@@ -447,7 +508,7 @@ def get_breadth() -> dict:
 
     today_str = datetime.now().date().isoformat()
     if _adv_dec_history_date != today_str:
-        _adv_dec_history = []
+        _adv_dec_history = _load_history("adv_dec_history", today_str)
         _adv_dec_history_date = today_str
     now = datetime.now()
     this_minute = now.strftime("%H:%M")
@@ -459,6 +520,7 @@ def get_breadth() -> dict:
             "declines": declines,
             "unchanged": unchanged,
         })
+        _save_history("adv_dec_history", today_str, _adv_dec_history)
 
     hist = _get_movers_hist()
     sma_trend = list(hist.get("sma_breadth_history", []))
@@ -534,15 +596,15 @@ def get_vix_state() -> Optional[dict]:
         return None
 
 
-# ── PCR / max-pain intraday trend (in-memory accumulator) ─────────────────────
+# ── PCR / max-pain intraday trend (persisted accumulator) ─────────────────────
 # options_service.get_oi_analysis() serves the ingested parquet, which only
 # changes when ingest_option_chain.py is rerun (batch/manual) -- so a PCR trend
 # built off it was flatlining at a single point all session. Instead this pulls
 # live OI for the whole ATM±20 chain via one batched kite.quote() call (~82
 # instruments, well under the 500/call limit) each time it's polled, so PCR and
-# max-pain actually move intraday. Resets on server restart and rolls over on
-# date/expiry change, same tradeoff as live_trading_service's other in-process
-# accumulators (e.g. _iday).
+# max-pain actually move intraday. Mirrored to disk (see _save_history) so a
+# same-day restart after close still shows the complete 9:15-15:30 session
+# instead of an empty chart, and rolls over on date/expiry change.
 _pcr_history: list[dict] = []
 _pcr_history_date = ""
 _pcr_history_expiry = ""
@@ -611,18 +673,31 @@ def _live_pcr_snapshot(expiry: str | None) -> dict | None:
 
 
 def get_pcr_history(expiry: str | None = None) -> dict:
-    """Live-snapshot NIFTY PCR/max-pain/spot, append to today's in-memory series,
-    and return the full series."""
+    """Live-snapshot NIFTY PCR/max-pain/spot, append to today's series, and
+    return the full series plus market_open.
+
+    Gated to market hours (09:15-15:30 IST): outside that window this just
+    replays whatever was recorded today (loaded from disk on the first call
+    after a restart) instead of firing another live kite.quote() and
+    appending a point that would just repeat the closing snapshot.
+    """
     global _pcr_history, _pcr_history_date, _pcr_history_expiry
+
+    today_str = datetime.now().date().isoformat()
+    if _pcr_history_date != today_str:
+        _pcr_history_expiry, _pcr_history = _load_pcr_history(today_str)
+        _pcr_history_date = today_str
+
+    market_open = live_trading_service._market_is_open()
+    if not market_open:
+        return {"expiry": _pcr_history_expiry, "points": list(_pcr_history), "market_open": False}
 
     snap = _live_pcr_snapshot(expiry)
     if snap is None:
-        return {"expiry": _pcr_history_expiry, "points": list(_pcr_history)}
+        return {"expiry": _pcr_history_expiry, "points": list(_pcr_history), "market_open": True}
 
-    today_str = datetime.now().date().isoformat()
-    if _pcr_history_date != today_str or _pcr_history_expiry != snap["expiry"]:
+    if _pcr_history_expiry != snap["expiry"]:
         _pcr_history = []
-        _pcr_history_date = today_str
         _pcr_history_expiry = snap["expiry"]
 
     _pcr_history.append({
@@ -631,8 +706,9 @@ def get_pcr_history(expiry: str | None = None) -> dict:
         "max_pain": snap["max_pain"],
         "spot": snap["spot"],
     })
+    _save_pcr_history(today_str, snap["expiry"], _pcr_history)
 
-    return {"expiry": snap["expiry"], "points": list(_pcr_history)}
+    return {"expiry": snap["expiry"], "points": list(_pcr_history), "market_open": True}
 
 
 def get_all_constituents(idx: dict | None = None) -> dict:

@@ -1128,17 +1128,27 @@ function PcrTrendChart({ expiry }: { expiry: string }) {
   const { CARD } = useTokens()
   const { mode } = useThemeMode()
   const [points, setPoints] = useState<PcrPoint[]>([])
+  const [marketOpen, setMarketOpen] = useState(true)
 
   useEffect(() => {
     if (!expiry) return
-    const load = () => nifty50Api.getPcrHistory(expiry).then(r => setPoints(r.points)).catch(() => {})
+    const load = () => nifty50Api.getPcrHistory(expiry).then(r => {
+      setPoints(r.points)
+      setMarketOpen(r.market_open)
+    }).catch(() => {})
     load()
     const id = setInterval(load, PCR_HISTORY_REFRESH_MS)
     return () => clearInterval(id)
   }, [expiry])
 
   const options = useMemo<Highcharts.Options>(() => {
-    const cats = points.map(p => p.time)
+    // Same fixed 09:15->15:30 grid as the Adv/Dec chart -- when multiple
+    // snapshots land in the same minute (30s poll cadence), the later one wins.
+    const byMinute = new Map(points.map(p => [p.time.slice(0, 5), p]))
+    const cats = SESSION_MINUTES
+    const pcrData = cats.map(t => byMinute.get(t)?.pcr ?? null)
+    const maxPainData = cats.map(t => byMinute.get(t)?.max_pain ?? null)
+    const spotData = cats.map(t => byMinute.get(t)?.spot ?? null)
     return {
       chart: { backgroundColor: 'transparent', height: 240, spacing: [6, 10, 6, 2] },
       title: { text: undefined },
@@ -1146,7 +1156,7 @@ function PcrTrendChart({ expiry }: { expiry: string }) {
       legend: { enabled: true, itemStyle: { color: INK3, fontSize: '0.62rem' } },
       xAxis: {
         categories: cats,
-        labels: { style: { color: INK3, fontSize: '0.56rem' }, step: Math.ceil(Math.max(cats.length, 1) / 8) },
+        labels: { style: { color: INK3, fontSize: '0.56rem' }, step: Math.ceil(cats.length / 8) },
         lineColor: BORDER, tickColor: BORDER,
       },
       yAxis: [
@@ -1155,19 +1165,25 @@ function PcrTrendChart({ expiry }: { expiry: string }) {
       ],
       tooltip: { shared: true, backgroundColor: mode === 'dark' ? '#0B1020' : '#fff', borderColor: BORDER, style: { color: INK, fontSize: '0.64rem' } },
       series: [
-        { type: 'line', name: 'PCR', data: points.map(p => p.pcr), color: CYAN, lineWidth: 1.5, marker: { enabled: true, radius: 2 }, yAxis: 0 },
-        { type: 'line', name: 'Max Pain', data: points.map(p => p.max_pain), color: '#f59e0b', lineWidth: 1.5, step: 'left', dashStyle: 'ShortDot', marker: { enabled: true, radius: 2 }, yAxis: 1 },
-        { type: 'line', name: 'Spot', data: points.map(p => p.spot), color: INK, lineWidth: 1, marker: { enabled: true, radius: 2 }, yAxis: 1 },
+        { type: 'line', name: 'PCR', data: pcrData, color: CYAN, lineWidth: 1.5, marker: { enabled: false }, connectNulls: true, yAxis: 0 },
+        { type: 'line', name: 'Max Pain', data: maxPainData, color: '#f59e0b', lineWidth: 1.5, step: 'left', dashStyle: 'ShortDot', marker: { enabled: false }, connectNulls: true, yAxis: 1 },
+        { type: 'line', name: 'Spot', data: spotData, color: INK, lineWidth: 1, marker: { enabled: false }, connectNulls: true, yAxis: 1 },
       ],
     }
   }, [points, mode, INK, INK3, BORDER, CYAN])
 
   return (
     <Box sx={{ ...CARD, p: 2 }}>
-      <SectionHead title="PCR & Max Pain Trend" accent="#f59e0b" meta={points.length ? `${points.length} snapshots today` : ''} />
+      <SectionHead
+        title={`PCR & Max Pain Trend — 9:15 to ${marketOpen ? 'live' : '3:30'}`}
+        accent="#f59e0b"
+        meta={points.length ? `${points.length} snapshots today` : ''}
+      />
       {!points.length ? (
         <Typography sx={{ ...SANS, fontSize: '0.7rem', color: INK3, py: 3, textAlign: 'center' }}>
-          No snapshots yet today — this builds up as the option chain refreshes (new ingestion or live update).
+          {marketOpen
+            ? 'No snapshots yet today — this builds up as the option chain refreshes (new ingestion or live update).'
+            : 'No snapshots recorded today.'}
         </Typography>
       ) : (
         <HighchartsReact highcharts={Highcharts} options={options} />
