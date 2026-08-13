@@ -213,7 +213,7 @@ function SmaTrendChart({ title, field, points, color }: {
       legend: { enabled: false },
       xAxis: {
         categories: cats,
-        labels: { style: { color: INK3, fontSize: '0.56rem' } },
+        labels: { style: { color: INK3, fontSize: '0.56rem' }, step: Math.ceil(cats.length / 8) },
         lineColor: BORDER, tickColor: BORDER,
       },
       yAxis: {
@@ -227,14 +227,14 @@ function SmaTrendChart({ title, field, points, color }: {
       },
       series: [{
         type: 'area', name: title, data: points.map(p => p[field]), color, lineWidth: 1.5, fillOpacity: 0.12,
-        marker: { enabled: true, radius: 2 },
+        marker: { enabled: false },
       }],
     }
   }, [points, field, color, title, mode, INK, INK3, BORDER])
 
   return (
     <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 1, p: 1 }}>
-      <Typography sx={{ ...SANS, fontSize: '0.66rem', fontWeight: 700, color: INK, mb: 0.5 }}>{title} — 1 week to live</Typography>
+      <Typography sx={{ ...SANS, fontSize: '0.66rem', fontWeight: 700, color: INK, mb: 0.5 }}>{title} — 6 months to live</Typography>
       {!points.length ? (
         <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, textAlign: 'center', py: 4 }}>No history yet.</Typography>
       ) : (

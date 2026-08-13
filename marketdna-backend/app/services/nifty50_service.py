@@ -259,14 +259,14 @@ def _sma_breadth_from_series(sym_series: dict[str, list[tuple[str, float]]]) -> 
     }
 
 
-_SMA_TREND_DAYS = 7
+_SMA_TREND_DAYS = 126  # ~6 months of trading days (21/month * 6)
 
 
 def _sma_breadth_history_from_series(sym_series: dict[str, list[tuple[str, float]]]) -> list[dict]:
     """Daily % above SMA20/50/200 for the last _SMA_TREND_DAYS trading days,
     same 'closes as of that day' math as _sma_breadth_from_series but repeated
     at each historical index instead of just the latest one. Powers the Market
-    Breadth 'lookback 1 week to live' SMA trend charts -- the live/today point
+    Breadth 'lookback 6 months to live' SMA trend charts -- the live/today point
     is appended separately in get_breadth() since it needs tick prices, not
     another EOD close."""
     ref_dates: list[str] = []
@@ -332,7 +332,7 @@ def _compute_movers_history() -> dict:
         SELECT symbol, STRFTIME('%Y-%m-%d', CAST(date AS DATE)), close
         FROM equities_prices
         WHERE symbol IN ({symbols_sql})
-          AND CAST(date AS DATE) >= CURRENT_DATE - INTERVAL 400 DAY
+          AND CAST(date AS DATE) >= CURRENT_DATE - INTERVAL 550 DAY
         ORDER BY symbol, date
     """).fetchall()
 
