@@ -14,9 +14,12 @@
 #      container env vars entirely).
 #   2. Restart the backend container so its @lru_cache'd Kite client re-reads the file.
 #   3. Run the 4 ingestion scripts as one-shot containers (continue past per-step failures).
-#   4. Invalidate backend caches + snapshot portfolio NAV (inside the backend container — it
+#   4. Feature engine incremental update — rebuilds returns_features and the other 12
+#      feature parquets (DataViz, Stock DNA, Market DNA, etc. all read from these; without
+#      this step they silently drift stale since nothing else rewrites them).
+#   5. Invalidate backend caches + snapshot portfolio NAV (inside the backend container — it
 #      has no host-exposed port).
-#   5. Edge Observatory + IV history jobs.
+#   6. Edge Observatory + IV history jobs.
 #
 # Errors in any one step are logged but do not abort the rest, matching the PS scripts'
 # $ErrorActionPreference = "Continue" behavior.
@@ -41,27 +44,31 @@ LOG_FILE="logs/post-market_$(date +%F).log"
     echo "========================================"
 
     echo ""
-    echo "[1/5] Writing fresh KITE_ACCESS_TOKEN into marketdna-data/.env ..."
+    echo "[1/6] Writing fresh KITE_ACCESS_TOKEN into marketdna-data/.env ..."
     sed -i "s|^KITE_ACCESS_TOKEN=.*|KITE_ACCESS_TOKEN=${TOKEN}|" marketdna-data/.env
     echo "      Done."
 
     echo ""
-    echo "[2/5] Restarting backend (re-reads the token; kite_client.py is @lru_cache'd) ..."
+    echo "[2/6] Restarting backend (re-reads the token; kite_client.py is @lru_cache'd) ..."
     docker compose restart backend
 
     echo ""
-    echo "[3/5] Ingestion ..."
+    echo "[3/6] Ingestion ..."
     docker compose run --rm ingestion python -m ingestion.download_nse500     || echo "      download_nse500 FAILED"
     docker compose run --rm ingestion python -m ingestion.ingest_delivery     || echo "      ingest_delivery FAILED"
     docker compose run --rm ingestion python -m ingestion.ingest_option_chain || echo "      ingest_option_chain FAILED"
     docker compose run --rm ingestion python -m ingestion.ingest_futures      || echo "      ingest_futures FAILED"
 
     echo ""
-    echo "[4/5] Cache invalidation + NAV snapshot ..."
+    echo "[4/6] Feature engine incremental update ..."
+    docker compose run --rm ingestion python -m feature_engine.compute_all --incremental || echo "      feature_engine.compute_all FAILED"
+
+    echo ""
+    echo "[5/6] Cache invalidation + NAV snapshot ..."
     docker compose exec -T backend python ops/invalidate_caches.py || echo "      invalidate_caches.py FAILED"
 
     echo ""
-    echo "[5/5] Edge Observatory + IV history ..."
+    echo "[6/6] Edge Observatory + IV history ..."
     docker compose exec -T backend python -m jobs.extract_iv                    || echo "      extract_iv FAILED"
     docker compose exec -T backend python -m jobs.measure_edges --if-new-month  || echo "      measure_edges FAILED"
 
