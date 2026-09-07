@@ -256,6 +256,11 @@ def run_pass(
 def build_token_map(nse500_symbols: set[str]) -> tuple[dict[str, int], list[str]]:
     """Fetch Kite instruments and map NSE 500 symbols to instrument tokens.
 
+    A symbol placed under surveillance (e.g. post-demerger, or excluded from F&O)
+    can move to a "-BE" (trade-to-trade) tradingsymbol on Kite — fall back to that
+    before giving up, so the canonical symbol keeps writing into its existing
+    parquet partition instead of silently dropping out of ingestion.
+
     Returns (symbol→token dict, list of unmatched symbols).
     """
     log.info("Fetching NSE instruments from Kite…")
@@ -267,16 +272,22 @@ def build_token_map(nse500_symbols: set[str]) -> tuple[dict[str, int], list[str]
         & (pl.col("instrument_type") == "EQ")
     )
 
-    kite_symbols = set(equities["tradingsymbol"].to_list())
-    matched = nse500_symbols & kite_symbols
-    unmatched = sorted(nse500_symbols - kite_symbols)
+    token_by_tradingsymbol = dict(
+        zip(equities["tradingsymbol"].to_list(), equities["instrument_token"].to_list())
+    )
+
+    token_map: dict[str, int] = {}
+    unmatched: list[str] = []
+    for symbol in nse500_symbols:
+        token = token_by_tradingsymbol.get(symbol, token_by_tradingsymbol.get(f"{symbol}-BE"))
+        if token is not None:
+            token_map[symbol] = int(token)
+        else:
+            unmatched.append(symbol)
+    unmatched.sort()
 
     if unmatched:
         log.warning(f"Symbols not found in Kite instruments ({len(unmatched)}): {unmatched}")
-
-    token_map: dict[str, int] = {}
-    for row in equities.filter(pl.col("tradingsymbol").is_in(matched)).to_dicts():
-        token_map[row["tradingsymbol"]] = int(row["instrument_token"])
 
     log.info(f"Matched {len(token_map)}/{len(nse500_symbols)} symbols")
     return token_map, unmatched
