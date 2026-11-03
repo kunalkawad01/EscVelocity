@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50, charts
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
@@ -31,6 +31,7 @@ from app.services import live_trading_service
 from app.services import options_service
 from app.services import portfolios_service
 from app.services import drivers_service
+from app.services import fno_charts_service
 
 app = FastAPI(
     title="MarketDNA API",
@@ -78,6 +79,8 @@ app.include_router(live_agent.router)
 app.include_router(stock_eda.router)
 app.include_router(nifty50.router)
 app.include_router(nifty50.ws_router)
+app.include_router(charts.router)
+app.include_router(charts.ws_router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -98,6 +101,7 @@ def _background_prewarm() -> None:
     import time
     for name, fn in [
         ("kite ticker",      live_trading_service.start_ticker),   # WebSocket OI accumulator
+        ("fno charts ticker", fno_charts_service.start_ticker),    # WebSocket for /charts page
         ("cointegration",    start_preload),              # ~3s, user-visible page
         ("portfolios",       portfolios_service.start_prewarm),   # ~17s, user-visible; before slow tasks
         ("screener prewarm", start_screener_prewarm),    # ~3min, all 9 pattern tabs
@@ -148,6 +152,7 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     live_trading_service.stop_ticker()
+    fno_charts_service.stop_ticker()
 
 
 @app.get("/health")

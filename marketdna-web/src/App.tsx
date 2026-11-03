@@ -29,6 +29,8 @@ import CompanyIntelligencePage from './pages/CompanyIntelligencePage'
 import FnoTacticalPage from './pages/FnoTacticalPage'
 import FnoMomentumPage from './pages/FnoMomentumPage'
 import Nifty50LivePage from './pages/Nifty50LivePage'
+import ChartsPage from './pages/ChartsPage'
+import ChartCartPage from './pages/ChartCartPage'
 import PortfoliosPage from './pages/PortfoliosPage'
 import PortfolioDetailPage from './pages/PortfolioDetailPage'
 import PortfolioBuilderPage from './pages/PortfolioBuilderPage'
@@ -74,6 +76,8 @@ export default function App() {
           <Route path="/fno-tactical"                   element={<FnoTacticalPage />} />
           <Route path="/fno-momentum"                   element={<FnoMomentumPage />} />
           <Route path="/nifty50-live"                   element={<Nifty50LivePage />} />
+          <Route path="/charts"                         element={<ChartsPage />} />
+          <Route path="/chart-cart"                     element={<ChartCartPage />} />
           <Route path="/portfolios"                     element={<PortfoliosPage />} />
           <Route path="/portfolios/new"                 element={<PortfolioBuilderPage />} />
           <Route path="/portfolios/edit/:key"           element={<PortfolioBuilderPage />} />

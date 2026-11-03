@@ -41,6 +41,13 @@ marketdna.yourdomain.com {
     handle /openapi.json {
         reverse_proxy backend:8000
     }
+    # Websocket endpoints (/ws/nifty50, /ws/charts, ...) live outside /api/* --
+    # without this they fall through to the SPA handle below, which tries to serve
+    # them as static files and 404s into index.html instead of upgrading the
+    # connection. reverse_proxy handles the Connection:Upgrade handshake transparently.
+    handle /ws/* {
+        reverse_proxy backend:8000
+    }
 
     # SPA fallback — frontend uses react-router-dom's BrowserRouter, so deep-link refreshes
     # (e.g. a hard-refresh on /fno-momentum) need to resolve to index.html, not a Caddy 404.

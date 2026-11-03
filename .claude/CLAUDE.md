@@ -403,7 +403,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `quant_strategies.py` | `/api/quant` | `/scan` (slow 20–40s, should be nightly), POST `/invalidate` |
 | `dataviz.py` + `dataviz_analytics.py` + `dataviz_breadth_extra.py` | `/api/dataviz` | NSE 500 universe. Key: `/returns/snapshot?horizon=ret_1d`, `/returns/history/{symbol}`, `/scatter?horizon=1m`, `/breadth/above200-weekly`. Horizons: `ret_1d` → `cagr_5y` (11 total). |
 | `stock_health.py` | `/api/stock-health` | GET `/scan` (instant — parquet-backed), GET `/{symbol}` (on-demand, ~1-2s), POST `/scan/invalidate` (forces recompute + parquet refresh), POST `/{symbol}/invalidate`. Scan parquet at `data_lake/derived/stock_health/scan.parquet`. |
-| `edges.py` | `/api/edges` | Edge Decay Observatory (read-only over Postgres `edge_measurements`). `/observatory` (all edges: vitals + status + decay series), `/{edge_key}/history`, POST `/invalidate`. Rows written by the standalone `jobs/measure_edges.py` (see Step 4) — never by the server. |
+| `edges.py` | `/api/edges` | Edge Decay Observatory (read-only over Postgres `edge_measurements`). `/observatory` (all edges: vitals + status + decay series), `/{edge_key}/history`, POST `/invalidate`. Rows written by the standalone `jobs/measure_edges.py` (see Step 5) — never by the server. |
 | `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
 | `fno_momentum.py` | `/api/fno-momentum` | F&O Momentum Radar. `/scan` — OI Gainers (futures OI up) + Short Covering (price↑ OI↓) buckets, each row must pass ≥1 momentum qualifier (±5% last session · best sector today · ±2% gap at 9:15), sorted by day change %. POST `/invalidate` (delegates to fno tactical caches). Zero extra Kite calls — piggybacks `fno_tactical_service._get_scan()`. |
 
@@ -586,7 +586,20 @@ Run this every day after NSE market close (~15:35 IST). Order matters.
 Options and futures can run in parallel (separate terminals) while OHLCV is running.
 Each script automatically refreshes its DuckDB view on completion.
 
-## Step 2 — Invalidate backend caches (backend must be running on port 8000)
+## Step 2 — Feature engine incremental update (from `marketdna-data/` with venv active)
+
+Rebuilds `returns_features`, `std_deviation_features`, and the other 11 feature parquets
+(DataViz, Stock DNA, Market DNA, breadth, markov regimes, etc. all read from these). Without
+this step the feature layer silently drifts stale — nothing else rewrites it, and pages like
+DataViz have no invalidate endpoint to mask the gap since their caches are date-keyed and
+self-expire regardless of whether the underlying parquet is current. Run AFTER Step 1
+so today's bar is in `equities_prices` first.
+
+```powershell
+.\.venv\Scripts\python.exe -m feature_engine.compute_all --incremental
+```
+
+## Step 3 — Invalidate backend caches (backend must be running on port 8000)
 
 The backend pre-warms all service caches at startup. After ingestion adds new data,
 the in-process Python caches are stale and must be flushed so pages pick up today's prices.
@@ -621,11 +634,11 @@ foreach ($url in $endpoints) {
 After invalidation each page re-queries DuckDB (which reads directly from the fresh parquet
 files) on its next request — no backend restart needed.
 
-## Step 3 — Snapshot portfolio NAV curves (backend running on port 8000)
+## Step 4 — Snapshot portfolio NAV curves (backend running on port 8000)
 
 `/api/portfolios/track/snapshot` is **not** a cache flush — it persists one EOD NAV point per
 portfolio × universe to the `portfolio_nav` Postgres table (upserted, keyed by trading date). Run it AFTER
-Step 1 (so today's bar is in `equities_prices`) and AFTER the Step 2 `/api/portfolios/invalidate`
+Step 1 (so today's bar is in `equities_prices`) and AFTER the Step 3 `/api/portfolios/invalidate`
 (so it snapshots off fresh data). It is keyed by trading date — idempotent, safe to re-run.
 
 ```powershell
@@ -637,7 +650,7 @@ try {
 }
 ```
 
-## Step 4 — Edge Observatory + IV history (from `marketdna-backend/`)
+## Step 5 — Edge Observatory + IV history (from `marketdna-backend/`)
 
 Both safe to run daily. Never run these inside the backend process — standalone batch
 jobs by design.
@@ -743,6 +756,21 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - **Fully static showcase** — 4 agent cards (Market Regime, Stock DNA, Pattern Edge, Options Flow). No API calls.
 - Pulsing "Active" dot is cosmetic only. Agents are not functional until Phase 4 MCP ships.
 - No business logic. Business logic note: agent routing + MCP tool selection lives in `mcp_server/`.
+
+### `/charts` — ChartsPage
+- **3-column grid of square candlestick tiles** across the full F&O underlying universe (~209 symbols from `marketdna-data/FO.csv`, same source as `/fno-tactical`). 8 timeframes per tile: 1D/2D/5D/1M/3M/YTD/1Y/5Y.
+- **One shared websocket** (`/ws/charts`) — single combined tick message/sec from a dedicated `KiteTicker` (`fno_charts_service.py`), mirroring `/ws/nifty50`'s pattern but on its own socket connection. Only the 1D tile's last candle tracks live ticks; other timeframes are static EOD daily history.
+- **Lazy-mounted tiles**: each card defers its history fetch + Highcharts mount until scrolled near the viewport (`IntersectionObserver`), then stays mounted — the cost-control equivalent of table virtualization for a chart grid.
+- Client-side symbol search/filter, no backend search endpoint. Candlestick/line toggle and a dotted prev-close reference line per tile.
+- **Chart cart**: ▲/▼ bullish/bearish add-to-cart buttons per tile, `localStorage`-backed (`useChartsCart`), grouped into sections like "1D Bullish". Floating cart button + drawer preview; full filterable view at `/chart-cart`.
+- Tile itself (`ChartTile`), the ticker hook (`useFoTicker`), lazy-mount hook (`useInView`), and shared constants live in `src/components/charts/` + `src/hooks/` — reused by `/chart-cart`, not page-local.
+- API: `chartsApi.getSymbols()`, `.getHistory(symbol, tf)`, `.wsUrl()` → `/api/charts/symbols`, `/api/charts/history`, `/ws/charts`.
+
+### `/chart-cart` — ChartCartPage
+- **Full-page view of the Charts page's persistent cart** — every bookmarked (symbol, timeframe, direction) setup rendered as a real `ChartTile` (same component as `/charts`), not a text list.
+- Filters: search, Direction (All/Bullish/Bearish), Timeframe (All + 8 tfs), Sort (Newest/Oldest/A–Z/Change %), View (By Section grouped like the cart drawer, or Flat Grid).
+- Reads/writes the same `localStorage` cart as `/charts` (`useChartsCart`, key `charts_cart_v1`) — no separate backend, no Postgres table.
+- API: none of its own — reuses `chartsApi.getHistory`/`wsUrl` per visible tile, exactly as `/charts` does.
 
 ### `/cointegration` — CointegrationPage
 - **Loads on mount**, single `cointegrationApi.getScan()` call. First load 3–5s (scan), subsequent <100ms (cached).
@@ -852,6 +880,8 @@ Compact facts per page — enough to work on any page without reading source. Fu
 |-------|---------|
 | `/` | `page_docu/landing_page.md` |
 | `/agents` | `page_docu/agents_page.md` |
+| `/charts` | `page_docu/charts_page.md` |
+| `/chart-cart` | `page_docu/chart_cart_page.md` |
 | `/cointegration` | `page_docu/cointegration_page.md` |
 | `/dataviz` | `page_docu/dataviz_page.md` |
 | `/delivery` | `page_docu/delivery_page.md` |
