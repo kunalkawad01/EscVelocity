@@ -37,6 +37,7 @@ import PortfolioBuilderPage from './pages/PortfolioBuilderPage'
 import EdgeObservatoryPage from './pages/EdgeObservatoryPage'
 import ResearchCopilotPage from './pages/ResearchCopilotPage'
 import LiveAgentPage from './pages/LiveAgentPage'
+import TradingRulesPage from './pages/TradingRulesPage'
 
 export default function App() {
   return (
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/edge-observatory"               element={<EdgeObservatoryPage />} />
           <Route path="/research-copilot"               element={<ResearchCopilotPage />} />
           <Route path="/live-agent"                     element={<LiveAgentPage />} />
+          <Route path="/trading-rules"                  element={<TradingRulesPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

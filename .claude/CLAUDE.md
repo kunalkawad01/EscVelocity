@@ -866,6 +866,13 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - Same sticky 2-row nav + `Section` wrapper pattern as StockPage. No global lookback control yet (each endpoint has a sensible default) — noted as a fast-follow in the doc.
 - API: `stockApi` (symbols, summary, ohlcv, returns, drawdown) + `stockEdaApi` (volatility-series, drawdown-history, seasonality, gaps, volume-profile, autocorrelation, extreme-days, benchmark-comparison).
 
+### `/trading-rules` — TradingRulesPage
+- **Editable personal rulebook, not analytics** — static, no API calls. Seeded from the trader's own journal (discipline, risk, planning, options/delta mechanics, scaling system, macro notes, mindset) into 9 color-accented sections.
+- **Click-to-edit inline**: click any rule's text to edit, `Enter`/blur saves, `Escape` cancels. Add rules per-section, add/delete whole sections, "Reset to defaults" restores the original seed (two-click inline confirm, no native dialogs).
+- **localStorage only** (`trading_rules_v1`) — same single-user-scratchpad rationale as `useChartsCart`; no backend, no cross-device sync.
+- Caret-on-focus fix: clicking mid-text to edit needs `onFocus` → `setSelectionRange(len, len)` or the caret resets to position 0 (MUI `TextField` `autoFocus` doesn't preserve the originating click position when swapping in from static `Typography`).
+- API: none.
+
 ### `/stock/:symbol` — StockPage (~461 lines shell + sub-components)
 - **URL param** `:symbol` — pages are linkable to specific stocks.
 - **19+ sections**, sticky 2-row nav (Row 1: symbol/price/regime/selector; Row 2: jump strip with CYAN active underline).
@@ -897,6 +904,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/stock` | `page_docu/stock_page.md` |
 | `/stock-eda` | `page_docu/stock_eda_page.md` |
 | `/stock-health` | `page_docu/stock_health_page.md` |
+| `/trading-rules` | `page_docu/trading_rules_page.md` |
 
 ---
 

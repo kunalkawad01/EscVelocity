@@ -23,6 +23,7 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [stock_eda_page.md](stock_eda_page.md) | `/stock-eda` | Chart-first EDA — distributions, seasonality, vol clustering, gaps, benchmark comparison |
 | [stock_health_page.md](stock_health_page.md) | `/stock-health` | 20-metric behavioural profile + 7-archetype scanner for NSE 500 |
 | [stock_page.md](stock_page.md) | `/stock` | Comprehensive per-stock research profile (19 sections) |
+| [trading_rules_page.md](trading_rules_page.md) | `/trading-rules` | Editable personal trading discipline & risk rulebook (localStorage) |
 
 ---
 
