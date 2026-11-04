@@ -5,12 +5,14 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import SearchBox from '../components/shared/SearchBox'
 import { ChartTile } from '../components/charts/ChartTile'
+import { IndicatorFilterBar } from '../components/charts/IndicatorFilterBar'
 import { MONO, SANS, GREEN, RED, TF_LABELS, pct, CART_SECTIONS } from '../components/charts/chartsCommon'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import { useFoTicker } from '../hooks/useFoTicker'
 import { useChartsCart } from '../hooks/useChartsCart'
 import type { CartItem, CartDirection } from '../hooks/useChartsCart'
+import { useIndicatorFilters } from '../hooks/useIndicatorFilters'
 import { CHARTS_TFS } from '../types/charts'
 import type { ChartsTf } from '../types/charts'
 
@@ -103,15 +105,17 @@ export default function ChartCartPage() {
   const [tfFilter, setTfFilter] = useState<TfFilter>('all')
   const [sortBy, setSortBy] = useState<SortBy>('newest')
   const [viewMode, setViewMode] = useState<ViewMode>('sections')
+  const indicatorFilters = useIndicatorFilters()
 
   const filtered = useMemo(() => {
     const q = search.trim().toUpperCase()
     return cart.items.filter(i =>
       (!q || i.symbol.includes(q)) &&
       (dirFilter === 'all' || i.direction === dirFilter) &&
-      (tfFilter === 'all' || i.tf === tfFilter),
+      (tfFilter === 'all' || i.tf === tfFilter) &&
+      (!indicatorFilters.active || indicatorFilters.passes(i.symbol)),
     )
-  }, [cart.items, search, dirFilter, tfFilter])
+  }, [cart.items, search, dirFilter, tfFilter, indicatorFilters])
 
   const sorted = useMemo(() => {
     const arr = [...filtered]
@@ -185,7 +189,7 @@ export default function ChartCartPage() {
               { value: 'all', label: 'All' }, { value: 'bullish', label: 'Bullish' }, { value: 'bearish', label: 'Bearish' },
             ]} />
           </Box>
-          <PillRow label="Timeframe" value={tfFilter} onChange={setTfFilter} options={[
+          <PillRow label="Cart Section TF" value={tfFilter} onChange={setTfFilter} options={[
             { value: 'all', label: 'All' },
             ...CHARTS_TFS.map(t => ({ value: t, label: TF_LABELS[t] })),
           ]} />
@@ -197,6 +201,9 @@ export default function ChartCartPage() {
             <PillRow label="View" value={viewMode} onChange={setViewMode} options={[
               { value: 'sections', label: 'By Section' }, { value: 'grid', label: 'Flat Grid' },
             ]} />
+          </Box>
+          <Box sx={{ ...CARD, p: 1.5 }}>
+            <IndicatorFilterBar f={indicatorFilters} />
           </Box>
           <Typography sx={{ ...MONO, fontSize: '0.62rem', color: INK3 }}>
             {sorted.length} / {cart.items.length} shown

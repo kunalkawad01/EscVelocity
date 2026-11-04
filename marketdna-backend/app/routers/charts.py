@@ -26,6 +26,16 @@ def get_history(symbol: str, tf: str = "1d"):
     return fno_charts_service.get_history(symbol, tf)
 
 
+@router.get("/indicators")
+def get_indicators(tf: str = "1d"):
+    """RSI(14) / ATR%(14) / period return% for every F&O symbol at one timeframe --
+    powers the Charts/Chart Cart filter bar. Slow (~70s) on the first request for a
+    given tf (209 Kite historical_data calls, rate-limited to 3 concurrent); fast on
+    repeat requests within the cache TTL.
+    """
+    return fno_charts_service.get_indicators_snapshot(tf)
+
+
 # Mounted without the /api prefix -- kept as its own router so the path is a
 # clean /ws/charts rather than /api/charts/ws (websockets aren't REST resources).
 ws_router = APIRouter()

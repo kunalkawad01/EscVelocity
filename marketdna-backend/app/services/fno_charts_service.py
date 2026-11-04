@@ -16,10 +16,14 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
 
+import numpy as np
+
 from app.services.fno_tactical_service import _FO_SYMBOLS
+from app.services.indicators_service import _rsi, _atr
 from app.services.kite_client import get_kite
 
 log = logging.getLogger(__name__)
@@ -129,6 +133,90 @@ def get_history(symbol: str, tf: str) -> dict:
     except Exception as exc:
         log.warning("get_history(%s, %s) failed: %s", symbol, tf, exc)
         return {"tf": tf, "symbol": symbol, "candles": [], "error": str(exc)}
+
+
+# ── Indicator snapshot (RSI / ATR% / Returns%) for the filter bar ─────────────
+# Reuses indicators_service's existing RSI/ATR formulas (same ones /indicators uses)
+# rather than re-deriving them. Computed per-timeframe, over the exact same candle
+# series get_history() already caches, so a snapshot is only a full Kite scan on the
+# first cold request for a given tf -- every (symbol, tf) history fetch underneath it
+# hits _history_cache on repeat calls, same TTLs as the Charts page tiles themselves.
+_indicators_cache: dict[str, tuple[float, dict]] = {}  # tf -> (fetched_at, response)
+_INDICATORS_MAX_WORKERS = 3  # Kite's historical_data endpoint is rate-limited ~3 req/s
+
+
+def _compute_indicators_one(symbol: str, tf: str, tick: Optional[dict]) -> tuple[str, Optional[dict]]:
+    hist = get_history(symbol, tf)
+    candles = hist.get("candles") or []
+    if len(candles) < 15:
+        return symbol, None
+
+    closes = np.array([c["close"] for c in candles], dtype=float)
+    highs = np.array([c["high"] for c in candles], dtype=float)
+    lows = np.array([c["low"] for c in candles], dtype=float)
+
+    rsi_val = float(_rsi(closes)[-1])
+    atr_val = float(_atr(highs, lows, closes)[-1])
+    last_close = closes[-1]
+
+    atr_pct = round(atr_val / last_close * 100, 2) if last_close and not np.isnan(atr_val) else None
+
+    # Returns: for 1D, "prev close -> last price" (the conventional, gap-inclusive day
+    # change% -- same number the tile header and live tick show), not "today's candle
+    # open -> last price". A stock that gapped up overnight on news and then traded flat
+    # intraday has a near-zero open-to-close move despite a large day change% -- using
+    # the candle-open baseline here silently excluded exactly those gap-driven movers
+    # from a "Returns > X" filter. For every other timeframe there's no single "previous
+    # close" baseline that means anything (what's "previous close" for a 1Y window?), so
+    # the period's own first candle open remains the right baseline there.
+    if tf == "1d" and tick and tick.get("prev_close"):
+        base = tick["prev_close"]
+        last = tick.get("ltp") or last_close
+    else:
+        base = candles[0]["open"]
+        last = last_close
+    return_pct = round((last - base) / base * 100, 2) if base else None
+
+    return symbol, {
+        "rsi": None if np.isnan(rsi_val) else round(rsi_val, 2),
+        "atr_pct": atr_pct,
+        "return_pct": return_pct,
+    }
+
+
+def get_indicators_snapshot(tf: str) -> dict:
+    """RSI(14) / ATR(14)-as-%-of-price / period return% for every F&O symbol at one
+    timeframe, in one bulk response -- powers the Charts/Chart Cart filter bar without
+    209 individual client-side history fetches just to filter the grid."""
+    if tf not in ALL_TFS:
+        return {"tf": tf, "indicators": {}, "error": f"unknown timeframe '{tf}'"}
+
+    cached = _indicators_cache.get(tf)
+    ttl = _HISTORY_TTL.get(tf, _DEFAULT_TTL)
+    if cached and (time.time() - cached[0]) < ttl:
+        return cached[1]
+
+    symbols = sorted(_FO_SYMBOLS)
+    ticks = get_ticks()
+    indicators: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=_INDICATORS_MAX_WORKERS) as ex:
+        futures = [ex.submit(_compute_indicators_one, s, tf, ticks.get(s)) for s in symbols]
+        for fut in futures:
+            try:
+                sym, val = fut.result()
+            except Exception as exc:
+                log.warning("get_indicators_snapshot(%s): a symbol failed -- %s", tf, exc)
+                continue
+            if val is not None:
+                indicators[sym] = val
+
+    result = {
+        "tf": tf,
+        "indicators": indicators,
+        "computed_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    _indicators_cache[tf] = (time.time(), result)
+    return result
 
 
 # ── Kite WebSocket ticker — all ~209 F&O underlyings ──────────────────────────

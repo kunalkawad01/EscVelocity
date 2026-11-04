@@ -8,31 +8,40 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import SearchBox from '../components/shared/SearchBox'
 import { ChartTile } from '../components/charts/ChartTile'
+import { IndicatorFilterBar } from '../components/charts/IndicatorFilterBar'
 import { MONO, SANS, GREEN, RED, TF_LABELS, pct, CART_SECTIONS } from '../components/charts/chartsCommon'
-import { usePalette } from '../hooks/usePalette'
+import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import { useFoTicker } from '../hooks/useFoTicker'
 import { chartsApi } from '../api/chartsApi'
 import { useChartsCart } from '../hooks/useChartsCart'
+import { useIndicatorFilters } from '../hooks/useIndicatorFilters'
 
 export default function ChartsPage() {
   const { INK, INK2, INK3, CYAN, BG, BORDER, PAPER, PAPER2 } = usePalette()
+  const { CARD } = useTokens()
   const { mode } = useThemeMode()
   const { ticks, wsConnected } = useFoTicker()
   const [symbols, setSymbols] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const cart = useChartsCart()
   const [cartOpen, setCartOpen] = useState(false)
+  const indicatorFilters = useIndicatorFilters()
 
   useEffect(() => {
     chartsApi.getSymbols().then(r => setSymbols(r.symbols)).catch(() => {})
   }, [])
 
-  const filtered = useMemo(() => {
+  const searched = useMemo(() => {
     const q = search.trim().toUpperCase()
     if (!q) return symbols
     return symbols.filter(s => s.includes(q))
   }, [symbols, search])
+
+  const filtered = useMemo(
+    () => (indicatorFilters.active ? searched.filter(s => indicatorFilters.passes(s)) : searched),
+    [searched, indicatorFilters],
+  )
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: BG }}>
@@ -75,6 +84,13 @@ export default function ChartsPage() {
         </Typography>
       </Box>
 
+      {/* RSI / ATR% / Returns% filter bar */}
+      <Box sx={{ px: { xs: 2, md: 4 }, py: 2, borderBottom: `1px solid ${BORDER}` }}>
+        <Box sx={{ ...CARD, p: 1.5 }}>
+          <IndicatorFilterBar f={indicatorFilters} />
+        </Box>
+      </Box>
+
       <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
         {!symbols.length ? (
           <Typography sx={{ ...SANS, fontSize: '0.8rem', color: INK3, textAlign: 'center', py: 6 }}>
@@ -82,7 +98,7 @@ export default function ChartsPage() {
           </Typography>
         ) : !filtered.length ? (
           <Typography sx={{ ...SANS, fontSize: '0.8rem', color: INK3, textAlign: 'center', py: 6 }}>
-            No symbols match "{search}".
+            {search ? `No symbols match "${search}".` : 'No symbols match the current indicator filters.'}
           </Typography>
         ) : (
           <Grid container spacing={2}>

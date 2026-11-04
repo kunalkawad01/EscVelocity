@@ -38,3 +38,21 @@ export interface ChartsTick {
 export interface ChartsWsMessage {
   ticks: Record<string, ChartsTick>
 }
+
+// One symbol's RSI(14) / ATR(14-as-%-of-price) / period-return%, computed over the
+// candle series for one timeframe -- see ChartsIndicatorsResponse.
+export interface ChartsIndicatorEntry {
+  rsi: number | null
+  atr_pct: number | null
+  return_pct: number | null
+}
+
+// GET /api/charts/indicators?tf=... -- every F&O symbol's indicators at one timeframe
+// in one bulk response, keyed by symbol. Powers the filter bar on /charts and
+// /chart-cart without fetching full history client-side just to filter the grid.
+export interface ChartsIndicatorsResponse {
+  tf: ChartsTf
+  indicators: Record<string, ChartsIndicatorEntry>
+  computed_at?: string
+  error?: string
+}

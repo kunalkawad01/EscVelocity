@@ -1,4 +1,4 @@
-import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsTf } from '../types/charts'
+import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsIndicatorsResponse, ChartsTf } from '../types/charts'
 
 // Relative path so requests go through Vite's dev proxy (→ 127.0.0.1:8000) like every
 // other API. Avoids the hardcoded `localhost:8000`, which browsers may resolve to IPv6
@@ -16,6 +16,11 @@ export const chartsApi = {
 
   getHistory: (symbol: string, tf: ChartsTf): Promise<ChartsHistoryResponse> =>
     fetch(`${BASE}/history?symbol=${encodeURIComponent(symbol)}&tf=${tf}`).then(json<ChartsHistoryResponse>),
+
+  // Slow (~70s) on the first request per tf -- see ChartsIndicatorsResponse. Callers
+  // should gate this behind an explicit action, not fire it on every keystroke.
+  getIndicators: (tf: ChartsTf): Promise<ChartsIndicatorsResponse> =>
+    fetch(`${BASE}/indicators?tf=${tf}`).then(json<ChartsIndicatorsResponse>),
 
   // ws:// URL for the live-tick stream. Uses the current page's host so it rides
   // through Vite's dev proxy (see vite.config.ts `/ws` entry) exactly like fetch
