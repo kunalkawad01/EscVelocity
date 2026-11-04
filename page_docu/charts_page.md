@@ -2,8 +2,8 @@
 
 A 3-column grid of square candlestick tiles covering the full F&O underlying universe
 (~209 symbols), each switchable across 8 timeframes (1D–5Y), with a searchable symbol
-filter, a single shared live WebSocket feed, and a persistent "chart cart" for bookmarking
-bullish/bearish setups by timeframe.
+filter, an RSI/ATR%/Returns% indicator filter bar, a single shared live WebSocket feed,
+and a persistent "chart cart" for bookmarking bullish/bearish setups by timeframe.
 
 ## What It Does
 
@@ -42,6 +42,18 @@ bullish/bearish setups by timeframe.
   per-item remove, per-section "clear", a "CLEAR ALL", and an "OPEN FULL CART PAGE →"
   link to `/chart-cart` (see `page_docu/chart_cart_page.md`) for filtering/sorting/a
   flat-grid view across the whole cart.
+- **Indicator filter bar (RSI / ATR% / Returns%).** A card below the hero with its own
+  "Indicator TF" timeframe picker (independent of each tile's own tf tab) and three
+  fields — RSI, ATR %, Returns % — each with a `<`/`>` operator toggle and a number box
+  (e.g. "RSI > 70"). Any subset can be filled in; a blank field doesn't filter on that
+  indicator. Clicking **Apply** (or **Re-scan** once a snapshot exists) fetches a bulk
+  indicator snapshot for every F&O symbol at the chosen timeframe and narrows the grid
+  to symbols passing all filled-in conditions — the `{filtered}/{total} symbols` counter
+  updates accordingly, combined with the search box (both narrow the same list).
+  Changing an operator or threshold after a snapshot exists re-filters instantly
+  client-side, with no new network call — only a timeframe change or **Re-scan**
+  re-fetches. A status line shows "Scanning…" while loading, then the snapshot
+  timestamp once done.
 
 ## Optimization
 
@@ -69,6 +81,18 @@ bullish/bearish setups by timeframe.
   (`_token_cache`) so repeat lookups are free.
 - **Cart has zero backend cost.** It's pure client-side `localStorage` state — no API call,
   no DuckDB/Postgres read, no extra load on the server per add/remove/toggle.
+- **Indicator snapshot is one bulk scan, cached per timeframe, not 209 client-side fetches.**
+  `GET /api/charts/indicators?tf=` computes RSI/ATR%/Returns% for the whole F&O universe
+  in one response and caches it (same TTL table as `get_history` — 15–60s for intraday
+  tf, 300s for daily tf). A cold scan is slow (~30s observed for 209 symbols at 1D, since
+  each symbol still needs its own `kite.historical_data()` call under the hood) — fetched
+  with a `ThreadPoolExecutor(max_workers=3)` to parallelize those calls without exceeding
+  Kite's ~3 req/s historical-data rate limit. Every (symbol, tf) history fetch inside the
+  scan still hits the same `_history_cache` the chart tiles themselves populate, so a
+  scan for a timeframe the user has already been browsing can be much faster than cold.
+  This is why the filter bar gates the fetch behind an explicit Apply/Re-scan button
+  instead of firing on every keystroke — same UX pattern as other slow scans in this app
+  (`/quant-strategies`, `/pattern-dna`'s validation gate).
 
 ## Lessons Learnt
 
@@ -97,6 +121,18 @@ bullish/bearish setups by timeframe.
   price action — there was no way to bookmark a stock as "I think this turns bearish" while
   it was still green. Replaced with two independent, always-available buttons (▲/▼) so the
   trader picks the direction themselves; see Business Logic.
+- **1D "Returns" must be gap-inclusive (prev close → last), not open-of-day → last.**
+  The first version of the Returns filter computed every timeframe's return the same way
+  the cart's price/change% context does: first candle's open → last close. For 1D that
+  meant "today's session open → now", which silently excludes overnight gap moves — a
+  stock that gapped up 10% on news and then traded flat all session shows a ~0% open-to-
+  close move despite a real +10% day. Reported as a bug (`Returns > 5` missing MARICO,
+  which was actually +10%) and fixed: for `tf == '1d'` specifically, Returns now uses the
+  live tick's `prev_close → ltp` (same number the tile header's change% and
+  `ChartsTick.change_pct` already show). Every other timeframe (2D…5Y) still uses its own
+  window's first-candle-open as the baseline — there's no single "previous close" that
+  means anything for a 1-year window, so period-start-to-period-end remains correct there.
+  See `_compute_indicators_one` in `fno_charts_service.py`.
 
 ## Business Logic
 
@@ -124,14 +160,28 @@ bullish/bearish setups by timeframe.
 - **Cart's price/change% context reflects the timeframe's own candle range**, not the live
   daily `change_pct` shown in the tile header — so a "5D Bullish" entry shows the 5-day
   move, not today's intraday move, even though both numbers are visible on the same tile.
+- **Indicator definitions.** RSI and ATR are Wilder's standard RSI(14)/ATR(14), identical
+  formulas to `/indicators` (reused, not re-derived — see `indicators_service._rsi`/`_atr`).
+  ATR is reported as **% of last close** (`atr_pct = atr / last_close * 100`), not raw
+  price units, so a ₹50 stock and a ₹5,000 stock are directly comparable in one filter.
+  Returns% is the period's own move — prev-close-based for 1D (see Lessons Learnt), and
+  first-candle-open-to-last-close for every longer timeframe. All three are computed over
+  the *same candle series the Indicator TF picker selects*, which is independent of
+  whatever tf each individual tile happens to be showing.
+- **A symbol with insufficient candle history (<15 bars) is dropped from the snapshot
+  entirely**, not given a null/zero indicator value — so it simply won't appear in any
+  Returns/RSI/ATR filter's passing set, same as if the filter excluded it. This mostly
+  affects thin/newly-listed F&O symbols on longer timeframes.
 
 ## Tech Stack
 
 - Backend: `app/services/fno_charts_service.py` (symbol list, OHLCV history with TTL cache,
-  token resolution, KiteTicker lifecycle), `app/routers/charts.py` (`GET /api/charts/symbols`,
-  `GET /api/charts/history`, `WS /ws/charts` on a separate `ws_router` so the path has no
-  `/api` prefix). Wired into `app/main.py`'s background prewarm (`start_ticker`, tagged
-  `"fno charts ticker"`) and shutdown (`stop_ticker`).
+  token resolution, KiteTicker lifecycle, `get_indicators_snapshot`/`_compute_indicators_one`
+  for RSI/ATR%/Returns%, reusing `indicators_service._rsi`/`_atr`), `app/routers/charts.py`
+  (`GET /api/charts/symbols`, `GET /api/charts/history`, `GET /api/charts/indicators`,
+  `WS /ws/charts` on a separate `ws_router` so the path has no `/api` prefix). Wired into
+  `app/main.py`'s background prewarm (`start_ticker`, tagged `"fno charts ticker"`) and
+  shutdown (`stop_ticker`).
 - Frontend: `src/pages/ChartsPage.tsx` (hero, grid, cart drawer). The chart tile itself,
   the live-tick websocket hook, the lazy-mount hook, and the shared formatting constants
   are **not** local to this page anymore — they live in `src/components/charts/` and
@@ -140,10 +190,14 @@ bullish/bearish setups by timeframe.
     buttons, timeframe tabs, candlestick/line toggle, Highstock chart).
   - `src/components/charts/chartsCommon.ts` — `MONO`, `SANS`, `GREEN`, `RED`, `TF_LABELS`,
     `pct`, `CART_SECTIONS`.
-  - `src/hooks/useFoTicker.ts`, `src/hooks/useInView.ts`.
-  - `src/api/chartsApi.ts` (`getSymbols`, `getHistory`, `wsUrl`), `src/types/charts.ts`
-    (`ChartsTf`, `CHARTS_TFS`, `ChartsTick`, `ChartsCandle`, `ChartsHistoryResponse`,
-    `ChartsWsMessage`).
+  - `src/components/charts/IndicatorFilterBar.tsx` — the RSI/ATR%/Returns% filter UI
+    (Indicator TF pills, three `<`/`>` + value fields, Apply/Re-scan/Clear, status line).
+  - `src/hooks/useFoTicker.ts`, `src/hooks/useInView.ts`, `src/hooks/useIndicatorFilters.ts`
+    (filter state + snapshot fetch + `passes(symbol)` matcher — see Business Logic).
+  - `src/api/chartsApi.ts` (`getSymbols`, `getHistory`, `getIndicators`, `wsUrl`),
+    `src/types/charts.ts` (`ChartsTf`, `CHARTS_TFS`, `ChartsTick`, `ChartsCandle`,
+    `ChartsHistoryResponse`, `ChartsWsMessage`, `ChartsIndicatorEntry`,
+    `ChartsIndicatorsResponse`).
   Highcharts/Highstock via `highcharts-react-official` (`constructorType="stockChart"`),
   MUI `Grid`/`Drawer`, shared `src/components/shared/SearchBox.tsx`, standard
   `usePalette`/`useTokens` design tokens.
@@ -168,3 +222,12 @@ bullish/bearish setups by timeframe.
   watchlist, but worth a confirm step if the cart grows into something higher-stakes.
 - No bulk action from the cart drawer yet (e.g. "open all 1D Bullish in Pattern DNA" or
   export to CSV) — today it's view/remove only.
+- Indicator filter bar only offers RSI/ATR%/Returns% — MACD cross, volume ratio, or a
+  distance-from-SMA filter would reuse the same bulk-snapshot pattern cheaply since
+  `indicators_service` already has those formulas.
+- No way to save/name a filter combination (e.g. "my oversold momentum screen") — every
+  reload starts from blank filters. Could persist alongside the cart in `localStorage`.
+- The indicator snapshot has no explicit "stale" indicator once its TTL has lapsed in the
+  background — the status line always shows the original scan timestamp even after the
+  underlying cache has silently refreshed on a later unrelated request. Worth surfacing
+  "may be stale, Re-scan to refresh" once TTL has passed.

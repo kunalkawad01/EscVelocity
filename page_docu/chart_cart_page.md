@@ -11,7 +11,10 @@ The full-page view of the Charts page's persistent "chart cart" — every bookma
 - **Filter bar** (hidden entirely when the cart is empty):
   - **Search** — substring match on symbol, same `SearchBox` component as `/charts`.
   - **Direction** — All / Bullish / Bearish, single-select pill row.
-  - **Timeframe** — All + the 8 timeframe pills (1D…5Y), single-select.
+  - **Cart Section TF** — All + the 8 timeframe pills (1D…5Y), single-select; filters by
+    which section a cart entry was *saved under* (its stored `tf`). Labeled "Cart Section
+    TF" specifically to disambiguate from the indicator filter bar's own "Indicator TF"
+    below it — see Business Logic for why these are two separate controls.
   - **Sort** — Newest / Oldest (by `addedAt`) / A–Z (symbol) / Change % (by the entry's
     stored `changePct`, descending).
   - **View** — "By Section" (default) groups filtered+sorted items under their
@@ -19,6 +22,11 @@ The full-page view of the Charts page's persistent "chart cart" — every bookma
     "Flat Grid" drops the grouping and renders every filtered+sorted item in one
     3-column grid, each tile carrying its own small badge (dot + "1D BULLISH" style
     label) so direction/timeframe stay legible without a section header.
+  - **Indicator filter bar (RSI / ATR% / Returns%)** — the exact same
+    `IndicatorFilterBar` component as `/charts`: its own Indicator TF picker plus
+    `<`/`>` + value fields for RSI, ATR %, Returns %, gated behind Apply/Re-scan. A cart
+    entry's *symbol* must pass the snapshot's indicator values to stay visible — the
+    entry's own saved timeframe/direction/price are unrelated to this check.
   - A `{shown} / {total}` counter sits under the controls.
 - **Real charts, not placeholders.** Every cart entry renders the exact same
   `ChartTile` component used on `/charts` — live LTP, prev-close dotted line,
@@ -53,6 +61,11 @@ The full-page view of the Charts page's persistent "chart cart" — every bookma
   across routes/tabs — simplest correct behavior given each page is its own React tree;
   not worth the complexity of a cross-page singleton connection for two lightweight
   research pages.
+- **Indicator filtering reuses `/charts`' bulk snapshot endpoint and client-side matcher
+  unmodified.** This page's `useIndicatorFilters()` is the exact same hook instance type
+  as `/charts`' — a separate instance (separate `GET /api/charts/indicators` call,
+  separate in-memory snapshot), but it hits the same server-side cache keyed by tf, so a
+  scan already warmed from browsing `/charts` at the same timeframe returns fast here too.
 
 ## Lessons Learnt
 
@@ -87,6 +100,21 @@ The full-page view of the Charts page's persistent "chart cart" — every bookma
   within whatever container they land in (a section in "By Section" mode, or the whole
   grid in "Flat Grid" mode); it never decides *which* section/view an item appears in.
   Direction/timeframe filters are the only controls that remove items from view.
+- **Two unrelated "timeframe" concepts coexist on this page, deliberately kept visually
+  distinct.** "Cart Section TF" filters by which `{tf}` a cart entry was *saved under*
+  (its identity, same as the grouping headings) — it's a property of the bookmark itself.
+  "Indicator TF" (inside the indicator filter bar) is the timeframe the *current* RSI/
+  ATR%/Returns% snapshot was computed on — a global setting applied uniformly across
+  every symbol in the cart regardless of what tf each entry was saved under. Setting
+  "Cart Section TF = 2D" and "Indicator TF = 1Y" is valid and meaningful: "show me my
+  2D-timeframe bookmarks, filtered by their 1-year RSI." Conflating the two labels (both
+  just "Timeframe") was considered and rejected — too easy to misread which one a change
+  affects.
+- **Indicator filtering applies to the symbol, not the saved entry.** A symbol bookmarked
+  under multiple (tf, direction) combinations shares one RSI/ATR/Returns value per
+  Indicator TF across all of its cart entries — filtering doesn't distinguish "this
+  entry's RSI" from "that entry's RSI" because RSI isn't a property of the bookmark, it's
+  a property of the symbol at the chosen Indicator TF.
 
 ## Tech Stack
 
@@ -97,12 +125,19 @@ The full-page view of the Charts page's persistent "chart cart" — every bookma
   - `ChartTile.tsx` — the chart tile itself.
   - `chartsCommon.ts` — `MONO`, `SANS`, `GREEN`, `RED`, `TF_LABELS`, `pct`,
     `CART_SECTIONS`.
+  - `IndicatorFilterBar.tsx` — the RSI/ATR%/Returns% filter UI, rendered a second time
+    on this page with its own `useIndicatorFilters()` instance (own `tf`/thresholds/
+    snapshot state, independent of `/charts`' instance — see Lessons Learnt for why they
+    still share the server-side cache).
   - `useFoTicker.ts`, `useInView.ts` — websocket ticks and lazy-mount.
+  - `useIndicatorFilters.ts` — filter state + `GET /api/charts/indicators` fetch +
+    `passes(symbol)` matcher, folded into this page's `filtered` memo alongside search/
+    direction/Cart Section TF.
   - `useChartsCart.ts` — the cart itself (`items`, `isInCart`, `toggle`, `remove`,
     `clearSection`, `clearAll`).
-- No new backend code — this page calls the same `chartsApi` (`/api/charts/symbols` is
-  unused here; `/api/charts/history` and `/ws/charts` are used exactly as `/charts` uses
-  them, per visible cart entry).
+- No new backend code of its own — this page calls the same `chartsApi` as `/charts`
+  (`getSymbols` unused here; `getHistory`/`wsUrl` used per visible cart entry;
+  `getIndicators` used by the indicator filter bar).
 - Route `/chart-cart`, nav entry under Signals → "Chart Cart" in `Navbar.tsx`, right
   after "Charts".
 
@@ -119,3 +154,12 @@ The full-page view of the Charts page's persistent "chart cart" — every bookma
   handle entries whose live tick hasn't arrived yet.
 - Consider persisting the chosen filter/sort/view state (e.g. in the URL query string)
   so a reload or a shared link preserves the trader's current cart view.
+- The two "timeframe" controls (Cart Section TF vs. Indicator TF) are functionally clear
+  but visually just two pill rows with different labels — a first-time user could still
+  miss the distinction. Worth a short inline hint or tooltip if this causes confusion in
+  practice.
+- Indicator filtering here and on `/charts` are two separate scans (two separate
+  `useIndicatorFilters()` instances, two client-side snapshots) even though they can
+  target the same timeframe — lifting the snapshot into shared state (e.g. a context, or
+  caching the fetched snapshot client-side keyed by tf) would avoid a redundant Re-scan
+  when a trader jumps between the two pages at the same Indicator TF.

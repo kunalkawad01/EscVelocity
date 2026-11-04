@@ -248,7 +248,7 @@ function BucketTable({ rows, emptyNote }: { rows: MomentumRow[]; emptyNote: stri
           {rows.map(r => (
             <TableRow key={r.symbol} hover>
               <TableCell sx={TD}>
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: INK, fontFamily: MONO }}>
+                <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: INK, fontFamily: SANS, letterSpacing: '-0.01em' }}>
                   {r.symbol}
                 </Typography>
                 {r.sector && (
@@ -258,27 +258,27 @@ function BucketTable({ rows, emptyNote }: { rows: MomentumRow[]; emptyNote: stri
                 )}
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: MONO }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                   {r.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: MONO, color: pctColor(r.change_pct) }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.change_pct) }}>
                   {fmtPct(r.change_pct)}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.74rem', fontFamily: MONO, color: pctColor(r.oi_chg_pct) }}>
+                <Typography sx={{ fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.oi_chg_pct) }}>
                   {fmtPct(r.oi_chg_pct)}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.74rem', fontFamily: MONO, color: pctColor(r.last_session_ret) }}>
+                <Typography sx={{ fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.last_session_ret) }}>
                   {fmtPct(r.last_session_ret)}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.74rem', fontFamily: MONO, color: pctColor(r.gap_0915_pct) }}>
+                <Typography sx={{ fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.gap_0915_pct) }}>
                   {fmtPct(r.gap_0915_pct)}
                 </Typography>
               </TableCell>
@@ -329,7 +329,7 @@ function OpenLevelTable({ rows, emptyNote, level }: { rows: MomentumRow[]; empty
           {rows.map(r => (
             <TableRow key={r.symbol} hover>
               <TableCell sx={TD}>
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: INK, fontFamily: MONO }}>
+                <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: INK, fontFamily: SANS, letterSpacing: '-0.01em' }}>
                   {r.symbol}
                 </Typography>
                 {r.sector && (
@@ -339,23 +339,23 @@ function OpenLevelTable({ rows, emptyNote, level }: { rows: MomentumRow[]; empty
                 )}
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: MONO }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                   {r.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: MONO, color: pctColor(r.change_pct) }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.change_pct) }}>
                   {fmtPct(r.change_pct)}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.74rem', fontFamily: MONO, color: pctColor(r.oi_chg_pct) }}>
+                <Typography sx={{ fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.oi_chg_pct) }}>
                   {fmtPct(r.oi_chg_pct)}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
                 <Typography sx={{
-                  fontSize: '0.74rem', fontFamily: MONO,
+                  fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
                   color: level === 'high' ? levelColor : INK2,
                   fontWeight: level === 'high' ? 700 : 400,
                 }}>
@@ -364,7 +364,7 @@ function OpenLevelTable({ rows, emptyNote, level }: { rows: MomentumRow[]; empty
               </TableCell>
               <TableCell sx={TD} align="right">
                 <Typography sx={{
-                  fontSize: '0.74rem', fontFamily: MONO,
+                  fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
                   color: level === 'high' ? levelColor : INK3,
                   fontWeight: level === 'high' ? 700 : 400,
                 }}>
@@ -373,7 +373,7 @@ function OpenLevelTable({ rows, emptyNote, level }: { rows: MomentumRow[]; empty
               </TableCell>
               <TableCell sx={TD} align="right">
                 <Typography sx={{
-                  fontSize: '0.74rem', fontFamily: MONO,
+                  fontSize: '0.74rem', fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
                   color: level === 'low' ? levelColor : INK3,
                   fontWeight: level === 'low' ? 700 : 400,
                 }}>
@@ -421,7 +421,7 @@ function MoversTable({ rows, emptyNote }: { rows: MomentumRow[]; emptyNote: stri
           {rows.map(r => (
             <TableRow key={r.symbol} hover>
               <TableCell sx={TD}>
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: INK, fontFamily: MONO }}>
+                <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: INK, fontFamily: SANS, letterSpacing: '-0.01em' }}>
                   {r.symbol}
                 </Typography>
                 {r.sector && (
@@ -431,12 +431,12 @@ function MoversTable({ rows, emptyNote }: { rows: MomentumRow[]; emptyNote: stri
                 )}
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: MONO }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: INK2, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                   {r.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </Typography>
               </TableCell>
               <TableCell sx={TD} align="right">
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: MONO, color: pctColor(r.change_pct) }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: SANS, fontVariantNumeric: 'tabular-nums', color: pctColor(r.change_pct) }}>
                   {fmtPct(r.change_pct)}
                 </Typography>
               </TableCell>

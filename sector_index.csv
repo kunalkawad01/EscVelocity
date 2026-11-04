@@ -1,0 +1,35 @@
+nse_sectoral_index,kite_tradingsymbol,available_on_kite,kite_earliest_date,notes
+Nifty Auto,NIFTY AUTO,Yes,2004-01-01,
+Nifty Bank,NIFTY BANK,Yes,2000-01-01,
+Nifty Chemicals,NIFTY CHEMICALS,Yes,2025-11-24,recently launched index -- minimal history
+Nifty Consumer Durables,NIFTY CONSR DURBL,Yes,2005-04-01,
+Nifty Financial Services,NIFTY FIN SERVICE,Yes,2004-01-01,
+Nifty Financial Services 25/50,NIFTY FINSRV25 50,Yes,2004-01-01,
+Nifty Financial Services Ex Bank,NIFTY FINSEREXBNK,Yes,2005-04-01,
+Nifty FMCG,NIFTY FMCG,Yes,2000-01-03,
+Nifty Healthcare,NIFTY HEALTHCARE,Yes,2005-04-01,
+Nifty IT,NIFTY IT,Yes,2000-01-03,
+Nifty Media,NIFTY MEDIA,Yes,2005-12-30,
+Nifty Metal,NIFTY METAL,Yes,2004-01-01,
+Nifty Oil and Gas,NIFTY OIL AND GAS,Yes,2005-04-01,
+Nifty Pharma,NIFTY PHARMA,Yes,2001-01-01,
+Nifty Private Bank,NIFTY PVT BANK,Yes,2005-04-01,
+Nifty PSU Bank,NIFTY PSU BANK,Yes,2004-01-01,
+Nifty Realty,NIFTY REALTY,Yes,2006-12-29,
+Nifty500 Healthcare,NIFTY500 HEALTH,Yes,2025-11-07,recently launched index -- minimal history
+Nifty Housing Finance,NIFTY HOUSING,Yes,2005-04-01,name differs slightly -- worth confirming
+Nifty MidSmall Financial Services,NIFTY MS FIN SERV,Yes,2005-04-01,
+Nifty MidSmall Healthcare,NIFTY MIDSML HLTH,Yes,2005-04-01,
+Nifty MidSmall IT & Telecom,NIFTY MS IT TELCM,Yes,2005-04-01,
+Nifty Capital Goods,,No,,
+Nifty Cement,,No,,
+Nifty Commercial & Transport Services,,No,,possible partial match to NIFTY TRANS LOGIS (Transportation & Logistics) -- unconfirmed
+Nifty Construction,,No,,
+Nifty Consumer Services,,No,,possible partial match to NIFTY NONCYC CONS (Non-Cyclical Consumer) -- unconfirmed
+Nifty Hospitals,,No,,
+Nifty Insurance,,No,,
+Nifty NBFC,,No,,
+Nifty Power,,No,,
+Nifty REITs & Realty,,No,,
+Nifty Retail,,No,,
+Nifty Telecommunications,,No,,
