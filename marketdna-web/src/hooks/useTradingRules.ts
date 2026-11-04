@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { tradingRulesApi } from '../api/tradingRulesApi'
 
 export interface TradingRule {
   id: string
@@ -11,6 +12,8 @@ export interface TradingRuleCategory {
   accent: string
   rules: TradingRule[]
 }
+
+export type SyncStatus = 'synced' | 'saving' | 'offline'
 
 const STORAGE_KEY = 'trading_rules_v1'
 
@@ -25,6 +28,8 @@ function mkRules(texts: string[]): TradingRule[] {
 
 // Seeded once from the trader's own journal/rules dump — editable from here on,
 // this is only the starting point, not a fixed spec. Reset button restores this exact seed.
+// Lives on the frontend (not the backend) so the Postgres store never needs its own
+// copy of the defaults — an empty/unreachable store just falls back to seeding this.
 export const DEFAULT_TRADING_RULES: TradingRuleCategory[] = [
   {
     id: 'sentiment', title: 'Market Sentiment & Tracking', accent: ACCENTS[0],
@@ -117,7 +122,7 @@ export const DEFAULT_TRADING_RULES: TradingRuleCategory[] = [
   },
 ]
 
-function load(): TradingRuleCategory[] {
+function loadLocal(): TradingRuleCategory[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_TRADING_RULES
@@ -132,17 +137,55 @@ function cloneDefaults(): TradingRuleCategory[] {
   return DEFAULT_TRADING_RULES.map(c => ({ ...c, rules: c.rules.map(r => ({ ...r })) }))
 }
 
-// Personal, editable trading rulebook — persisted client-side (localStorage) only,
-// same rationale as useChartsCart: single-user scratchpad, no backend needed.
+// Postgres-backed trading rulebook. Source of truth is the `trading_rules` table
+// (via tradingRulesApi); localStorage is kept only as an instant-paint cache and an
+// offline fallback when the backend is unreachable — same role it played before this
+// moved off being localStorage-only (see useChartsCart for the pattern this started from).
 export function useTradingRules() {
-  const [categories, setCategories] = useState<TradingRuleCategory[]>(() => load())
+  const [categories, setCategories] = useState<TradingRuleCategory[]>(() => loadLocal())
+  const [loading, setLoading] = useState(true)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced')
 
+  const didReconcile = useRef(false)
+  const suppressNextSave = useRef(false)
+
+  // One-time reconcile with the backend on mount: backend wins if it has data;
+  // otherwise this local/default copy is the seed, pushed up to create the row.
+  useEffect(() => {
+    let cancelled = false
+    tradingRulesApi.get()
+      .then(doc => {
+        if (cancelled) return
+        if (doc && doc.categories.length > 0) {
+          suppressNextSave.current = true   // this setCategories is a sync-FROM-backend, not a new edit to push back
+          setCategories(doc.categories)
+          setSyncStatus('synced')
+        } else {
+          setSyncStatus('saving')
+          tradingRulesApi.save(categories)
+            .then(() => { if (!cancelled) setSyncStatus('synced') })
+            .catch(() => { if (!cancelled) setSyncStatus('offline') })
+        }
+      })
+      .catch(() => { if (!cancelled) setSyncStatus('offline') })
+      .finally(() => { if (!cancelled) { didReconcile.current = true; setLoading(false) } })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only; `categories` here is intentionally the initial (localStorage/default) snapshot, used only to seed the backend if nothing is saved yet
+  }, [])
+
+  // Every change: cache locally (instant, always) + push to backend (source of truth).
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(categories))
     } catch {
-      // private mode / storage quota — edits just won't persist this session
+      // private mode / storage quota — local cache just won't persist this session
     }
+    if (suppressNextSave.current) { suppressNextSave.current = false; return }
+    if (!didReconcile.current) return   // don't push before the initial GET has resolved
+    setSyncStatus('saving')
+    tradingRulesApi.save(categories)
+      .then(() => setSyncStatus('synced'))
+      .catch(() => setSyncStatus('offline'))
   }, [categories])
 
   const addRule = useCallback((categoryId: string, text: string) => {
@@ -183,7 +226,7 @@ export function useTradingRules() {
   const totalRules = categories.reduce((n, c) => n + c.rules.length, 0)
 
   return {
-    categories, totalRules,
+    categories, totalRules, loading, syncStatus,
     addRule, updateRule, deleteRule,
     addCategory, renameCategory, deleteCategory,
     resetToDefaults,

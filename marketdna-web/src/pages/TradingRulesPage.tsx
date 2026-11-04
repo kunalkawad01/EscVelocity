@@ -191,7 +191,7 @@ function AddCategoryCard({ onAdd }: { onAdd: (title: string) => void }) {
 export default function TradingRulesPage() {
   const { BG, BORDER, CYAN, INK, INK2, INK3 } = useTokens()
   const { mode } = useThemeMode()
-  const { categories, totalRules, addRule, updateRule, deleteRule, addCategory, deleteCategory, resetToDefaults } = useTradingRules()
+  const { categories, totalRules, syncStatus, addRule, updateRule, deleteRule, addCategory, deleteCategory, resetToDefaults } = useTradingRules()
   const [resetConfirming, setResetConfirming] = useState(false)
 
   return (
@@ -226,6 +226,21 @@ export default function TradingRulesPage() {
             <Typography sx={{ ...MONO, fontSize: '0.72rem', color: INK3 }}>
               {categories.length} sections · {totalRules} rules
             </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }} title={
+              syncStatus === 'synced' ? 'Saved to the server — available from any browser' :
+              syncStatus === 'saving' ? 'Saving…' :
+              'Server unreachable — changes are kept in this browser only until it reconnects'
+            }>
+              <Box sx={{
+                width: 6, height: 6, borderRadius: '50%',
+                bgcolor: syncStatus === 'synced' ? '#22c55e' : syncStatus === 'saving' ? '#fbbf24' : '#ef4444',
+                animation: syncStatus === 'saving' ? 'syncpulse 1s ease-in-out infinite' : 'none',
+                '@keyframes syncpulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
+              }} />
+              <Typography sx={{ ...MONO, fontSize: '0.68rem', color: INK3 }}>
+                {syncStatus === 'synced' ? 'Synced' : syncStatus === 'saving' ? 'Saving…' : 'Offline — local only'}
+              </Typography>
+            </Box>
             {resetConfirming ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography sx={{ ...JAKARTA, fontSize: '0.72rem', color: '#ef4444' }}>Discard your edits and restore the original list?</Typography>

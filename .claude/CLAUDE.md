@@ -406,6 +406,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `edges.py` | `/api/edges` | Edge Decay Observatory (read-only over Postgres `edge_measurements`). `/observatory` (all edges: vitals + status + decay series), `/{edge_key}/history`, POST `/invalidate`. Rows written by the standalone `jobs/measure_edges.py` (see Step 5) — never by the server. |
 | `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
 | `fno_momentum.py` | `/api/fno-momentum` | F&O Momentum Radar. `/scan` — OI Gainers (futures OI up) + Short Covering (price↑ OI↓) buckets, each row must pass ≥1 momentum qualifier (±5% last session · best sector today · ±2% gap at 9:15), sorted by day change %. POST `/invalidate` (delegates to fno tactical caches). Zero extra Kite calls — piggybacks `fno_tactical_service._get_scan()`. |
+| `trading_rules.py` | `/api/trading-rules` | Personal Trading Rules rulebook. `GET` (whole doc, or `null` if unsaved/DB down) + `PUT` (replace whole doc) over a single JSONB row in Postgres table `trading_rules`. No invalidate endpoint — not day-data, nothing to go stale. |
 
 ---
 
@@ -867,11 +868,11 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - API: `stockApi` (symbols, summary, ohlcv, returns, drawdown) + `stockEdaApi` (volatility-series, drawdown-history, seasonality, gaps, volume-profile, autocorrelation, extreme-days, benchmark-comparison).
 
 ### `/trading-rules` — TradingRulesPage
-- **Editable personal rulebook, not analytics** — static, no API calls. Seeded from the trader's own journal (discipline, risk, planning, options/delta mechanics, scaling system, macro notes, mindset) into 9 color-accented sections.
+- **Editable personal rulebook, Postgres-backed.** Seeded from the trader's own journal (discipline, risk, planning, options/delta mechanics, scaling system, macro notes, mindset) into 9 color-accented sections.
 - **Click-to-edit inline**: click any rule's text to edit, `Enter`/blur saves, `Escape` cancels. Add rules per-section, add/delete whole sections, "Reset to defaults" restores the original seed (two-click inline confirm, no native dialogs).
-- **localStorage only** (`trading_rules_v1`) — same single-user-scratchpad rationale as `useChartsCart`; no backend, no cross-device sync.
+- **Postgres single-document store** (table `trading_rules`, one JSONB row) is the source of truth; `localStorage` (`trading_rules_v1`) is kept only as an instant-paint cache + offline fallback. Defaults live only in the frontend (`DEFAULT_TRADING_RULES`) — an empty/unreachable store just gets seeded from there on first load. `StoreUnavailable` degrades gracefully: GET → `null`, PUT → 503, page shows "Offline — local only".
 - Caret-on-focus fix: clicking mid-text to edit needs `onFocus` → `setSelectionRange(len, len)` or the caret resets to position 0 (MUI `TextField` `autoFocus` doesn't preserve the originating click position when swapping in from static `Typography`).
-- API: none.
+- API: `GET/PUT /api/trading-rules` (`app/routers/trading_rules.py` → `app/services/trading_rules_store.py`).
 
 ### `/stock/:symbol` — StockPage (~461 lines shell + sub-components)
 - **URL param** `:symbol` — pages are linkable to specific stocks.
