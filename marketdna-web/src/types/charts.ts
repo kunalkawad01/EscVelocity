@@ -2,6 +2,11 @@ export type ChartsTf = '1d' | '2d' | '5d' | '1mo' | '3mo' | 'ytd' | '1y' | '5y'
 
 export const CHARTS_TFS: ChartsTf[] = ['1d', '2d', '5d', '1mo', '3mo', 'ytd', '1y', '5y']
 
+// Candle resolution selectable on the 1D tab only -- every other timeframe has one
+// fixed interval appropriate to its own lookback (see fno_charts_service.TF_CONFIG).
+export type ChartsOneDInterval = '1m' | '5m'
+export const ONE_D_INTERVALS: ChartsOneDInterval[] = ['1m', '5m']
+
 export interface ChartsSymbolsResponse {
   symbols: string[]
   n: number

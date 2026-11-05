@@ -18,12 +18,13 @@ def get_symbols():
 
 
 @router.get("/history")
-def get_history(symbol: str, tf: str = "1d"):
+def get_history(symbol: str, tf: str = "1d", interval: str = "1m"):
     """OHLCV candles for one F&O underlying.
 
     tf: one of 1d, 2d, 5d, 1mo, 3mo, ytd, 1y, 5y
+    interval: candle resolution, only honored for tf='1d' -- '1m' (default) or '5m'.
     """
-    return fno_charts_service.get_history(symbol, tf)
+    return fno_charts_service.get_history(symbol, tf, interval)
 
 
 @router.get("/indicators")

@@ -1,4 +1,4 @@
-import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsIndicatorsResponse, ChartsTf } from '../types/charts'
+import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsIndicatorsResponse, ChartsTf, ChartsOneDInterval } from '../types/charts'
 
 // Relative path so requests go through Vite's dev proxy (→ 127.0.0.1:8000) like every
 // other API. Avoids the hardcoded `localhost:8000`, which browsers may resolve to IPv6
@@ -14,8 +14,10 @@ export const chartsApi = {
   getSymbols: (): Promise<ChartsSymbolsResponse> =>
     fetch(`${BASE}/symbols`).then(json<ChartsSymbolsResponse>),
 
-  getHistory: (symbol: string, tf: ChartsTf): Promise<ChartsHistoryResponse> =>
-    fetch(`${BASE}/history?symbol=${encodeURIComponent(symbol)}&tf=${tf}`).then(json<ChartsHistoryResponse>),
+  // `interval` only matters for tf='1d' ('1m'/'5m') -- ignored server-side for
+  // every other timeframe, so callers for those tfs can simply omit it.
+  getHistory: (symbol: string, tf: ChartsTf, interval: ChartsOneDInterval = '1m'): Promise<ChartsHistoryResponse> =>
+    fetch(`${BASE}/history?symbol=${encodeURIComponent(symbol)}&tf=${tf}&interval=${interval}`).then(json<ChartsHistoryResponse>),
 
   // Slow (~70s) on the first request per tf -- see ChartsIndicatorsResponse. Callers
   // should gate this behind an explicit action, not fire it on every keystroke.

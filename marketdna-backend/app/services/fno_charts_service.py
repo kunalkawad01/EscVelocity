@@ -43,7 +43,11 @@ TF_CONFIG: dict[str, tuple[str, int]] = {
 YTD_TF = "ytd"
 ALL_TFS = ("1d", "2d", "5d", "1mo", "3mo", "ytd", "1y", "5y")
 
-_history_cache: dict[tuple[str, str], tuple[float, dict]] = {}  # (symbol, tf) -> (fetched_at, response)
+# Selectable candle resolution for the 1D tab only -- every other timeframe has a
+# single fixed interval (see TF_CONFIG) appropriate to its own lookback window.
+ONE_D_INTERVALS: dict[str, str] = {"1m": "minute", "5m": "5minute"}
+
+_history_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}  # (symbol, tf, interval) -> (fetched_at, response)
 _HISTORY_TTL: dict[str, int] = {"1d": 15, "2d": 30, "5d": 60}
 _DEFAULT_TTL = 300  # 1mo/3mo/ytd/1y/5y are daily candles -- barely change intraday
 
@@ -87,18 +91,36 @@ def _get_token(symbol: str) -> Optional[int]:
     return _resolve_tokens([symbol]).get(symbol)
 
 
-def get_history(symbol: str, tf: str) -> dict:
+def _session_start(now: datetime) -> datetime:
+    """09:15 of the most recently started NSE session (today if it's a weekday
+    and 09:15 has already passed, else the most recent prior weekday) -- used
+    so the 1D tile begins exactly at today's open instead of bleeding into
+    yesterday's candles via a rolling 24h lookback."""
+    d = now.date()
+    if now.weekday() >= 5 or now.hour * 60 + now.minute < 9 * 60 + 15:
+        d -= timedelta(days=1)
+        while d.weekday() >= 5:
+            d -= timedelta(days=1)
+    return datetime(d.year, d.month, d.day, 9, 15)
+
+
+def get_history(symbol: str, tf: str, interval: str = "1m") -> dict:
     """OHLCV candles for one F&O underlying across the 8 Charts-page timeframes.
 
-    Cached per (symbol, tf) with a short TTL for the intraday buckets (1d/2d/5d)
-    so switching tabs back and forth across the 3-column grid doesn't re-hit Kite
-    on every click; the daily-candle buckets (1mo..5y) barely change intraday.
+    `interval` ('1m'/'5m') only applies to tf='1d' -- lets a trader switch the live
+    1D tab between 1-minute and 5-minute candles. Every other timeframe ignores it
+    and uses its own fixed Kite interval (see TF_CONFIG).
+
+    Cached per (symbol, tf, interval) with a short TTL for the intraday buckets
+    (1d/2d/5d) so switching tabs back and forth across the 3-column grid doesn't
+    re-hit Kite on every click; the daily-candle buckets (1mo..5y) barely change
+    intraday.
     """
     symbol = symbol.upper()
     if tf not in ALL_TFS:
         return {"tf": tf, "symbol": symbol, "candles": [], "error": f"unknown timeframe '{tf}'"}
 
-    cache_key = (symbol, tf)
+    cache_key = (symbol, tf, interval if tf == "1d" else "")
     cached = _history_cache.get(cache_key)
     ttl = _HISTORY_TTL.get(tf, _DEFAULT_TTL)
     if cached and (time.time() - cached[0]) < ttl:
@@ -110,15 +132,18 @@ def get_history(symbol: str, tf: str) -> dict:
 
     to_dt = datetime.now()
     if tf == YTD_TF:
-        interval = "day"
+        kite_interval = "day"
         from_dt = datetime(to_dt.year, 1, 1)
+    elif tf == "1d":
+        kite_interval = ONE_D_INTERVALS.get(interval, "minute")
+        from_dt = _session_start(to_dt)
     else:
-        interval, days = TF_CONFIG[tf]
+        kite_interval, days = TF_CONFIG[tf]
         from_dt = to_dt - timedelta(days=days)
 
     try:
         kite = get_kite()
-        raw = kite.historical_data(token, from_dt, to_dt, interval)
+        raw = kite.historical_data(token, from_dt, to_dt, kite_interval)
         candles = [
             {
                 "time": c["date"].isoformat(),
@@ -127,7 +152,7 @@ def get_history(symbol: str, tf: str) -> dict:
             }
             for c in raw
         ]
-        result = {"tf": tf, "symbol": symbol, "interval": interval, "candles": candles}
+        result = {"tf": tf, "symbol": symbol, "interval": kite_interval, "candles": candles}
         _history_cache[cache_key] = (time.time(), result)
         return result
     except Exception as exc:

@@ -8,8 +8,8 @@ import { usePalette, useTokens } from '../../hooks/usePalette'
 import { useThemeMode } from '../../contexts/ThemeModeContext'
 import { useInView } from '../../hooks/useInView'
 import { chartsApi } from '../../api/chartsApi'
-import { CHARTS_TFS } from '../../types/charts'
-import type { ChartsTf, ChartsTick, ChartsHistoryResponse } from '../../types/charts'
+import { CHARTS_TFS, ONE_D_INTERVALS } from '../../types/charts'
+import type { ChartsTf, ChartsTick, ChartsHistoryResponse, ChartsOneDInterval } from '../../types/charts'
 import type { CartDirection } from '../../hooks/useChartsCart'
 import { MONO, SANS, GREEN, RED, TF_LABELS, pct } from './chartsCommon'
 
@@ -32,18 +32,35 @@ export function ChartTile({
   const { ref, inView } = useInView<HTMLDivElement>()
   const [tf, setTf] = useState<ChartsTf>(initialTf)
   const [chartType, setChartType] = useState<'candlestick' | 'line'>('candlestick')
+  // Only consulted when tf === '1d' -- every other timeframe has one fixed Kite
+  // interval server-side and ignores this. Kept in state (not reset on tf change)
+  // so flipping back to 1D later remembers the trader's last chosen resolution.
+  const [oneDInterval, setOneDInterval] = useState<ChartsOneDInterval>('1m')
   const [hist, setHist] = useState<ChartsHistoryResponse | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!inView) return
     let cancelled = false
-    setLoading(true)
-    chartsApi.getHistory(symbol, tf)
-      .then(r => { if (!cancelled) setHist(r) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [inView, symbol, tf])
+    const fetchHist = () => {
+      setLoading(true)
+      chartsApi.getHistory(symbol, tf, oneDInterval)
+        .then(r => { if (!cancelled) setHist(r) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }
+    fetchHist()
+    // Intraday timeframes grow a new bar as the session progresses (a fresh minute/
+    // 5-minute/15-minute candle forms) -- without this poll the tile only ever shows
+    // whatever history was fetched at mount, so the live tick just keeps overlaying
+    // the same last bar forever and the x-axis never advances until a hard refresh
+    // remounts the component. Poll at the same cadence as the backend's own cache TTL
+    // (fno_charts_service._HISTORY_TTL) so a new candle appears on its own. Longer
+    // timeframes are static EOD data by design and don't need this.
+    const POLL_MS: Partial<Record<ChartsTf, number>> = { '1d': 15_000, '2d': 30_000, '5d': 60_000 }
+    const ms = POLL_MS[tf]
+    const id = ms ? setInterval(fetchHist, ms) : undefined
+    return () => { cancelled = true; if (id) clearInterval(id) }
+  }, [inView, symbol, tf, oneDInterval])
 
   const changeColor = (tick?.change_pct ?? 0) >= 0 ? GREEN : RED
 
@@ -74,9 +91,15 @@ export function ChartTile({
     }
     const lineColor = changeColor
 
+    // Highstock auto-groups series points into wider visual bars once there are more
+    // points than fit the chart's pixel width (its own "dataGrouping" feature) -- with
+    // ~200+ 1-minute points squeezed into a small square tile, it silently re-bucketed
+    // both the 1m and 5m series down to roughly the same visual candle width, making the
+    // 1D resolution toggle look like it did nothing. Disabled so the chart always plots
+    // the raw candles the trader explicitly asked for.
     const series: Highcharts.SeriesOptionsType = chartType === 'candlestick'
-      ? { type: 'candlestick', name: symbol, data: ohlc, color: RED, upColor: GREEN, lineColor: RED, upLineColor: GREEN }
-      : { type: 'area', name: symbol, data: ohlc.map(c => [c[0], c[4]]), color: lineColor, lineWidth: 1.3, fillOpacity: 0.12, marker: { enabled: false } }
+      ? { type: 'candlestick', name: symbol, data: ohlc, color: RED, upColor: GREEN, lineColor: RED, upLineColor: GREEN, dataGrouping: { enabled: false } }
+      : { type: 'area', name: symbol, data: ohlc.map(c => [c[0], c[4]]), color: lineColor, lineWidth: 1.3, fillOpacity: 0.12, marker: { enabled: false }, dataGrouping: { enabled: false } }
 
     return {
       time: { timezone: 'Asia/Kolkata' },
@@ -182,6 +205,26 @@ export function ChartTile({
           </Box>
           ))}
         </Box>
+        {tf === '1d' && (
+          <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+            {ONE_D_INTERVALS.map(iv => (
+              <Box
+                key={iv}
+                onClick={() => setOneDInterval(iv)}
+                title={iv === '1m' ? '1-minute candles' : '5-minute candles'}
+                sx={{
+                  px: 0.5, py: 0.1, borderRadius: 0.75, cursor: 'pointer',
+                  bgcolor: oneDInterval === iv ? `${CYAN}20` : 'transparent',
+                  border: `1px solid ${oneDInterval === iv ? CYAN : BORDER}`,
+                }}
+              >
+                <Typography sx={{ ...MONO, fontSize: '0.5rem', fontWeight: oneDInterval === iv ? 800 : 600, color: oneDInterval === iv ? CYAN : INK3 }}>
+                  {iv.toUpperCase()}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
         <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
           {(['candlestick', 'line'] as const).map(ct => (
             <Box
