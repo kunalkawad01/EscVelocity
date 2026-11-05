@@ -39,6 +39,19 @@ export function useChartsCart() {
     }
   }, [items])
 
+  // The native `storage` event only fires in OTHER tabs/documents, never the one that
+  // made the write — so this purely handles cross-tab sync (e.g. clearing the cart on
+  // the Charts page while /chart-cart is already open in another tab) without fighting
+  // the effect above for same-tab updates.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY) return
+      setItems(loadCart())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   // Bullish/bearish are independent entries for the same (symbol, tf) -- a trader
   // can mark a chart either way, or both, since direction is the trader's own call,
   // not something derived from price action.
