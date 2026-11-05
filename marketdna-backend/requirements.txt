@@ -21,6 +21,13 @@ anthropic==0.107.1
 openai==1.109.1
 TA-Lib==0.7.1
 vectorbt==1.1.0
+# Pinned explicitly -- vectorbt==1.1.0 registers a plotly theme template that uses the
+# legacy Mapbox trace types (scattermapbox, etc.). Plotly 6+ dropped those in favor of
+# MapLibre-based "map" traces, which breaks vectorbt's import-time `_settings.py` theme
+# registration with "Invalid property specified ... 'scattermapbox'". Without this pin,
+# plotly is pulled in transitively (unpinned) and a rebuild can silently resolve to an
+# incompatible 6.x/7.x release, crash-looping the backend on startup.
+plotly==5.24.1
 kiteconnect==5.2.0
 scikit-learn==1.9.0
 hmmlearn==0.3.3
