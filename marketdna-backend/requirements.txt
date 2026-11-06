@@ -31,3 +31,6 @@ plotly==5.24.1
 kiteconnect==5.2.0
 scikit-learn==1.9.0
 hmmlearn==0.3.3
+# Daily F&O PDF reports (scripts/generate_fno_pdf_report.py, generate_fno_cluster_report.py)
+matplotlib==3.11.1
+reportlab==5.1.0
