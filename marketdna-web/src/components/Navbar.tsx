@@ -49,6 +49,7 @@ const NAV_GROUPS = [
       { to: '/nifty50-live',     label: 'Nifty 50 Live', desc: 'Live index tick, contributors & option chain' },
       { to: '/charts',           label: 'Charts',        desc: 'Live candlestick grid across the F&O universe' },
       { to: '/chart-cart',       label: 'Chart Cart',    desc: 'Saved bullish/bearish setups, filterable by timeframe' },
+      { to: '/clusters',         label: 'Clusters',      desc: 'PCA + K-Means return clusters — chart grid & daily PDF buttons' },
       { to: '/trading-rules',    label: 'Trading Rules', desc: 'Editable personal discipline & risk rulebook' },
       { to: '/live-trading',     label: 'Live',      desc: 'Sector scatter & breakthrough signals' },
       { to: '/intraday-race',    label: 'Race',      desc: 'Bar race, ATR scatter & norm returns'  },

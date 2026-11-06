@@ -5,6 +5,7 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | File | Route | One-line purpose |
 |------|-------|-----------------|
 | [agents_page.md](agents_page.md) | `/agents` | AI research agent showcase — static capabilities card |
+| [clusters_page.md](clusters_page.md) | `/clusters` | PCA + K-Means return clusters — live chart grid + on-demand daily PDF buttons |
 | [cointegration_page.md](cointegration_page.md) | `/cointegration` | Statistical pairs trading via Engle-Granger + Johansen |
 | [dataviz_page.md](dataviz_page.md) | `/dataviz` | Returns Intelligence — cross-sectional returns, scatter, breadth for NSE 500 |
 | [delivery_page.md](delivery_page.md) | `/delivery` | NSE delivery data intelligence — 6 signals, graded edge |

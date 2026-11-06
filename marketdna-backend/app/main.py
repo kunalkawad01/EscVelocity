@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50, charts, trading_rules
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50, charts, trading_rules, fno_reports
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
@@ -82,6 +82,7 @@ app.include_router(nifty50.ws_router)
 app.include_router(charts.router)
 app.include_router(charts.ws_router)
 app.include_router(trading_rules.router)
+app.include_router(fno_reports.router)
 
 log = __import__("logging").getLogger(__name__)
 

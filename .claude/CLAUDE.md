@@ -407,6 +407,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
 | `fno_momentum.py` | `/api/fno-momentum` | F&O Momentum Radar. `/scan` — OI Gainers (futures OI up) + Short Covering (price↑ OI↓) buckets, each row must pass ≥1 momentum qualifier (±5% last session · best sector today · ±2% gap at 9:15), sorted by day change %. POST `/invalidate` (delegates to fno tactical caches). Zero extra Kite calls — piggybacks `fno_tactical_service._get_scan()`. |
 | `trading_rules.py` | `/api/trading-rules` | Personal Trading Rules rulebook. `GET` (whole doc, or `null` if unsaved/DB down) + `PUT` (replace whole doc) over a single JSONB row in Postgres table `trading_rules`. No invalidate endpoint — not day-data, nothing to go stale. |
+| `fno_reports.py` | `/api/fno-reports` | Powers `/clusters`. `GET /cluster-snapshot` (PCA+K-Means, cached per date, `force=true` to recompute) + POST `/invalidate`. `POST /{job}/generate` (`job` = `returns`\|`cluster`) launches the matching `scripts/generate_fno_*.py` as a background subprocess; `GET /{job}/status` to poll; `GET /{job}/download` streams the latest PDF for that job. |
 
 ---
 
@@ -773,6 +774,12 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - Reads/writes the same `localStorage` cart as `/charts` (`useChartsCart`, key `charts_cart_v1`) — no separate backend, no Postgres table.
 - API: none of its own — reuses `chartsApi.getHistory`/`wsUrl` per visible tile, exactly as `/charts` does.
 
+### `/clusters` — ClustersPage
+- **Two on-demand PDF buttons** (FNO Returns Report, Cluster Report) — POST `/api/fno-reports/{job}/generate` kicks off the existing CLI script as a background subprocess (`fno_reports_jobs.py`), frontend polls `/status` every 3s while running, then shows a download link. Exists so the trader never has to remember the CLI commands.
+- **Live chart grid grouped by K-Means cluster** — reuses `/charts`' `ChartTile`/`useFoTicker`/`useInView`/`useChartsCart` verbatim, just sectioned by cluster instead of flat alphabetical.
+- **PCA + K-Means snapshot**: 1D/5D/1M/3M/1Y gap-inclusive returns, standardized, K-Means with k swept 3–7 (best silhouette score), clusters relabeled A/B/C… by descending mean 1Y return. Core logic lives in `app/services/fno_cluster_service.py` — single source of truth shared by the API (`GET /api/fno-reports/cluster-snapshot`, cached per calendar date) and `scripts/generate_fno_cluster_report.py` (imports from the service), so the live page and the PDF never disagree.
+- API: `fnoReportsApi` → `getClusterSnapshot`, `generate`, `getStatus`, `downloadUrl`.
+
 ### `/cointegration` — CointegrationPage
 - **Loads on mount**, single `cointegrationApi.getScan()` call. First load 3–5s (scan), subsequent <100ms (cached).
 - Uses `SectionCard` + `StatCard` from `../components/SectionCard` — not the standard `CARD` token.
@@ -890,6 +897,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/agents` | `page_docu/agents_page.md` |
 | `/charts` | `page_docu/charts_page.md` |
 | `/chart-cart` | `page_docu/chart_cart_page.md` |
+| `/clusters` | `page_docu/clusters_page.md` |
 | `/cointegration` | `page_docu/cointegration_page.md` |
 | `/dataviz` | `page_docu/dataviz_page.md` |
 | `/delivery` | `page_docu/delivery_page.md` |
