@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Box, Button, CircularProgress, Grid, Typography } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
+import { Box, Button, CircularProgress, Grid, Tab, Tabs, Typography } from '@mui/material'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import Navbar from '../components/Navbar'
@@ -121,6 +121,7 @@ export default function ClustersPage() {
   const [snapshot, setSnapshot] = useState<ClusterSnapshotResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeCluster, setActiveCluster] = useState<string | null>(null)
 
   const loadSnapshot = (force = false) => {
     setLoading(true)
@@ -132,6 +133,26 @@ export default function ClustersPage() {
   }
 
   useEffect(() => { loadSnapshot(false) }, [])
+
+  // Reset to the first (strongest-momentum) cluster whenever a fresh snapshot lands --
+  // covers both first load and "Recompute" landing on a different k (cluster count can
+  // shift day to day since k is chosen by silhouette score, not fixed).
+  useEffect(() => {
+    if (!snapshot) return
+    if (!snapshot.groups.some(g => g.cluster === activeCluster)) {
+      setActiveCluster(snapshot.groups[0]?.cluster ?? null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot])
+
+  const activeGroup = useMemo(
+    () => snapshot?.groups.find(g => g.cluster === activeCluster) ?? null,
+    [snapshot, activeCluster],
+  )
+  const activeColor = useMemo(() => {
+    const i = snapshot?.groups.findIndex(g => g.cluster === activeCluster) ?? -1
+    return i >= 0 ? CLUSTER_PALETTE[i % CLUSTER_PALETTE.length] : CLUSTER_PALETTE[0]
+  }, [snapshot, activeCluster])
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: BG }}>
@@ -197,25 +218,58 @@ export default function ClustersPage() {
           </Typography>
         )}
 
-        {snapshot?.groups.map((g, i) => {
-          const color = CLUSTER_PALETTE[i % CLUSTER_PALETTE.length]
-          return (
-            <Box key={g.cluster} sx={{ mb: 5 }}>
-              <SectionHead
-                title={`Cluster ${g.cluster} — ${g.character}`}
-                accent={color}
-                meta={`${g.n} symbols · 1D ${pct(g.mean_1d)} · 5D ${pct(g.mean_5d)} · 1M ${pct(g.mean_1m)} · 3M ${pct(g.mean_3m)} · 1Y ${pct(g.mean_1y)}`}
-              />
-              <Grid container spacing={2}>
-                {g.symbols.map(sym => (
-                  <Grid item xs={12} sm={6} md={4} key={sym}>
-                    <ChartTile symbol={sym} tick={ticks[sym]} isInCart={cart.isInCart} onToggleCart={cart.toggle} />
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          )
-        })}
+        {snapshot && snapshot.groups.length > 0 && (
+          <>
+            <Tabs
+              value={activeCluster}
+              onChange={(_, v) => setActiveCluster(v)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                minHeight: 40, mb: 2.5, borderBottom: `1px solid ${BORDER}`,
+                '& .MuiTabs-indicator': { bgcolor: activeColor, height: 2.5 },
+              }}
+            >
+              {snapshot.groups.map((g, i) => {
+                const color = CLUSTER_PALETTE[i % CLUSTER_PALETTE.length]
+                return (
+                  <Tab
+                    key={g.cluster}
+                    value={g.cluster}
+                    disableRipple
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: color }} />
+                        <Typography sx={{ ...SANS, fontSize: '0.74rem', fontWeight: 700 }}>
+                          Cluster {g.cluster}
+                        </Typography>
+                        <Typography sx={{ ...MONO, fontSize: '0.62rem', color: INK3 }}>({g.n})</Typography>
+                      </Box>
+                    }
+                    sx={{ minHeight: 40, textTransform: 'none', px: 1.5 }}
+                  />
+                )
+              })}
+            </Tabs>
+
+            {activeGroup && (
+              <Box>
+                <SectionHead
+                  title={activeGroup.character}
+                  accent={activeColor}
+                  meta={`${activeGroup.n} symbols · 1D ${pct(activeGroup.mean_1d)} · 5D ${pct(activeGroup.mean_5d)} · 1M ${pct(activeGroup.mean_1m)} · 3M ${pct(activeGroup.mean_3m)} · 1Y ${pct(activeGroup.mean_1y)}`}
+                />
+                <Grid container spacing={2}>
+                  {activeGroup.symbols.map(sym => (
+                    <Grid item xs={12} sm={6} md={4} key={sym}>
+                      <ChartTile symbol={sym} tick={ticks[sym]} isInCart={cart.isInCart} onToggleCart={cart.toggle} />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
+          </>
+        )}
       </Box>
 
       <Footer />
