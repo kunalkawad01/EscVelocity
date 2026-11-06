@@ -1,23 +1,11 @@
 import { useCallback, useState } from 'react'
 import { chartsApi } from '../api/chartsApi'
+import { EMPTY_FILTER, matchesFilter as matches } from '../components/charts/chartsCommon'
+import type { FilterOp, FilterValue } from '../components/charts/chartsCommon'
 import type { ChartsIndicatorEntry, ChartsTf } from '../types/charts'
 
-export type FilterOp = '<' | '>'
-
-export interface IndicatorFilterValue {
-  op: FilterOp
-  value: string
-}
-
-const EMPTY_FILTER: IndicatorFilterValue = { op: '<', value: '' }
-
-function matches(f: IndicatorFilterValue, v: number | null): boolean {
-  if (!f.value.trim()) return true           // blank textbox -- this indicator isn't filtering
-  const threshold = parseFloat(f.value)
-  if (Number.isNaN(threshold)) return true
-  if (v == null) return false                // couldn't compute this indicator for the symbol
-  return f.op === '<' ? v < threshold : v > threshold
-}
+export type { FilterOp }
+export type IndicatorFilterValue = FilterValue
 
 // RSI / ATR% / Returns% filters, shared by /charts and /chart-cart. The indicator
 // snapshot is a bulk backend scan (slow cold, ~70s for the full F&O universe) so it's

@@ -30,11 +30,20 @@ export interface ChartsHistoryResponse {
 }
 
 // One F&O underlying's latest tick, keyed by symbol in the /ws/charts message.
+// open/high/low are TODAY's session so far (Kite MODE_FULL tick's "ohlc" block);
+// prev_close is the PREVIOUS day's close -- same quirk fno_charts_service.py relies
+// on elsewhere for gap-inclusive returns. Powers the live return filters (vs
+// yesterday's close / today's open / today's high / today's low) on
+// /charts, /clusters and /chart-cart -- no backend scan needed, just arithmetic
+// against whatever tick is already streaming.
 export interface ChartsTick {
   ltp: number
   prev_close: number
   change: number
   change_pct: number
+  open?: number
+  high?: number
+  low?: number
   ts: string
 }
 

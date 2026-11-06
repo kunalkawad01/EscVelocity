@@ -9,6 +9,7 @@ import Footer from '../components/Footer'
 import SearchBox from '../components/shared/SearchBox'
 import { ChartTile } from '../components/charts/ChartTile'
 import { IndicatorFilterBar } from '../components/charts/IndicatorFilterBar'
+import { LiveReturnFilterBar } from '../components/charts/LiveReturnFilterBar'
 import { MONO, SANS, GREEN, RED, TF_LABELS, pct, CART_SECTIONS } from '../components/charts/chartsCommon'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
@@ -16,6 +17,7 @@ import { useFoTicker } from '../hooks/useFoTicker'
 import { chartsApi } from '../api/chartsApi'
 import { useChartsCart } from '../hooks/useChartsCart'
 import { useIndicatorFilters } from '../hooks/useIndicatorFilters'
+import { useLiveReturnFilters } from '../hooks/useLiveReturnFilters'
 
 export default function ChartsPage() {
   const { INK, INK2, INK3, CYAN, BG, BORDER, PAPER, PAPER2 } = usePalette()
@@ -27,6 +29,7 @@ export default function ChartsPage() {
   const cart = useChartsCart()
   const [cartOpen, setCartOpen] = useState(false)
   const indicatorFilters = useIndicatorFilters()
+  const liveFilters = useLiveReturnFilters(ticks)
 
   useEffect(() => {
     chartsApi.getSymbols().then(r => setSymbols(r.symbols)).catch(() => {})
@@ -39,8 +42,11 @@ export default function ChartsPage() {
   }, [symbols, search])
 
   const filtered = useMemo(
-    () => (indicatorFilters.active ? searched.filter(s => indicatorFilters.passes(s)) : searched),
-    [searched, indicatorFilters],
+    () => searched.filter(s =>
+      (!indicatorFilters.active || indicatorFilters.passes(s)) &&
+      (!liveFilters.active || liveFilters.passes(s)),
+    ),
+    [searched, indicatorFilters, liveFilters],
   )
 
   return (
@@ -85,9 +91,12 @@ export default function ChartsPage() {
       </Box>
 
       {/* RSI / ATR% / Returns% filter bar */}
-      <Box sx={{ px: { xs: 2, md: 4 }, py: 2, borderBottom: `1px solid ${BORDER}` }}>
+      <Box sx={{ px: { xs: 2, md: 4 }, py: 2, borderBottom: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         <Box sx={{ ...CARD, p: 1.5 }}>
           <IndicatorFilterBar f={indicatorFilters} />
+        </Box>
+        <Box sx={{ ...CARD, p: 1.5 }}>
+          <LiveReturnFilterBar f={liveFilters} />
         </Box>
       </Box>
 

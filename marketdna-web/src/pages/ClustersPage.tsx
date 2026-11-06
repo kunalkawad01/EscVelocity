@@ -5,11 +5,13 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { ChartTile } from '../components/charts/ChartTile'
+import { LiveReturnFilterBar } from '../components/charts/LiveReturnFilterBar'
 import { MONO, SANS, RED, pct } from '../components/charts/chartsCommon'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import { useFoTicker } from '../hooks/useFoTicker'
 import { useChartsCart } from '../hooks/useChartsCart'
+import { useLiveReturnFilters } from '../hooks/useLiveReturnFilters'
 import { fnoReportsApi } from '../api/fnoReportsApi'
 import type { ClusterSnapshotResponse, ReportJob, ReportJobStatus } from '../types/fnoReports'
 
@@ -115,9 +117,11 @@ function ReportButtonCard({ job }: { job: ReportJob }) {
 
 export default function ClustersPage() {
   const { INK, INK2, INK3, CYAN, BG, BORDER } = usePalette()
+  const { CARD } = useTokens()
   const { mode } = useThemeMode()
   const { ticks } = useFoTicker()
   const cart = useChartsCart()
+  const liveFilters = useLiveReturnFilters(ticks)
   const [snapshot, setSnapshot] = useState<ClusterSnapshotResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -153,6 +157,10 @@ export default function ClustersPage() {
     const i = snapshot?.groups.findIndex(g => g.cluster === activeCluster) ?? -1
     return i >= 0 ? CLUSTER_PALETTE[i % CLUSTER_PALETTE.length] : CLUSTER_PALETTE[0]
   }, [snapshot, activeCluster])
+  const activeSymbols = useMemo(
+    () => (activeGroup ? activeGroup.symbols.filter(sym => !liveFilters.active || liveFilters.passes(sym)) : []),
+    [activeGroup, liveFilters],
+  )
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: BG }}>
@@ -185,6 +193,13 @@ export default function ClustersPage() {
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <ReportButtonCard job="returns" />
           <ReportButtonCard job="cluster" />
+        </Box>
+      </Box>
+
+      {/* Live return filter bar */}
+      <Box sx={{ px: { xs: 2, md: 4 }, py: 2, borderBottom: `1px solid ${BORDER}` }}>
+        <Box sx={{ ...CARD, p: 1.5 }}>
+          <LiveReturnFilterBar f={liveFilters} />
         </Box>
       </Box>
 
@@ -257,15 +272,21 @@ export default function ClustersPage() {
                 <SectionHead
                   title={activeGroup.character}
                   accent={activeColor}
-                  meta={`${activeGroup.n} symbols · 1D ${pct(activeGroup.mean_1d)} · 5D ${pct(activeGroup.mean_5d)} · 1M ${pct(activeGroup.mean_1m)} · 3M ${pct(activeGroup.mean_3m)} · 1Y ${pct(activeGroup.mean_1y)}`}
+                  meta={`${liveFilters.active ? `${activeSymbols.length} / ${activeGroup.n}` : activeGroup.n} symbols · 1D ${pct(activeGroup.mean_1d)} · 5D ${pct(activeGroup.mean_5d)} · 1M ${pct(activeGroup.mean_1m)} · 3M ${pct(activeGroup.mean_3m)} · 1Y ${pct(activeGroup.mean_1y)}`}
                 />
-                <Grid container spacing={2}>
-                  {activeGroup.symbols.map(sym => (
-                    <Grid item xs={12} sm={6} md={4} key={sym}>
-                      <ChartTile symbol={sym} tick={ticks[sym]} isInCart={cart.isInCart} onToggleCart={cart.toggle} />
-                    </Grid>
-                  ))}
-                </Grid>
+                {!activeSymbols.length ? (
+                  <Typography sx={{ ...SANS, fontSize: '0.8rem', color: INK3, textAlign: 'center', py: 4 }}>
+                    No symbols in Cluster {activeGroup.cluster} match the current live return filters.
+                  </Typography>
+                ) : (
+                  <Grid container spacing={2}>
+                    {activeSymbols.map(sym => (
+                      <Grid item xs={12} sm={6} md={4} key={sym}>
+                        <ChartTile symbol={sym} tick={ticks[sym]} isInCart={cart.isInCart} onToggleCart={cart.toggle} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
               </Box>
             )}
           </>

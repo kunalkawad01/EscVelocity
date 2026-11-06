@@ -6,6 +6,7 @@ import Footer from '../components/Footer'
 import SearchBox from '../components/shared/SearchBox'
 import { ChartTile } from '../components/charts/ChartTile'
 import { IndicatorFilterBar } from '../components/charts/IndicatorFilterBar'
+import { LiveReturnFilterBar } from '../components/charts/LiveReturnFilterBar'
 import { MONO, SANS, GREEN, RED, TF_LABELS, pct, CART_SECTIONS } from '../components/charts/chartsCommon'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
@@ -13,6 +14,7 @@ import { useFoTicker } from '../hooks/useFoTicker'
 import { useChartsCart } from '../hooks/useChartsCart'
 import type { CartItem, CartDirection } from '../hooks/useChartsCart'
 import { useIndicatorFilters } from '../hooks/useIndicatorFilters'
+import { useLiveReturnFilters } from '../hooks/useLiveReturnFilters'
 import { CHARTS_TFS } from '../types/charts'
 import type { ChartsTf } from '../types/charts'
 
@@ -106,6 +108,7 @@ export default function ChartCartPage() {
   const [sortBy, setSortBy] = useState<SortBy>('newest')
   const [viewMode, setViewMode] = useState<ViewMode>('sections')
   const indicatorFilters = useIndicatorFilters()
+  const liveFilters = useLiveReturnFilters(ticks)
 
   const filtered = useMemo(() => {
     const q = search.trim().toUpperCase()
@@ -113,9 +116,10 @@ export default function ChartCartPage() {
       (!q || i.symbol.includes(q)) &&
       (dirFilter === 'all' || i.direction === dirFilter) &&
       (tfFilter === 'all' || i.tf === tfFilter) &&
-      (!indicatorFilters.active || indicatorFilters.passes(i.symbol)),
+      (!indicatorFilters.active || indicatorFilters.passes(i.symbol)) &&
+      (!liveFilters.active || liveFilters.passes(i.symbol)),
     )
-  }, [cart.items, search, dirFilter, tfFilter, indicatorFilters])
+  }, [cart.items, search, dirFilter, tfFilter, indicatorFilters, liveFilters])
 
   const sorted = useMemo(() => {
     const arr = [...filtered]
@@ -204,6 +208,9 @@ export default function ChartCartPage() {
           </Box>
           <Box sx={{ ...CARD, p: 1.5 }}>
             <IndicatorFilterBar f={indicatorFilters} />
+          </Box>
+          <Box sx={{ ...CARD, p: 1.5 }}>
+            <LiveReturnFilterBar f={liveFilters} />
           </Box>
           <Typography sx={{ ...MONO, fontSize: '0.62rem', color: INK3 }}>
             {sorted.length} / {cart.items.length} shown

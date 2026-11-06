@@ -246,7 +246,7 @@ def get_indicators_snapshot(tf: str) -> dict:
 
 # ── Kite WebSocket ticker — all ~209 F&O underlyings ──────────────────────────
 _tick_lock = threading.Lock()
-_fo_ticks: dict[str, dict] = {}       # symbol -> {ltp, prev_close, change, change_pct, ts}
+_fo_ticks: dict[str, dict] = {}       # symbol -> {ltp, prev_close, change, change_pct, open, high, low, ts}
 _fo_token_symbol: dict[int, str] = {}  # instrument_token -> symbol
 _ticker = None  # KiteTicker instance, module singleton
 
@@ -259,7 +259,14 @@ def _on_fo_ticks(ws, ticks: list[dict]) -> None:
             if sym is None:
                 continue
             ltp = float(t.get("last_price") or 0)
-            prev_close = float((t.get("ohlc") or {}).get("close") or 0)
+            ohlc = t.get("ohlc") or {}
+            # Kite's MODE_FULL "ohlc" block is {open, high, low} for TODAY's session
+            # plus "close" for the PREVIOUS day -- same quirk the rest of this file
+            # already relies on for prev_close/gap-inclusive returns.
+            prev_close = float(ohlc.get("close") or 0)
+            day_open = float(ohlc.get("open") or 0)
+            day_high = float(ohlc.get("high") or 0)
+            day_low = float(ohlc.get("low") or 0)
             change = ltp - prev_close if prev_close else 0.0
             change_pct = (change / prev_close * 100) if prev_close else 0.0
             _fo_ticks[sym] = {
@@ -267,6 +274,9 @@ def _on_fo_ticks(ws, ticks: list[dict]) -> None:
                 "prev_close": round(prev_close, 2),
                 "change": round(change, 2),
                 "change_pct": round(change_pct, 3),
+                "open": round(day_open, 2),
+                "high": round(day_high, 2),
+                "low": round(day_low, 2),
                 "ts": now_iso,
             }
 
