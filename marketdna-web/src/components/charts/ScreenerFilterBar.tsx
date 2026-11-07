@@ -4,7 +4,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { usePalette, useTokens } from '../../hooks/usePalette'
 import { MONO } from './chartsCommon'
 import {
-  SCREENER_FIELDS, SCREENER_FIELD_LABELS, PERCENTILE_KEYS, PERCENTILE_LABELS, pctileBandFor,
+  SCREENER_FIELDS, SCREENER_FIELD_LABELS, PERCENTILE_KEYS, PERCENTILE_LABELS, pctileBandFor, isPriceField,
 } from '../../hooks/useScreenerFilters'
 import type { PercentileKey, ScreenerField, ScreenerOp, UseScreenerFilters } from '../../hooks/useScreenerFilters'
 
@@ -132,6 +132,7 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
           {f.conditions.map((c, i) => {
             const pctileCapable = pctileBandFor(c.field) !== null
+            const isPrice = isPriceField(c.field)
             return (
               <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                 <Typography sx={{ ...MONO, fontSize: '0.58rem', fontWeight: 800, color: CYAN, minWidth: 26, textAlign: 'center' }}>
@@ -181,28 +182,30 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
                   </Select>
                 ) : (
                   <>
+                    {isPrice && <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>₹</Typography>}
                     <OutlinedInput
                       size="small"
                       value={c.value}
                       onChange={e => f.updateCondition(c.id, { value: e.target.value })}
-                      placeholder={c.op === 'between' ? 'e.g. 60' : 'e.g. 2'}
+                      placeholder={isPrice ? 'e.g. 500' : c.op === 'between' ? 'e.g. 60' : 'e.g. 2'}
                       inputProps={{ inputMode: 'decimal' }}
                       sx={{ ...INPUT_SX, width: 72, bgcolor: PAPER2, '& input': { ...MONO, fontSize: '0.68rem', py: 0.6, color: INK } }}
                     />
                     {c.op === 'between' && (
                       <>
                         <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>and</Typography>
+                        {isPrice && <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>₹</Typography>}
                         <OutlinedInput
                           size="small"
                           value={c.value2}
                           onChange={e => f.updateCondition(c.id, { value2: e.target.value })}
-                          placeholder="e.g. 90"
+                          placeholder={isPrice ? 'e.g. 1000' : 'e.g. 90'}
                           inputProps={{ inputMode: 'decimal' }}
                           sx={{ ...INPUT_SX, width: 72, bgcolor: PAPER2, '& input': { ...MONO, fontSize: '0.68rem', py: 0.6, color: INK } }}
                         />
                       </>
                     )}
-                    <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>%</Typography>
+                    {!isPrice && <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>%</Typography>}
                   </>
                 )}
                 {pctileCapable && (
@@ -248,10 +251,10 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
       </Box>
 
       <Typography sx={{ ...MONO, fontSize: '0.58rem', color: INK2 }}>
-        Add any number of conditions on live return fields (op can be &lt;, &gt;, or B/W for a between-range), then
-        pick Match ALL (AND) or Match ANY (OR) to combine them. "vs Yday Close"/"vs Today Open" conditions can
-        switch to "vs OWN %ILE" to compare against that stock's own 5-year percentile instead of a fixed number.
-        Live off the streaming tick — updates every second, no scan needed.
+        Add any number of conditions on live return fields, or raw LTP (op can be &lt;, &gt;, or B/W for a
+        between-range), then pick Match ALL (AND) or Match ANY (OR) to combine them. "vs Yday Close"/"vs Today Open"
+        conditions can switch to "vs OWN %ILE" to compare against that stock's own 5-year percentile instead of a
+        fixed number. Live off the streaming tick — updates every second, no scan needed.
       </Typography>
     </Box>
   )

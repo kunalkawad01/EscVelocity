@@ -3,17 +3,20 @@ import { giveBackPct, pctFrom, recoveryPct } from '../components/charts/chartsCo
 import type { ChartsTick, ScreenerSymbolStats } from '../types/charts'
 
 export type ScreenerField =
+  | 'ltp'
   | 'vsPrevClose' | 'vsOpen' | 'vsHigh' | 'vsLow'
   | 'giveBack' | 'recovery' | 'lowVsOpen' | 'highVsOpen'
   | 'vsSMA20' | 'vsSMA50' | 'vsSMA100' | 'vsSMA200'
 
 export const SCREENER_FIELDS: ScreenerField[] = [
+  'ltp',
   'vsPrevClose', 'vsOpen', 'vsHigh', 'vsLow',
   'giveBack', 'recovery', 'lowVsOpen', 'highVsOpen',
   'vsSMA20', 'vsSMA50', 'vsSMA100', 'vsSMA200',
 ]
 
 export const SCREENER_FIELD_LABELS: Record<ScreenerField, string> = {
+  ltp: 'LTP',
   vsPrevClose: 'vs Yday Close',
   vsOpen: 'vs Today Open',
   vsHigh: 'vs Today High',
@@ -26,6 +29,12 @@ export const SCREENER_FIELD_LABELS: Record<ScreenerField, string> = {
   vsSMA50: 'vs SMA50',
   vsSMA100: 'vs SMA100',
   vsSMA200: 'vs SMA200',
+}
+
+// Every field except LTP is a %-based return; LTP is a raw price. Drives the
+// unit suffix and placeholder text in ScreenerFilterBar's value box.
+export function isPriceField(field: ScreenerField): boolean {
+  return field === 'ltp'
 }
 
 // '<' / '>' compare against `value`; 'between' compares against the inclusive
@@ -75,6 +84,7 @@ let _idCounter = 0
 const nextId = () => `cond_${Date.now()}_${_idCounter++}`
 
 // Same live-tick-derived return metrics as useLiveReturnFilters, plus:
+//   - ltp -- the raw last-traded price itself, not a %-return (see isPriceField).
 //   - giveBack / recovery -- how much of a rally/decline the live price has
 //     handed back or clawed back (chartsCommon.giveBackPct/recoveryPct).
 //   - lowVsOpen / highVsOpen -- where the day's LOW/HIGH sits relative to the
@@ -88,6 +98,7 @@ const nextId = () => `cond_${Date.now()}_${_idCounter++}`
 // existing call site that doesn't need SMA fields can omit it.
 export function screenerMetric(t: ChartsTick, field: ScreenerField, stats?: ScreenerSymbolStats): number | null {
   switch (field) {
+    case 'ltp': return t.ltp
     case 'vsPrevClose': return t.prev_close ? t.change_pct : null
     case 'vsOpen': return pctFrom(t.ltp, t.open)
     case 'vsHigh': return pctFrom(t.ltp, t.high)

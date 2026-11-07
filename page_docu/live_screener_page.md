@@ -66,14 +66,20 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
 - **Dynamic AND/OR return filter.** Unlike `/charts`' `LiveReturnFilterBar` (four fixed
   slots — vs yesterday close / today open / today high / today low — always AND-ed), this
   page's `ScreenerFilterBar` is an open-ended list: "+ ADD CONDITION" appends a row with a
-  field `Select` (vs Yday Close / vs Today Open / vs Today High / vs Today Low / **Give-back
-  %** / **Recovery %** / **Low vs Open %** / **High vs Open %** / **vs SMA20/50/100/200**), a
-  3-way op toggle (`<` / `>` / **B/W**), and a value box; any number of rows can target the
-  same or different fields. Once 2+ conditions exist, a "Match ALL" / "Match ANY" toggle
-  appears and decides whether the table requires every condition to pass (AND) or at least
-  one (OR). No Apply step — re-evaluates instantly against the streaming tick (plus the bulk
-  `screener-stats` snapshot for SMA/percentile fields — see below), same instant feel as
-  `/charts`' live filters.
+  field `Select` (**LTP** / vs Yday Close / vs Today Open / vs Today High / vs Today Low /
+  **Give-back %** / **Recovery %** / **Low vs Open %** / **High vs Open %** /
+  **vs SMA20/50/100/200**), a 3-way op toggle (`<` / `>` / **B/W**), and a value box; any
+  number of rows can target the same or different fields. Once 2+ conditions exist, a "Match
+  ALL" / "Match ANY" toggle appears and decides whether the table requires every condition to
+  pass (AND) or at least one (OR). No Apply step — re-evaluates instantly against the
+  streaming tick (plus the bulk `screener-stats` snapshot for SMA/percentile fields — see
+  below), same instant feel as `/charts`' live filters.
+- **LTP is the one raw-price field — every other field is a %-return.** `isPriceField(field)`
+  (`useScreenerFilters.ts`) drives the value box's unit: a leading `₹` and a `500`-style
+  placeholder for LTP, vs the usual trailing `%` and `2`-style placeholder for everything
+  else. LTP has no "vs OWN %ILE" mode (`pctileBandFor('ltp')` is `null`, same as Give-back
+  %/Recovery %/vs-SMA — there's no "5-year distribution of this stock's own price" that would
+  mean anything) — e.g. `LTP < 500` screens for stocks currently trading under ₹500.
 - **"vs OWN %ILE" — compare against the stock's own history, not a fixed cutoff.** On a "vs
   Yday Close" or "vs Today Open" condition only, a "vs OWN %ILE" toggle appears next to the
   op buttons. Turning it on swaps the numeric value box for a Select of that symbol's own
