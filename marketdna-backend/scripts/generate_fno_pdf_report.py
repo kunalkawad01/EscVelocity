@@ -47,6 +47,7 @@ Run (from anywhere, using the backend venv python):
 import argparse
 import json
 import os
+import time
 import datetime as dt
 import urllib.parse
 from collections import OrderedDict
@@ -169,17 +170,36 @@ def find_movers(symbols: list[str]) -> pd.DataFrame:
 
 # --------------------------------------------------------- live intraday --
 
-def fetch_tf(symbol: str, tf: str, session: requests.Session):
-    try:
-        r = session.get(
-            f"{BACKEND}/api/charts/history",
-            params={"symbol": symbol, "tf": tf},
-            timeout=20,
-        )
-        r.raise_for_status()
-        return symbol, tf, r.json().get("candles") or []
-    except Exception:
-        return symbol, tf, None
+def fetch_tf(symbol: str, tf: str, session: requests.Session, retries: int = 3):
+    """Fetch one (symbol, tf) of live intraday candles, retrying on failure/empty
+    result -- Kite's historical API rate-limits around ~3 req/s and with 209
+    symbols x 3 live timeframes per PDF run, some individual calls always get
+    throttled or time out. The backend itself catches Kite exceptions and
+    returns HTTP 200 with an empty candles list + an "error" field rather than
+    a non-2xx status, so a transient hiccup must be detected from the payload,
+    not just from raise_for_status(). Without retrying here, a single throttled
+    call permanently blanks that symbol's chart tile."""
+    last_err = None
+    for attempt in range(retries):
+        try:
+            r = session.get(
+                f"{BACKEND}/api/charts/history",
+                params={"symbol": symbol, "tf": tf},
+                timeout=20,
+            )
+            r.raise_for_status()
+            body = r.json()
+            candles = body.get("candles") or []
+            if candles:
+                return symbol, tf, candles
+            last_err = body.get("error")
+        except Exception as exc:
+            last_err = str(exc)
+        if attempt < retries - 1:
+            time.sleep(1.5 * (attempt + 1))
+    if last_err:
+        print(f"  WARN {symbol} {tf}: no candles after {retries} attempts ({last_err})")
+    return symbol, tf, None
 
 
 def fetch_all_intraday(symbols: list[str]) -> dict:
