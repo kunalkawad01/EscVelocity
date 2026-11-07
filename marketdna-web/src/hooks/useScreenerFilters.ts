@@ -160,6 +160,24 @@ export function useScreenerFilters(ticks: Record<string, ChartsTick>, stats?: Re
 
   const clear = useCallback(() => setConditions([]), [])
 
+  // Add/remove one exact preset condition in one click -- e.g. the "Never Above
+  // Open" / "Never Below Open" quick-filter buttons in ScreenerFilterBar. Acts
+  // as a toggle: clicking it again (matching field+op+value, non-pctile) removes
+  // that condition rather than piling up duplicates.
+  const toggleQuickFilter = useCallback((field: ScreenerField, op: ScreenerOp, value: string) => {
+    setConditions(prev => {
+      const idx = prev.findIndex(c => !c.pctileMode && c.field === field && c.op === op && c.value === value)
+      if (idx >= 0) return prev.filter((_, i) => i !== idx)
+      return [...prev, { id: nextId(), field, op, value, value2: '', pctileMode: false }]
+    })
+  }, [])
+
+  const hasQuickFilter = useCallback(
+    (field: ScreenerField, op: ScreenerOp, value: string) =>
+      conditions.some(c => !c.pctileMode && c.field === field && c.op === op && c.value === value),
+    [conditions],
+  )
+
   const activeConditions = conditions.filter(isConditionActive)
   const active = activeConditions.length > 0
 
@@ -182,6 +200,7 @@ export function useScreenerFilters(ticks: Record<string, ChartsTick>, stats?: Re
   return {
     conditions, combinator, setCombinator,
     addCondition, updateCondition, removeCondition, clear,
+    toggleQuickFilter, hasQuickFilter,
     active, passes,
   }
 }

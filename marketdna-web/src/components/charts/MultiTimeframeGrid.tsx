@@ -29,14 +29,13 @@ const SCREENER_TFS: Array<{ tf: ChartsTf; label: string }> = [
 // no add-to-cart, since here the "switching" is done by laying all 6 out at
 // once instead of one tile with tabs.
 function MiniTfCard({
-  symbol, tf, label, hist, tick, loading,
+  symbol, tf, label, hist, tick,
 }: {
   symbol: string
   tf: ChartsTf
   label: string
-  hist: ChartsHistoryResponse | null | undefined
+  hist: ChartsHistoryResponse | undefined
   tick: ChartsTick | undefined
-  loading: boolean
 }) {
   const { INK, INK3, BORDER, CYAN } = usePalette()
   const { CARD } = useTokens()
@@ -132,7 +131,7 @@ function MiniTfCard({
       <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {!candles.length ? (
           <Typography sx={{ ...SANS, fontSize: '0.62rem', color: INK3, textAlign: 'center', mt: 2 }}>
-            {loading ? 'loading…' : (hist?.error ?? 'No candles.')}
+            {!hist ? 'loading…' : (hist.error ?? 'No candles.')}
           </Typography>
         ) : (
           <Box sx={{ position: 'absolute', inset: 0 }}>
@@ -150,21 +149,26 @@ function MiniTfCard({
 // Fetches all 6 timeframes in parallel once per symbol -- only mounted when a
 // Live Screener row is expanded, so this is already lazy by construction (no
 // separate IntersectionObserver gate needed, unlike /charts' tile grid).
+//
+// Each tf's result is written to state AS IT ARRIVES, not after Promise.all
+// settles -- the original version waited for the single slowest of the 6
+// fetches (often '1y', the largest payload) before showing ANY of them, so a
+// fast 'Today' response sat invisible behind a slow '1 Year' one. Writing
+// incrementally lets fast timeframes render immediately and spreads the 6
+// Highcharts mounts across separate render passes instead of one synchronous
+// burst, which is what actually made the expand feel like a freeze rather
+// than a mount cost -- a symbol reported as "slow / not smooth" to load.
 export function MultiTimeframeGrid({ symbol, tick }: { symbol: string; tick: ChartsTick | undefined }) {
-  const [hist, setHist] = useState<Record<string, ChartsHistoryResponse | null>>({})
-  const [loading, setLoading] = useState(true)
+  const [hist, setHist] = useState<Record<string, ChartsHistoryResponse>>({})
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    Promise.all(
-      SCREENER_TFS.map(({ tf }) => chartsApi.getHistory(symbol, tf).then(r => [tf, r] as const)),
-    ).then(results => {
-      if (cancelled) return
-      setHist(Object.fromEntries(results))
-    }).finally(() => {
-      if (!cancelled) setLoading(false)
-    })
+    setHist({}) // new symbol -- every card goes back to "loading…" immediately
+    for (const { tf } of SCREENER_TFS) {
+      chartsApi.getHistory(symbol, tf)
+        .then(r => { if (!cancelled) setHist(prev => ({ ...prev, [tf]: r })) })
+        .catch(() => { if (!cancelled) setHist(prev => ({ ...prev, [tf]: { tf, symbol, candles: [], error: 'Failed to load' } })) })
+    }
     return () => { cancelled = true }
   }, [symbol])
 
@@ -178,7 +182,6 @@ export function MultiTimeframeGrid({ symbol, tick }: { symbol: string; tick: Cha
             label={label}
             hist={hist[tf]}
             tick={tf === '1d' ? tick : undefined}
-            loading={loading}
           />
         </Grid>
       ))}

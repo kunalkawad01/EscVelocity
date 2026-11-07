@@ -108,6 +108,18 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
   box for two ("...and..."), e.g. **Give-back % B/W 60 and 90** — an inclusive range match,
   order-independent (typing 90-then-60 behaves identically to 60-then-90). Replaces what
   would otherwise need two stacked `>`/`<` conditions on the same field.
+- **Quick filter buttons — "Never Above Open" / "Never Below Open".** Two one-click toggle
+  chips above the condition list (`QUICK:` row) that add/remove one exact preset condition:
+  "Never Above Open" → `High vs Open % < 0.001`, "Never Below Open" → `Low vs Open % >
+  -0.001`. Clicking an active chip removes that exact condition rather than piling up
+  duplicates (`useScreenerFilters.toggleQuickFilter`/`hasQuickFilter` match on
+  field+op+value). Thresholds are `0.001`/`-0.001`, not exactly `0`, for the same reason the
+  manual version of this screen needs it (see Lessons Learnt below) — a stock that's only
+  moved one direction all session very commonly has `high === open` or `low === open`
+  exactly, and a strict `< 0`/`> 0` would wrongly exclude that equality case. "Open" here is
+  whichever the **Open Ref** toggle currently has selected (9:15 raw print or 9:18
+  reference) — the quick filters read `highVsOpen`/`lowVsOpen`, which are already computed
+  off `effectiveTicks`, so they inherit the override automatically with no extra wiring.
 
 ## Optimization
 
@@ -169,6 +181,18 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
 
 ## Lessons Learnt
 
+- **`Promise.all` across the 6 timeframe fetches made the whole grid wait for the single
+  slowest one.** The original `MultiTimeframeGrid` fetched all 6 `getHistory` calls via
+  `Promise.all(...).then(results => setHist(Object.fromEntries(results)))` — one state write,
+  after every promise settled. A fast "Today" response (already warm in
+  `fno_charts_service._history_cache`) sat invisible behind a slow cold "1 Year" fetch, so
+  the whole expanded row looked frozen on "loading…" for however long the slowest of the 6
+  took, then all 6 Highcharts instances mounted in one synchronous burst. Reported as "chart
+  loading is slow, not smooth." Fixed by writing each tf's result to state **as that specific
+  fetch resolves** (`setHist(prev => ({ ...prev, [tf]: r }))` inside each `.then()`, no
+  `Promise.all`) — fast timeframes now render immediately, and the 6 mounts naturally spread
+  across separate render passes instead of one big one. The `loading` boolean was removed
+  entirely in favor of `hist[tf] === undefined` meaning "still loading" for that one card.
 - **Row-click-to-expand needs `Record<symbol, boolean>`, not per-row `useState`.** Same
   rule as any `.map()`-rendered list with independent open/closed state (see CLAUDE.md
   Frontend lessons) — one `expanded` object in the page component, toggled with
@@ -279,10 +303,12 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
   - **5-Day / 1 Month / Quarterly / 1 Year** (`tf='5d'/'1mo'/'3mo'/'1y'`) — the same existing
     `/charts` timeframes, unchanged. Return% is first-candle-open → last-candle-close of
     each window, identical convention to `ChartTile`'s non-1D `periodPerf`.
-  - All 6 fetch in parallel per expand (see Optimization), each rendered as a real
-    candlestick chart with the same visual language as `ChartTile` (red/green candles, tiny
-    mono axis labels, prev-close dotted line on Today) — just without `ChartTile`'s
-    tabs/resolution toggle/cart buttons, since each card is already locked to one timeframe.
+  - All 6 fetch in parallel per expand and render **independently as each one resolves**
+    (see Optimization — a fast timeframe shows its chart immediately rather than waiting for
+    the slowest of the 6), each a real candlestick chart with the same visual language as
+    `ChartTile` (red/green candles, tiny mono axis labels, prev-close dotted line on Today)
+    — just without `ChartTile`'s tabs/resolution toggle/cart buttons, since each card is
+    already locked to one timeframe.
 - **5-year intraday return percentiles + moving averages, below the 6-timeframe grid.**
   `IntradayStatsTable` — a second fetch per expanded row, against `GET /api/stock/{symbol}/
   intraday-stats?years=5` (not `chartsApi` — this is a `stockApi` endpoint, since it's
@@ -320,8 +346,10 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
   '<' | '>' | 'between'`, `PercentileKey = 'min'|'p25'|'p50'|'p75'|'p90'|'max'`,
   `pctileBandFor(field)` (which of `intraday`/`closeToClose` a field maps to, or `null` if
   it has no percentile mode), `combinator`,
-  `addCondition`/`updateCondition`/`removeCondition`/`clear`, `active`, `passes(symbol,
-  stats?)`, local `matchesCondition`/`isConditionActive` -- deliberately not the shared
+  `addCondition`/`updateCondition`/`removeCondition`/`clear`, `toggleQuickFilter(field, op,
+  value)`/`hasQuickFilter(field, op, value)` (add/remove one exact preset condition in one
+  click, toggling on a field+op+value match), `active`, `passes(symbol, stats?)`, local
+  `matchesCondition`/`isConditionActive` -- deliberately not the shared
   `chartsCommon.matchesFilter`, which only knows `'<'`/`'>'`),
   `src/components/charts/ScreenerFilterBar.tsx` (the condition-row UI, including the local
   `ScreenerOpToggle` 3-way `<`/`>`/`B/W` control with an `allowBetween` prop (`false` in

@@ -43,6 +43,14 @@ function ScreenerOpToggle({ op, onChange, allowBetween = true }: { op: ScreenerO
   )
 }
 
+// The two preset quick-filter buttons -- "Never Above Open" / "Never Below
+// Open". Thresholds are a hair off zero (0.001 / -0.001), not exactly 0,
+// because the day's high/low very commonly *equals* the open for a stock that
+// has only moved one direction all session -- a strict "< 0"/"> 0" would wrongly
+// exclude that equality case (see live_screener_page.md Lessons Learnt).
+const NEVER_ABOVE_OPEN = { field: 'highVsOpen' as const, op: '<' as const, value: '0.001' }
+const NEVER_BELOW_OPEN = { field: 'lowVsOpen' as const, op: '>' as const, value: '-0.001' }
+
 // Dynamic AND/OR return-condition builder: any number of (field, op, value[,
 // value2], pctileMode) rows, combined by one chosen logic (Match ALL / Match
 // ANY). "Between" conditions (e.g. "Give-back % between 60 and 90") take two
@@ -54,8 +62,11 @@ function ScreenerOpToggle({ op, onChange, allowBetween = true }: { op: ScreenerO
 // streaming tick (plus the bulk screener-stats snapshot for SMA/percentile
 // fields) -- no Apply step, no extra network call from this component itself.
 export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
-  const { INK3, CYAN, BORDER } = usePalette()
+  const { INK, INK3, CYAN, BORDER } = usePalette()
   const { INPUT_SX, PAPER2 } = useTokens()
+
+  const aboveActive = f.hasQuickFilter(NEVER_ABOVE_OPEN.field, NEVER_ABOVE_OPEN.op, NEVER_ABOVE_OPEN.value)
+  const belowActive = f.hasQuickFilter(NEVER_BELOW_OPEN.field, NEVER_BELOW_OPEN.op, NEVER_BELOW_OPEN.value)
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
@@ -82,6 +93,39 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
             ))}
           </Box>
         )}
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+        <Typography sx={{ ...MONO, fontSize: '0.56rem', fontWeight: 700, color: INK3, letterSpacing: '0.06em' }}>
+          QUICK:
+        </Typography>
+        <Box
+          onClick={() => f.toggleQuickFilter(NEVER_ABOVE_OPEN.field, NEVER_ABOVE_OPEN.op, NEVER_ABOVE_OPEN.value)}
+          sx={{
+            px: 1, py: 0.35, borderRadius: 1, cursor: 'pointer',
+            bgcolor: aboveActive ? `${CYAN}20` : 'transparent',
+            border: `1px solid ${aboveActive ? CYAN : BORDER}`,
+          }}
+        >
+          <Typography sx={{ ...MONO, fontSize: '0.6rem', fontWeight: 800, color: aboveActive ? CYAN : INK }}>
+            NEVER ABOVE OPEN
+          </Typography>
+        </Box>
+        <Box
+          onClick={() => f.toggleQuickFilter(NEVER_BELOW_OPEN.field, NEVER_BELOW_OPEN.op, NEVER_BELOW_OPEN.value)}
+          sx={{
+            px: 1, py: 0.35, borderRadius: 1, cursor: 'pointer',
+            bgcolor: belowActive ? `${CYAN}20` : 'transparent',
+            border: `1px solid ${belowActive ? CYAN : BORDER}`,
+          }}
+        >
+          <Typography sx={{ ...MONO, fontSize: '0.6rem', fontWeight: 800, color: belowActive ? CYAN : INK }}>
+            NEVER BELOW OPEN
+          </Typography>
+        </Box>
+        <Typography sx={{ ...MONO, fontSize: '0.56rem', color: INK3 }}>
+          (High vs Open % &lt; 0.001 / Low vs Open % &gt; -0.001 — "Open" follows the Open Ref toggle above)
+        </Typography>
       </Box>
 
       {f.conditions.length > 0 && (
