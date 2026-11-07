@@ -24,6 +24,12 @@ and a persistent "chart cart" for bookmarking bullish/bearish setups by timefram
 - **Candlestick/line toggle.** Small 2-button switch per tile (next to the timeframe tabs)
   swaps the series between Highcharts `candlestick` and a filled `area` line, independently
   per card.
+- **1D candle resolution toggle (1M / 5M).** Shown only on the 1D tab, next to the
+  candlestick/line toggle — lets a trader switch that tile's live chart between 1-minute
+  and 5-minute candles. Independent per tile (two tiles can show different resolutions at
+  once) and remembered per tile across tf tab switches (flipping to 2D and back to 1D keeps
+  the last chosen resolution). Every other timeframe has one fixed interval and has no such
+  control.
 - **Previous-close reference line.** A dotted `yAxis` plot line at `tick.prev_close`,
   labeled "Prev Close", so a trader can see today's move against yesterday's close at a
   glance without reading the header number. Only drawn when a live tick exists for that
@@ -71,6 +77,10 @@ and a persistent "chart cart" for bookmarking bullish/bearish setups by timefram
   a grid of charts, so this is the equivalent cost-control for this page shape.
   (Fast-follow if scroll performance ever becomes an issue even with lazy mount: a true
   windowed grid.)
+- **Intraday tiles (1D/2D/5D) poll `getHistory` on an interval matching the backend's own
+  cache TTL** (15s/30s/60s) while mounted, instead of fetching once at mount and never
+  again — see Lessons Learnt. Longer timeframes (1mo…5y) fetch once only; their candles are
+  static EOD data that doesn't change intraday, so polling them would be pure waste.
 - **Per-(symbol, tf) history cache, short TTL on intraday.** `fno_charts_service.get_history`
   caches each (symbol, tf) response; 1d/2d/5d get a 15–60s TTL (cheap to refresh, changes
   fast), 1mo/3mo/ytd/1y/5y get a 300s TTL (daily candles, barely move intraday) — same
@@ -133,6 +143,38 @@ and a persistent "chart cart" for bookmarking bullish/bearish setups by timefram
   window's first-candle-open as the baseline — there's no single "previous close" that
   means anything for a 1-year window, so period-start-to-period-end remains correct there.
   See `_compute_indicators_one` in `fno_charts_service.py`.
+- **1D history must start at today's 09:15 open, not "now minus 24 hours."** The original
+  `get_history()` computed the 1D lookback as `to_dt - timedelta(days=1)` — a rolling 24h
+  window, which bleeds into the tail end of the *previous* trading session's candles
+  whenever `now` is before yesterday's exact clock time (e.g. checking the chart at 10:30am
+  pulls candles back to 10:30am yesterday, well before today's 09:15 open). Reported as a
+  bug (1D tile visibly starting with a chunk of the prior day). Fixed with `_session_start()`
+  in `fno_charts_service.py`: resolves 09:15 of the most recently started session — today at
+  09:15 if it's a weekday and that time has passed, else the most recent prior weekday —
+  and uses that as `from_dt` for `tf == '1d'` specifically. Every other timeframe (2D…5Y)
+  is unaffected; their rolling N-day lookbacks are correct by design since there's no single
+  "session start" to anchor to.
+- **A tile's history was only ever fetched once — new candles never appeared without a hard
+  refresh.** `ChartTile`'s live overlay (see Business Logic) only mutates the *last* bar of
+  whatever `hist.candles` array was fetched at mount; it never appends a new bar. Since the
+  original fetch effect had no re-fetch of any kind, the x-axis was frozen at mount time
+  forever — a trader watching the 1D tile all morning would see the live tick keep moving
+  the same last candle's close, but a brand-new minute candle (as the session progressed)
+  would never appear until the page was reloaded (which remounts `ChartTile`, forcing a
+  fresh fetch against whatever history Kite now has). Reported as "need a hard refresh to
+  see a new candle form." Fixed by polling `getHistory` on an interval for the 1D/2D/5D
+  tabs specifically, matching the backend's own TTL per tf (see Optimization) — a new
+  candle now appears on its own as the session progresses.
+- **Highstock auto-groups points you didn't ask it to group.** After shipping the 1M/5M
+  resolution toggle, both options visually looked identical — 1m's ~200+ points and 5m's
+  ~40 points both rendered as the same handful of wide bars. Root cause: Highstock's
+  candlestick/OHLC series has `dataGrouping` enabled by default, which re-buckets points to
+  keep each visual bar above a minimum pixel width — in a small square tile that silently
+  collapsed both resolutions down to roughly the same coarse grouping, making the toggle
+  look broken even though the correct raw data (confirmed via network requests) was being
+  fetched for each choice all along. The bug was in the chart options, not the fetch layer.
+  Fixed with `dataGrouping: { enabled: false }` on both the candlestick and area series so
+  the chart always plots the exact candles it was given.
 
 ## Business Logic
 
@@ -143,8 +185,20 @@ and a persistent "chart cart" for bookmarking bullish/bearish setups by timefram
   - 8 timeframes map to Kite intervals: 1d→minute/1day, 2d→5minute/2day, 5d→15minute/5day,
     1mo/3mo/1y/5y→day/N-day lookback, ytd→day from Jan 1 of the current year (not a fixed
     day-count, computed per request).
+  - **1D's lookback is session-anchored, not a rolling 24h window.** `from_dt` for `tf=='1d'`
+    is always 09:15 of the current (or, pre-market/weekend, most recent) trading day — so
+    the 1D tile always shows exactly "today's candles so far," never a mix of today's and
+    yesterday's bars. See Lessons Learnt.
 - **Live overlay is 1D-only by design**, not a limitation — EOD daily candles (1mo–5y)
   have nothing to tick live against until tomorrow's bar exists.
+- **1D resolution (1m/5m) is a display choice, not a separate timeframe.** It's an
+  `interval` query param on the same `GET /api/charts/history?tf=1d` endpoint (`'1m'`→Kite
+  `minute`, `'5m'`→Kite `5minute`), ignored server-side for every other `tf`. Cached as a
+  distinct `(symbol, '1d', interval)` entry so switching resolution on one tile never
+  evicts the other resolution's cached data — flipping back and forth doesn't re-hit Kite
+  if both were already warm. The cart's `periodPerf` (open→close) and the live tick overlay
+  (last bar's O/H/L/C) are unaffected by which resolution is selected — both operate on
+  "whatever the last bar in `hist.candles` is," regardless of its width.
 - **Cart is client-only, no backend endpoint.** It's a personal watchlist/trade-idea
   tracker scoped to one browser (`localStorage`, key `charts_cart_v1`), not shared data —
   consistent with every other piece of page state here (tf tab, chart type) being local
@@ -175,27 +229,31 @@ and a persistent "chart cart" for bookmarking bullish/bearish setups by timefram
 
 ## Tech Stack
 
-- Backend: `app/services/fno_charts_service.py` (symbol list, OHLCV history with TTL cache,
-  token resolution, KiteTicker lifecycle, `get_indicators_snapshot`/`_compute_indicators_one`
-  for RSI/ATR%/Returns%, reusing `indicators_service._rsi`/`_atr`), `app/routers/charts.py`
-  (`GET /api/charts/symbols`, `GET /api/charts/history`, `GET /api/charts/indicators`,
-  `WS /ws/charts` on a separate `ws_router` so the path has no `/api` prefix). Wired into
-  `app/main.py`'s background prewarm (`start_ticker`, tagged `"fno charts ticker"`) and
-  shutdown (`stop_ticker`).
+- Backend: `app/services/fno_charts_service.py` (symbol list, OHLCV history with TTL cache
+  keyed `(symbol, tf, interval)`, `ONE_D_INTERVALS` map for the 1D resolution toggle,
+  `_session_start()`, token resolution, KiteTicker lifecycle,
+  `get_indicators_snapshot`/`_compute_indicators_one` for RSI/ATR%/Returns%, reusing
+  `indicators_service._rsi`/`_atr`), `app/routers/charts.py`
+  (`GET /api/charts/symbols`, `GET /api/charts/history?symbol=&tf=&interval=`,
+  `GET /api/charts/indicators`, `WS /ws/charts` on a separate `ws_router` so the path has
+  no `/api` prefix). Wired into `app/main.py`'s background prewarm (`start_ticker`, tagged
+  `"fno charts ticker"`) and shutdown (`stop_ticker`).
 - Frontend: `src/pages/ChartsPage.tsx` (hero, grid, cart drawer). The chart tile itself,
   the live-tick websocket hook, the lazy-mount hook, and the shared formatting constants
   are **not** local to this page anymore — they live in `src/components/charts/` and
   `src/hooks/` so `/chart-cart` can reuse them (see `page_docu/chart_cart_page.md`):
   - `src/components/charts/ChartTile.tsx` — the chart tile (symbol header, add-to-cart
-    buttons, timeframe tabs, candlestick/line toggle, Highstock chart).
+    buttons, timeframe tabs, candlestick/line toggle, 1D resolution toggle, Highstock
+    chart).
   - `src/components/charts/chartsCommon.ts` — `MONO`, `SANS`, `GREEN`, `RED`, `TF_LABELS`,
     `pct`, `CART_SECTIONS`.
   - `src/components/charts/IndicatorFilterBar.tsx` — the RSI/ATR%/Returns% filter UI
     (Indicator TF pills, three `<`/`>` + value fields, Apply/Re-scan/Clear, status line).
   - `src/hooks/useFoTicker.ts`, `src/hooks/useInView.ts`, `src/hooks/useIndicatorFilters.ts`
     (filter state + snapshot fetch + `passes(symbol)` matcher — see Business Logic).
-  - `src/api/chartsApi.ts` (`getSymbols`, `getHistory`, `getIndicators`, `wsUrl`),
-    `src/types/charts.ts` (`ChartsTf`, `CHARTS_TFS`, `ChartsTick`, `ChartsCandle`,
+  - `src/api/chartsApi.ts` (`getSymbols`, `getHistory` — takes an optional
+    `ChartsOneDInterval`, `getIndicators`, `wsUrl`), `src/types/charts.ts` (`ChartsTf`,
+    `CHARTS_TFS`, `ChartsOneDInterval`, `ONE_D_INTERVALS`, `ChartsTick`, `ChartsCandle`,
     `ChartsHistoryResponse`, `ChartsWsMessage`, `ChartsIndicatorEntry`,
     `ChartsIndicatorsResponse`).
   Highcharts/Highstock via `highcharts-react-official` (`constructorType="stockChart"`),
