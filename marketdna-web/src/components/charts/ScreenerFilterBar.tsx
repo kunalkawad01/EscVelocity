@@ -15,7 +15,7 @@ import type { PercentileKey, ScreenerField, ScreenerOp, UseScreenerFilters } fro
 // `allowBetween=false` (percentile mode) hides the B/W option -- a percentile
 // condition is already "< / > one breakpoint", not a fixed numeric range.
 function ScreenerOpToggle({ op, onChange, allowBetween = true }: { op: ScreenerOp; onChange: (op: ScreenerOp) => void; allowBetween?: boolean }) {
-  const { INK3, CYAN, BORDER } = usePalette()
+  const { INK2, CYAN, BORDER } = usePalette()
   const OPS: Array<{ value: ScreenerOp; label: string }> = [
     { value: '<', label: '<' },
     { value: '>', label: '>' },
@@ -34,7 +34,7 @@ function ScreenerOpToggle({ op, onChange, allowBetween = true }: { op: ScreenerO
             border: `1px solid ${op === o.value ? CYAN : BORDER}`,
           }}
         >
-          <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 800, color: op === o.value ? CYAN : INK3 }}>
+          <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 800, color: op === o.value ? CYAN : INK2 }}>
             {o.label}
           </Typography>
         </Box>
@@ -62,7 +62,7 @@ const NEVER_BELOW_OPEN = { field: 'lowVsOpen' as const, op: '>' as const, value:
 // streaming tick (plus the bulk screener-stats snapshot for SMA/percentile
 // fields) -- no Apply step, no extra network call from this component itself.
 export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
-  const { INK, INK3, CYAN, BORDER } = usePalette()
+  const { INK, INK2, CYAN, BORDER } = usePalette()
   const { INPUT_SX, PAPER2 } = useTokens()
 
   const aboveActive = f.hasQuickFilter(NEVER_ABOVE_OPEN.field, NEVER_ABOVE_OPEN.op, NEVER_ABOVE_OPEN.value)
@@ -71,7 +71,7 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-        <Typography sx={{ ...MONO, fontSize: '0.6rem', fontWeight: 700, color: INK3, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        <Typography sx={{ ...MONO, fontSize: '0.6rem', fontWeight: 700, color: INK2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           Dynamic Return Filter
         </Typography>
         {f.conditions.length > 1 && (
@@ -86,7 +86,7 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
                   border: `1px solid ${f.combinator === m ? CYAN : BORDER}`,
                 }}
               >
-                <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 800, color: f.combinator === m ? CYAN : INK3 }}>
+                <Typography sx={{ ...MONO, fontSize: '0.62rem', fontWeight: 800, color: f.combinator === m ? CYAN : INK2 }}>
                   Match {m === 'AND' ? 'ALL' : 'ANY'}
                 </Typography>
               </Box>
@@ -96,7 +96,7 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-        <Typography sx={{ ...MONO, fontSize: '0.56rem', fontWeight: 700, color: INK3, letterSpacing: '0.06em' }}>
+        <Typography sx={{ ...MONO, fontSize: '0.56rem', fontWeight: 700, color: INK2, letterSpacing: '0.06em' }}>
           QUICK:
         </Typography>
         <Box
@@ -123,7 +123,7 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
             NEVER BELOW OPEN
           </Typography>
         </Box>
-        <Typography sx={{ ...MONO, fontSize: '0.56rem', color: INK3 }}>
+        <Typography sx={{ ...MONO, fontSize: '0.56rem', color: INK2 }}>
           (High vs Open % &lt; 0.001 / Low vs Open % &gt; -0.001 — "Open" follows the Open Ref toggle above)
         </Typography>
       </Box>
@@ -151,11 +151,11 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
                       value: c.pctileMode && !stillPctileCapable ? '' : c.value,
                     })
                   }}
-                  sx={{ ...INPUT_SX, width: 150, '& .MuiSelect-select': { ...MONO, fontSize: '0.66rem', py: 0.6 } }}
+                  sx={{ ...INPUT_SX, width: 150, '& .MuiSelect-select': { ...MONO, fontSize: '0.66rem', py: 0.6, color: INK } }}
                   MenuProps={{ PaperProps: { sx: { bgcolor: PAPER2 } } }}
                 >
                   {SCREENER_FIELDS.map(fld => (
-                    <MenuItem key={fld} value={fld} sx={{ ...MONO, fontSize: '0.7rem' }}>
+                    <MenuItem key={fld} value={fld} sx={{ ...MONO, fontSize: '0.7rem', color: INK }}>
                       {SCREENER_FIELD_LABELS[fld]}
                     </MenuItem>
                   ))}
@@ -170,11 +170,11 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
                     size="small"
                     value={PERCENTILE_KEYS.includes(c.value as PercentileKey) ? c.value : 'p50'}
                     onChange={e => f.updateCondition(c.id, { value: e.target.value })}
-                    sx={{ ...INPUT_SX, width: 150, '& .MuiSelect-select': { ...MONO, fontSize: '0.66rem', py: 0.6 } }}
+                    sx={{ ...INPUT_SX, width: 150, '& .MuiSelect-select': { ...MONO, fontSize: '0.66rem', py: 0.6, color: INK } }}
                     MenuProps={{ PaperProps: { sx: { bgcolor: PAPER2 } } }}
                   >
                     {PERCENTILE_KEYS.map(k => (
-                      <MenuItem key={k} value={k} sx={{ ...MONO, fontSize: '0.7rem' }}>
+                      <MenuItem key={k} value={k} sx={{ ...MONO, fontSize: '0.7rem', color: INK }}>
                         {PERCENTILE_LABELS[k]}
                       </MenuItem>
                     ))}
@@ -187,22 +187,22 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
                       onChange={e => f.updateCondition(c.id, { value: e.target.value })}
                       placeholder={c.op === 'between' ? 'e.g. 60' : 'e.g. 2'}
                       inputProps={{ inputMode: 'decimal' }}
-                      sx={{ ...INPUT_SX, width: 72, bgcolor: PAPER2, '& input': { ...MONO, fontSize: '0.68rem', py: 0.6 } }}
+                      sx={{ ...INPUT_SX, width: 72, bgcolor: PAPER2, '& input': { ...MONO, fontSize: '0.68rem', py: 0.6, color: INK } }}
                     />
                     {c.op === 'between' && (
                       <>
-                        <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK3 }}>and</Typography>
+                        <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>and</Typography>
                         <OutlinedInput
                           size="small"
                           value={c.value2}
                           onChange={e => f.updateCondition(c.id, { value2: e.target.value })}
                           placeholder="e.g. 90"
                           inputProps={{ inputMode: 'decimal' }}
-                          sx={{ ...INPUT_SX, width: 72, bgcolor: PAPER2, '& input': { ...MONO, fontSize: '0.68rem', py: 0.6 } }}
+                          sx={{ ...INPUT_SX, width: 72, bgcolor: PAPER2, '& input': { ...MONO, fontSize: '0.68rem', py: 0.6, color: INK } }}
                         />
                       </>
                     )}
-                    <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK3 }}>%</Typography>
+                    <Typography sx={{ ...MONO, fontSize: '0.6rem', color: INK2 }}>%</Typography>
                   </>
                 )}
                 {pctileCapable && (
@@ -218,13 +218,13 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
                       border: `1px solid ${c.pctileMode ? CYAN : BORDER}`,
                     }}
                   >
-                    <Typography sx={{ ...MONO, fontSize: '0.58rem', fontWeight: 800, color: c.pctileMode ? CYAN : INK3 }}>
+                    <Typography sx={{ ...MONO, fontSize: '0.58rem', fontWeight: 800, color: c.pctileMode ? CYAN : INK2 }}>
                       vs OWN %ILE
                     </Typography>
                   </Box>
                 )}
                 <IconButton size="small" onClick={() => f.removeCondition(c.id)} sx={{ p: 0.3 }}>
-                  <DeleteOutlineIcon sx={{ fontSize: '0.95rem', color: INK3 }} />
+                  <DeleteOutlineIcon sx={{ fontSize: '0.95rem', color: INK2 }} />
                 </IconButton>
               </Box>
             )
@@ -242,12 +242,12 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
         </Box>
         {f.conditions.length > 0 && (
           <Box onClick={f.clear} sx={{ px: 1.1, py: 0.5, borderRadius: 1, cursor: 'pointer', border: `1px solid ${BORDER}` }}>
-            <Typography sx={{ ...MONO, fontSize: '0.64rem', fontWeight: 700, color: INK3 }}>CLEAR</Typography>
+            <Typography sx={{ ...MONO, fontSize: '0.64rem', fontWeight: 700, color: INK2 }}>CLEAR</Typography>
           </Box>
         )}
       </Box>
 
-      <Typography sx={{ ...MONO, fontSize: '0.58rem', color: INK3 }}>
+      <Typography sx={{ ...MONO, fontSize: '0.58rem', color: INK2 }}>
         Add any number of conditions on live return fields (op can be &lt;, &gt;, or B/W for a between-range), then
         pick Match ALL (AND) or Match ANY (OR) to combine them. "vs Yday Close"/"vs Today Open" conditions can
         switch to "vs OWN %ILE" to compare against that stock's own 5-year percentile instead of a fixed number.
