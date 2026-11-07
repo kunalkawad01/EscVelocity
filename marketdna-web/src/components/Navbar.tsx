@@ -48,6 +48,7 @@ const NAV_GROUPS = [
       { to: '/fno-momentum',     label: 'F&O Momentum', desc: 'OI gainers & short covering with momentum filters' },
       { to: '/nifty50-live',     label: 'Nifty 50 Live', desc: 'Live index tick, contributors & option chain' },
       { to: '/charts',           label: 'Charts',        desc: 'Live candlestick grid across the F&O universe' },
+      { to: '/live-screener',    label: 'Live Screener', desc: 'Sortable live table — open/high/low/close, dynamic AND/OR return filters' },
       { to: '/chart-cart',       label: 'Chart Cart',    desc: 'Saved bullish/bearish setups, filterable by timeframe' },
       { to: '/clusters',         label: 'Clusters',      desc: 'PCA + K-Means return clusters — chart grid & daily PDF buttons' },
       { to: '/trading-rules',    label: 'Trading Rules', desc: 'Editable personal discipline & risk rulebook' },

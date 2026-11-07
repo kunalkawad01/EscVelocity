@@ -3,7 +3,7 @@ from app.services import stock_metrics, stock_metrics_advanced
 from app.models.stock import (
     OHLCVResponse, RelativeStrengthResponse, ReturnsResponse,
     RiskResponse, DrawdownResponse, MarketComparisonResponse,
-    PercentilesResponse, StockSummary, SymbolListResponse,
+    PercentilesResponse, IntradayStatsResponse, StockSummary, SymbolListResponse,
     RegimeResponse, TrendPersistenceResponse, InsightsResponse,
     AnalogResponse,
 )
@@ -95,6 +95,17 @@ def stock_market_comparison(symbol: str):
 def stock_percentiles(symbol: str):
     try:
         return stock_metrics.get_percentiles(symbol.upper())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{symbol}/intraday-stats", response_model=IntradayStatsResponse)
+def stock_intraday_stats(symbol: str, years: int = 5):
+    """Intraday (open->close) return percentiles (min/25/50/75/90/max) over the
+    last `years` years, plus latest SMA20/50/100/200 -- powers the Live
+    Screener's expanded-row stats table."""
+    try:
+        return stock_metrics.get_intraday_stats(symbol.upper(), years)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

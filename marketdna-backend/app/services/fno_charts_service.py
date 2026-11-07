@@ -22,6 +22,7 @@ from typing import Optional
 
 import numpy as np
 
+from app.services.duckdb_client import get_connection
 from app.services.fno_tactical_service import _FO_SYMBOLS
 from app.services.indicators_service import _rsi, _atr
 from app.services.kite_client import get_kite
@@ -41,7 +42,8 @@ TF_CONFIG: dict[str, tuple[str, int]] = {
     "5y":  ("day", 1825),
 }
 YTD_TF = "ytd"
-ALL_TFS = ("1d", "2d", "5d", "1mo", "3mo", "ytd", "1y", "5y")
+YESTERDAY_TF = "yesterday"
+ALL_TFS = ("1d", "yesterday", "2d", "5d", "1mo", "3mo", "ytd", "1y", "5y")
 
 # Selectable candle resolution for the 1D tab only -- every other timeframe has a
 # single fixed interval (see TF_CONFIG) appropriate to its own lookback window.
@@ -104,8 +106,23 @@ def _session_start(now: datetime) -> datetime:
     return datetime(d.year, d.month, d.day, 9, 15)
 
 
+def _prev_session_bounds(now: datetime) -> tuple[datetime, datetime]:
+    """09:15->15:30 of the trading day immediately before the current session
+    (see _session_start) -- the 'Yesterday' tab's fixed lookback window. Always a
+    fully-completed session (never today), so the close bound is always 15:30
+    rather than "now"."""
+    cur_session_date = _session_start(now).date()
+    d = cur_session_date - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return datetime(d.year, d.month, d.day, 9, 15), datetime(d.year, d.month, d.day, 15, 30)
+
+
 def get_history(symbol: str, tf: str, interval: str = "1m") -> dict:
-    """OHLCV candles for one F&O underlying across the 8 Charts-page timeframes.
+    """OHLCV candles for one F&O underlying across the 9 Charts-page timeframes
+    (adds 'yesterday' -- the prior completed trading session only, 09:15-15:30,
+    fixed Kite interval '5minute' -- used by the Live Screener's 6-timeframe
+    expanded view; not a tab on the /charts tile grid itself).
 
     `interval` ('1m'/'5m') only applies to tf='1d' -- lets a trader switch the live
     1D tab between 1-minute and 5-minute candles. Every other timeframe ignores it
@@ -137,6 +154,9 @@ def get_history(symbol: str, tf: str, interval: str = "1m") -> dict:
     elif tf == "1d":
         kite_interval = ONE_D_INTERVALS.get(interval, "minute")
         from_dt = _session_start(to_dt)
+    elif tf == YESTERDAY_TF:
+        kite_interval = "5minute"
+        from_dt, to_dt = _prev_session_bounds(to_dt)
     else:
         kite_interval, days = TF_CONFIG[tf]
         from_dt = to_dt - timedelta(days=days)
@@ -241,6 +261,153 @@ def get_indicators_snapshot(tf: str) -> dict:
         "computed_at": datetime.now().isoformat(timespec="seconds"),
     }
     _indicators_cache[tf] = (time.time(), result)
+    return result
+
+
+# ── Reference-open snapshot (noise-reduced "open") ─────────────────────────────
+# The raw 09:15 open print can be choppy -- the opening auction / first minute or
+# two of algo activity often prints a value the stock doesn't hold. This exposes
+# "price at HH:MM" (e.g. 09:18) as an alternative open reference for the Live
+# Screener's open-based columns/filters (From Open %, Give-back %, Recovery %,
+# Low/High vs Open %), computed from the same 1D 1-minute candle series
+# get_history() already caches -- reuses it rather than a second Kite call shape.
+_REF_OPEN_CACHE: dict[str, tuple[float, dict]] = {}  # "HH:MM" -> (fetched_at, response)
+_REF_OPEN_TTL = 120  # the reference is effectively frozen once the session passes HH:MM
+
+
+def _reference_open_one(symbol: str, minute: str) -> Optional[float]:
+    hist = get_history(symbol, "1d", "1m")
+    candles = hist.get("candles") or []
+    for c in candles:
+        # c["time"] is an ISO timestamp with the Asia/Kolkata offset, e.g.
+        # "2026-11-07T09:18:00+05:30" -- slicing out HH:MM avoids a datetime
+        # parse + tz-compare per candle for what's otherwise a plain string match.
+        if c["time"][11:16] >= minute:
+            return c["open"]
+    return None  # today's session hasn't reached `minute` yet for this symbol
+
+
+def get_reference_open_snapshot(minute: str = "09:18") -> dict:
+    """Bulk 'price at HH:MM' for every F&O symbol today, in one response -- powers
+    the Live Screener's 9:15-vs-9:18(or other) open-reference toggle without 209
+    individual client-side history fetches. Slow (~70s) cold since it still needs
+    one Kite historical_data call per symbol under get_history(); fast on repeat
+    calls within the TTL, and free for any symbol whose (symbol, '1d', '1m') entry
+    is already warm from the Charts page / indicator scan.
+    """
+    cached = _REF_OPEN_CACHE.get(minute)
+    if cached and (time.time() - cached[0]) < _REF_OPEN_TTL:
+        return cached[1]
+
+    symbols = sorted(_FO_SYMBOLS)
+    opens: dict[str, float] = {}
+    with ThreadPoolExecutor(max_workers=_INDICATORS_MAX_WORKERS) as ex:
+        futures = {ex.submit(_reference_open_one, s, minute): s for s in symbols}
+        for fut, sym in futures.items():
+            try:
+                v = fut.result()
+            except Exception as exc:
+                log.warning("get_reference_open_snapshot(%s): %s failed -- %s", minute, sym, exc)
+                continue
+            if v is not None:
+                opens[sym] = round(v, 2)
+
+    result = {
+        "minute": minute,
+        "opens": opens,
+        "computed_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    _REF_OPEN_CACHE[minute] = (time.time(), result)
+    return result
+
+
+# ── Bulk historical return-percentile bands + SMA (Live Screener filter) ──────
+# Per-symbol 5-year return-percentile breakpoints (intraday open->close AND
+# close-to-close) plus latest SMA20/50/100/200, across the whole F&O universe in
+# ONE grouped DuckDB query -- powers the Live Screener's "vs own percentile"
+# filter mode (e.g. "vs Yday Close < this stock's own 25th percentile" -- an
+# unusually weak day for THAT stock specifically, not a fixed % cutoff that
+# means something different for a low-vol vs high-vol name) and its
+# vs-SMA20/50/100/200 filter fields. Pure local DuckDB aggregation, not a Kite
+# call, so this is fast (a single grouped scan) even cold -- nothing like the
+# per-symbol Kite historical_data cost of get_reference_open_snapshot.
+_PCTL_BANDS_CACHE: dict[int, tuple[float, dict]] = {}  # years -> (fetched_at, response)
+_PCTL_BANDS_TTL = 3600  # 5y percentile bands + SMA barely move intraday
+
+
+def get_percentile_bands(years: int = 5) -> dict:
+    cached = _PCTL_BANDS_CACHE.get(years)
+    if cached and (time.time() - cached[0]) < _PCTL_BANDS_TTL:
+        return cached[1]
+
+    con = get_connection()
+    cutoff = (datetime.now().date() - timedelta(days=365 * years))
+    symbols = sorted(_FO_SYMBOLS)
+
+    df = con.execute("""
+        WITH base AS (
+            SELECT symbol, CAST(date AS DATE) AS d, open, close,
+                LAG(close) OVER (PARTITION BY symbol ORDER BY CAST(date AS DATE)) AS prev_close,
+                ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY CAST(date AS DATE) DESC) AS rn_desc
+            FROM equities_prices
+            WHERE symbol = ANY(?) AND CAST(date AS DATE) >= ?
+        ),
+        rets AS (
+            SELECT symbol, rn_desc, close,
+                (close - open) / NULLIF(open, 0) * 100 AS intraday_ret,
+                CASE WHEN prev_close IS NOT NULL
+                     THEN (close - prev_close) / NULLIF(prev_close, 0) * 100 END AS cc_ret
+            FROM base
+            WHERE open IS NOT NULL
+        )
+        SELECT symbol, COUNT(*) AS n,
+            MIN(intraday_ret) AS i_min,
+            QUANTILE_CONT(intraday_ret, 0.25) AS i_p25,
+            QUANTILE_CONT(intraday_ret, 0.50) AS i_p50,
+            QUANTILE_CONT(intraday_ret, 0.75) AS i_p75,
+            QUANTILE_CONT(intraday_ret, 0.90) AS i_p90,
+            MAX(intraday_ret) AS i_max,
+            MIN(cc_ret) AS c_min,
+            QUANTILE_CONT(cc_ret, 0.25) AS c_p25,
+            QUANTILE_CONT(cc_ret, 0.50) AS c_p50,
+            QUANTILE_CONT(cc_ret, 0.75) AS c_p75,
+            QUANTILE_CONT(cc_ret, 0.90) AS c_p90,
+            MAX(cc_ret) AS c_max,
+            AVG(CASE WHEN rn_desc <= 20 THEN close END) AS sma20,
+            AVG(CASE WHEN rn_desc <= 50 THEN close END) AS sma50,
+            AVG(CASE WHEN rn_desc <= 100 THEN close END) AS sma100,
+            AVG(CASE WHEN rn_desc <= 200 THEN close END) AS sma200
+        FROM rets
+        GROUP BY symbol
+    """, [symbols, cutoff]).pl()
+
+    def _r(v: Optional[float], dp: int = 3) -> Optional[float]:
+        return round(float(v), dp) if v is not None else None
+
+    stats: dict[str, dict] = {}
+    for row in df.to_dicts():
+        stats[row["symbol"]] = {
+            "n": row["n"],
+            "intraday": {
+                "min": _r(row["i_min"]), "p25": _r(row["i_p25"]), "p50": _r(row["i_p50"]),
+                "p75": _r(row["i_p75"]), "p90": _r(row["i_p90"]), "max": _r(row["i_max"]),
+            },
+            "closeToClose": {
+                "min": _r(row["c_min"]), "p25": _r(row["c_p25"]), "p50": _r(row["c_p50"]),
+                "p75": _r(row["c_p75"]), "p90": _r(row["c_p90"]), "max": _r(row["c_max"]),
+            },
+            "sma": {
+                "sma20": _r(row["sma20"], 2), "sma50": _r(row["sma50"], 2),
+                "sma100": _r(row["sma100"], 2), "sma200": _r(row["sma200"], 2),
+            },
+        }
+
+    result = {
+        "years": years,
+        "stats": stats,
+        "computed_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    _PCTL_BANDS_CACHE[years] = (time.time(), result)
     return result
 
 

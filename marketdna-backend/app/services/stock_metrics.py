@@ -1,7 +1,7 @@
 """All metric calculations via DuckDB. No analytics in Python unless post-processing."""
 import functools
 import numpy as np
-from datetime import date as _date
+from datetime import date as _date, timedelta
 from typing import Any, Optional
 from app.services.duckdb_client import get_connection
 from app.services.redis_client import cache, TTL_24H
@@ -53,6 +53,7 @@ from app.models.stock import (
     DrawdownResponse, DrawdownPoint, DrawdownStats,
     MarketComparisonResponse, RatioPoint, MarketComparisonStats,
     PercentilesResponse, PercentileMetric,
+    IntradayStatsResponse, IntradayPercentiles, SMASnapshot,
     StockSummary,
     RegimePoint, RegimeStats, RegimeResponse,
     SMAStreak, TrendPersistenceResponse,
@@ -512,6 +513,61 @@ def get_percentiles(symbol: str) -> PercentilesResponse:
         PercentileMetric(metric="1-Year Return", current_value=round(last["ret_1y"] or 0, 2), unit="%", percentile=pct_rank(ret_1y, last["ret_1y"]), label="Annual"),
     ]
     return PercentilesResponse(symbol=symbol, metrics=metrics)
+
+
+@_day_cached
+def get_intraday_stats(symbol: str, years: int = 5) -> IntradayStatsResponse:
+    """Intraday (open->close) daily return distribution over the last `years`
+    years, plus the latest SMA20/50/100/200 off the same close series -- powers
+    the Live Screener's expanded-row stats table.
+
+    "Intraday return" here means the stock's own in-session move,
+    (close-open)/open*100 per day -- distinct from get_returns()'s daily_stats,
+    which is close-to-close and therefore includes the overnight gap. SMAs are
+    the plain trailing mean of close over the window ending on the latest bar
+    in the 5y series (not a true "last 200 trading days from today" if the feed
+    has a gap, but equities_prices has no such gaps in practice).
+    """
+    con = get_connection()
+    cutoff = _date.today() - timedelta(days=365 * years)
+
+    df = con.execute("""
+        SELECT CAST(date AS DATE) AS d, open, close
+        FROM equities_prices
+        WHERE symbol = ? AND CAST(date AS DATE) >= ?
+        ORDER BY d
+    """, [symbol, cutoff]).pl()
+
+    rows = df.to_dicts()
+    if not rows:
+        return IntradayStatsResponse(symbol=symbol, years=years, n=0)
+
+    intraday = [(r["close"] - r["open"]) / r["open"] * 100 for r in rows if r["open"]]
+    closes = np.array([r["close"] for r in rows], dtype=float)
+
+    percentiles = None
+    if intraday:
+        arr = np.array(intraday)
+        percentiles = IntradayPercentiles(
+            min=round(float(np.min(arr)), 3),
+            p25=round(float(np.percentile(arr, 25)), 3),
+            p50=round(float(np.percentile(arr, 50)), 3),
+            p75=round(float(np.percentile(arr, 75)), 3),
+            p90=round(float(np.percentile(arr, 90)), 3),
+            max=round(float(np.max(arr)), 3),
+        )
+
+    def _last_sma(period: int) -> Optional[float]:
+        if len(closes) < period:
+            return None
+        return round(float(np.mean(closes[-period:])), 2)
+
+    sma = SMASnapshot(
+        sma20=_last_sma(20), sma50=_last_sma(50),
+        sma100=_last_sma(100), sma200=_last_sma(200),
+    )
+
+    return IntradayStatsResponse(symbol=symbol, years=years, n=len(intraday), percentiles=percentiles, sma=sma)
 
 
 @_day_cached

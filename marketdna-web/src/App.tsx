@@ -30,6 +30,7 @@ import FnoTacticalPage from './pages/FnoTacticalPage'
 import FnoMomentumPage from './pages/FnoMomentumPage'
 import Nifty50LivePage from './pages/Nifty50LivePage'
 import ChartsPage from './pages/ChartsPage'
+import LiveScreenerPage from './pages/LiveScreenerPage'
 import ChartCartPage from './pages/ChartCartPage'
 import ClustersPage from './pages/ClustersPage'
 import PortfoliosPage from './pages/PortfoliosPage'
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/fno-momentum"                   element={<FnoMomentumPage />} />
           <Route path="/nifty50-live"                   element={<Nifty50LivePage />} />
           <Route path="/charts"                         element={<ChartsPage />} />
+          <Route path="/live-screener"                  element={<LiveScreenerPage />} />
           <Route path="/chart-cart"                     element={<ChartCartPage />} />
           <Route path="/clusters"                       element={<ClustersPage />} />
           <Route path="/portfolios"                     element={<PortfoliosPage />} />

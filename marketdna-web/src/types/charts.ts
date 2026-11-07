@@ -1,4 +1,8 @@
-export type ChartsTf = '1d' | '2d' | '5d' | '1mo' | '3mo' | 'ytd' | '1y' | '5y'
+// 'yesterday' is a valid tf for GET /api/charts/history (the prior completed
+// session only, 09:15-15:30) but is deliberately left out of CHARTS_TFS -- it
+// powers the Live Screener's 6-timeframe expanded view, not a tab on the
+// /charts tile grid, so it must stay out of TF tab lists / cart sections.
+export type ChartsTf = '1d' | 'yesterday' | '2d' | '5d' | '1mo' | '3mo' | 'ytd' | '1y' | '5y'
 
 export const CHARTS_TFS: ChartsTf[] = ['1d', '2d', '5d', '1mo', '3mo', 'ytd', '1y', '5y']
 
@@ -67,6 +71,53 @@ export interface ChartsIndicatorEntry {
 export interface ChartsIndicatorsResponse {
   tf: ChartsTf
   indicators: Record<string, ChartsIndicatorEntry>
+  computed_at?: string
+  error?: string
+}
+
+// GET /api/charts/reference-open?minute=HH:MM -- every F&O symbol's traded price
+// at that clock minute today (the first 1-minute candle at or after it), in one
+// bulk response. Powers the Live Screener's 9:15-vs-9:18(or other) open-reference
+// toggle, a noise-reduced alternative to the raw opening-auction print. A symbol
+// is simply absent from `opens` if today's session hasn't reached `minute` yet.
+export interface ChartsReferenceOpenResponse {
+  minute: string
+  opens: Record<string, number>
+  computed_at?: string
+  error?: string
+}
+
+// One symbol's return-percentile breakpoints over the lookback window (see
+// ScreenerSymbolStats) -- min/25th/50th/75th/90th/max, all in %.
+export interface ReturnPercentileBand {
+  min: number
+  p25: number
+  p50: number
+  p75: number
+  p90: number
+  max: number
+}
+
+// One symbol's entry in GET /api/charts/screener-stats: 5-year return-percentile
+// bands for both the intraday (open->close) and close-to-close daily return
+// series, plus latest SMA20/50/100/200. Powers the Live Screener's "vs own
+// percentile" filter mode (compare a live metric against THIS stock's own
+// historical distribution, not a fixed % cutoff) and its vs-SMA filter fields.
+export interface ScreenerSymbolStats {
+  n: number
+  intraday: ReturnPercentileBand
+  closeToClose: ReturnPercentileBand
+  sma: {
+    sma20: number | null
+    sma50: number | null
+    sma100: number | null
+    sma200: number | null
+  }
+}
+
+export interface ChartsScreenerStatsResponse {
+  years: number
+  stats: Record<string, ScreenerSymbolStats>
   computed_at?: string
   error?: string
 }

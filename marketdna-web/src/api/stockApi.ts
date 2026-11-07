@@ -1,7 +1,7 @@
 import type {
   OHLCVResponse, RelativeStrengthResponse, ReturnsResponse,
   RiskResponse, DrawdownResponse, MarketComparisonResponse,
-  PercentilesResponse, StockSummary, SymbolListResponse,
+  PercentilesResponse, IntradayStatsResponse, StockSummary, SymbolListResponse,
   RegimeResponse, TrendPersistenceResponse, InsightsResponse,
   AnalogResponse,
   ZScoreResponse, DualMomentumResponse,
@@ -44,6 +44,7 @@ export const stockApi = {
   getDrawdown: (symbol: string) => get<DrawdownResponse>(`${BASE}/${symbol}/drawdown`),
   getMarketComparison: (symbol: string) => get<MarketComparisonResponse>(`${BASE}/${symbol}/market-comparison`),
   getPercentiles: (symbol: string) => get<PercentilesResponse>(`${BASE}/${symbol}/percentiles`),
+  getIntradayStats: (symbol: string, years = 5) => get<IntradayStatsResponse>(`${BASE}/${symbol}/intraday-stats?years=${years}`),
   askQuestion: (symbol: string, question: string) =>
     post<ChatResponse>(`${BASE}/${symbol}/chat`, { question }),
   getRegime: (symbol: string) => get<RegimeResponse>(`${BASE}/${symbol}/regime`),

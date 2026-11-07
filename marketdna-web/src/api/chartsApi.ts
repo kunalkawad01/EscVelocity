@@ -1,4 +1,4 @@
-import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsIndicatorsResponse, ChartsTf, ChartsOneDInterval } from '../types/charts'
+import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsIndicatorsResponse, ChartsReferenceOpenResponse, ChartsScreenerStatsResponse, ChartsTf, ChartsOneDInterval } from '../types/charts'
 
 // Relative path so requests go through Vite's dev proxy (→ 127.0.0.1:8000) like every
 // other API. Avoids the hardcoded `localhost:8000`, which browsers may resolve to IPv6
@@ -23,6 +23,16 @@ export const chartsApi = {
   // should gate this behind an explicit action, not fire it on every keystroke.
   getIndicators: (tf: ChartsTf): Promise<ChartsIndicatorsResponse> =>
     fetch(`${BASE}/indicators?tf=${tf}`).then(json<ChartsIndicatorsResponse>),
+
+  // Slow (~70s) cold, same shape as getIndicators -- see ChartsReferenceOpenResponse.
+  // Gate behind an explicit action, not every render.
+  getReferenceOpen: (minute = '09:18'): Promise<ChartsReferenceOpenResponse> =>
+    fetch(`${BASE}/reference-open?minute=${minute}`).then(json<ChartsReferenceOpenResponse>),
+
+  // Fast even cold (~4s for the whole F&O universe) -- a single local DuckDB
+  // aggregation, no Kite calls -- so this is safe to fetch eagerly on mount.
+  getScreenerStats: (years = 5): Promise<ChartsScreenerStatsResponse> =>
+    fetch(`${BASE}/screener-stats?years=${years}`).then(json<ChartsScreenerStatsResponse>),
 
   // ws:// URL for the live-tick stream. Uses the current page's host so it rides
   // through Vite's dev proxy (see vite.config.ts `/ws` entry) exactly like fetch

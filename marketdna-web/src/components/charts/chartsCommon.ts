@@ -6,9 +6,10 @@ export const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
 export const SANS = { fontFamily: "'IBM Plex Sans', sans-serif" } as const
 export const GREEN = '#22c55e'
 export const RED = '#ef4444'
+export const AMBER = '#fbbf24'
 
 export const TF_LABELS: Record<ChartsTf, string> = {
-  '1d': '1D', '2d': '2D', '5d': '5D', '1mo': '1M', '3mo': '3M', ytd: 'YTD', '1y': '1Y', '5y': '5Y',
+  '1d': '1D', yesterday: 'YDAY', '2d': '2D', '5d': '5D', '1mo': '1M', '3mo': '3M', ytd: 'YTD', '1y': '1Y', '5y': '5Y',
 }
 
 export const pct = (v: number | null | undefined, dp = 2) =>
@@ -38,6 +39,27 @@ export function matchesFilter(f: FilterValue, v: number | null): boolean {
 export function pctFrom(value: number, base: number | undefined): number | null {
   if (!base) return null
   return ((value - base) / base) * 100
+}
+
+// "Give-back %" -- how much of the day's open-to-high rally the live price has
+// handed back: 0% = still sitting at the high, 100% = fully round-tripped to the
+// open, >100% = now trading below the open (gave back more than it gained). Null
+// when the stock never traded above its own open (open === high, or ltp's high
+// hasn't arrived yet) -- there's no rally to give back, so the metric doesn't
+// apply rather than reading as a misleading 0%.
+export function giveBackPct(ltp: number, open: number | undefined, high: number | undefined): number | null {
+  if (!open || !high || high <= open) return null
+  return ((high - ltp) / (high - open)) * 100
+}
+
+// "Recovery %" -- the mirror image of Give-back %: how much of the day's
+// open-to-low DECLINE the live price has clawed back. 0% = still sitting at the
+// low, 100% = fully recovered back to the open, >100% = now trading above the
+// open (recovered more than it lost). Null when the stock never traded below
+// its own open (open <= low) -- there's no decline to recover from.
+export function recoveryPct(ltp: number, open: number | undefined, low: number | undefined): number | null {
+  if (!open || !low || open <= low) return null
+  return ((ltp - low) / (open - low)) * 100
 }
 
 // All 16 (timeframe x direction) cart sections in display order, e.g. "1D Bullish",

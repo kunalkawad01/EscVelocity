@@ -146,6 +146,30 @@ export interface PercentilesResponse {
   metrics: PercentileMetric[]
 }
 
+export interface IntradayPercentiles {
+  min: number
+  p25: number
+  p50: number
+  p75: number
+  p90: number
+  max: number
+}
+
+export interface SMASnapshot {
+  sma20: number | null
+  sma50: number | null
+  sma100: number | null
+  sma200: number | null
+}
+
+export interface IntradayStatsResponse {
+  symbol: string
+  years: number
+  n: number
+  percentiles: IntradayPercentiles | null
+  sma: SMASnapshot | null
+}
+
 export interface StockSummary {
   symbol: string
   name: string

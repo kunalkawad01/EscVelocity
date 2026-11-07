@@ -140,6 +140,30 @@ class PercentilesResponse(BaseModel):
     metrics: list[PercentileMetric]
 
 
+class IntradayPercentiles(BaseModel):
+    min: float
+    p25: float
+    p50: float
+    p75: float
+    p90: float
+    max: float
+
+
+class SMASnapshot(BaseModel):
+    sma20: Optional[float] = None
+    sma50: Optional[float] = None
+    sma100: Optional[float] = None
+    sma200: Optional[float] = None
+
+
+class IntradayStatsResponse(BaseModel):
+    symbol: str
+    years: int
+    n: int
+    percentiles: Optional[IntradayPercentiles] = None
+    sma: Optional[SMASnapshot] = None
+
+
 class StockSummary(BaseModel):
     symbol: str
     name: str

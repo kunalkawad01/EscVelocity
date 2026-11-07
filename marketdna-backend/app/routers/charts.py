@@ -21,7 +21,7 @@ def get_symbols():
 def get_history(symbol: str, tf: str = "1d", interval: str = "1m"):
     """OHLCV candles for one F&O underlying.
 
-    tf: one of 1d, 2d, 5d, 1mo, 3mo, ytd, 1y, 5y
+    tf: one of 1d, yesterday, 2d, 5d, 1mo, 3mo, ytd, 1y, 5y
     interval: candle resolution, only honored for tf='1d' -- '1m' (default) or '5m'.
     """
     return fno_charts_service.get_history(symbol, tf, interval)
@@ -35,6 +35,27 @@ def get_indicators(tf: str = "1d"):
     repeat requests within the cache TTL.
     """
     return fno_charts_service.get_indicators_snapshot(tf)
+
+
+@router.get("/reference-open")
+def get_reference_open(minute: str = "09:18"):
+    """Bulk 'price at HH:MM' for every F&O symbol today -- a noise-reduced
+    alternative to the raw 09:15 open print, used by the Live Screener's open-
+    reference toggle. Slow (~70s) cold, same shape as /indicators; fast on
+    repeat requests within the cache TTL.
+    """
+    return fno_charts_service.get_reference_open_snapshot(minute)
+
+
+@router.get("/screener-stats")
+def get_screener_stats(years: int = 5):
+    """Per-symbol 5-year return-percentile bands (intraday open->close AND
+    close-to-close) plus latest SMA20/50/100/200, across the whole F&O
+    universe in one call -- powers the Live Screener's 'vs own percentile'
+    filter mode and vs-SMA filter fields. Local DuckDB aggregation, fast even
+    cold (unlike /indicators or /reference-open, no Kite calls involved).
+    """
+    return fno_charts_service.get_percentile_bands(years)
 
 
 # Mounted without the /api prefix -- kept as its own router so the path is a

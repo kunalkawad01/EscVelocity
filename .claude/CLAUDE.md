@@ -812,6 +812,12 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - Clicking a scan row pre-loads the symbol into StockDetailSection; behavior differs by layout mode.
 - API: `indicatorsApi.scan()`, `indicatorsApi.getSymbol(symbol)`
 
+### `/live-screener` — LiveScreenerPage
+- **One sortable table across the whole F&O universe** (~209 symbols) — Symbol · LTP · Chg % · Open · Prev Close · High · Low · From High % · From Low % · From Open %. Click a column header to sort (▲/▼ toggle); reuses the same `/ws/charts` tick as `/charts`.
+- **Row click expands 6 timeframes at once** (`MultiTimeframeGrid`, not `ChartTile`): Today (live) · Yesterday · 5-Day · 1 Month · Quarterly · 1 Year, each its own mini chart with a color-coded return%. "Yesterday" is a new backend tf (`fno_charts_service._prev_session_bounds` — prior completed session only, 09:15–15:30 fixed bounds) added to `GET /api/charts/history`, deliberately kept out of `CHARTS_TFS` so the 8 tabs on `/charts`/`/chart-cart`/`/clusters` are unaffected. Multiple rows can be expanded at once (`Record<symbol, boolean>` state, never per-row `useState`).
+- **Dynamic AND/OR return filter** (`useScreenerFilters` + `ScreenerFilterBar`): open-ended list of (field, op, value) conditions on the four live-tick return fields (vs yday close/today open/today high/today low), combined by one global Match ALL (AND) / Match ANY (OR) toggle — more flexible than `/charts`' fixed four-slot `LiveReturnFilterBar`, which always ANDs.
+- API: `chartsApi.getSymbols()`, `.getHistory(symbol, tf)` (tf incl. `'yesterday'`), `.wsUrl()`.
+
 ### `/markov-options` — MarkovOptionsPage
 - **6-regime Markov classifier**. Stock analysis loads immediately on mount. Market scan requires "Run Market Scan" (30–60s).
 - SVG illustrations in `public/illustrations/`: `computing-regimes.svg` (loading), `markov-chain.svg` (hero), `market-scan.svg` (scan gate).
@@ -904,6 +910,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/fno-tactical` | `page_docu/fno_tactical_page.md` |
 | `/fno-momentum` | `page_docu/fno_momentum_page.md` |
 | `/indicators` | `page_docu/indicators_page.md` |
+| `/live-screener` | `page_docu/live_screener_page.md` |
 | `/markov-options` | `page_docu/markov_options_page.md` |
 | `/nifty50-live` | `page_docu/nifty50_live_page.md` |
 | `/pattern-dna` | `page_docu/pattern_dna_page.md` |

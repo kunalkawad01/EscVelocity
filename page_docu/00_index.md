@@ -14,6 +14,7 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [indicators_page.md](indicators_page.md) | `/indicators` | **Reference UI.** Technical indicator scanner + edge lab |
 | [iv_smile_page.md](iv_smile_page.md) | `/iv-smile` | Options volatility smile + Black-Scholes greeks + skew analytics |
 | [landing_page.md](landing_page.md) | `/` | Editorial home — module showcase + platform philosophy |
+| [live_screener_page.md](live_screener_page.md) | `/live-screener` | Sortable live F&O table (OHLC + from-high/low/open %) with dynamic AND/OR return filters and click-to-expand charts |
 | [markov_options_page.md](markov_options_page.md) | `/markov-options` | 6-regime Markov classifier + options strategy engine |
 | [options_page.md](options_page.md) | `/options` | F&O OI analysis — butterfly, max pain, CE/PE walls, 4-way buildup signal |
 | [pattern_dna_page.md](pattern_dna_page.md) | `/pattern-dna` | Pattern detection + validation + DNA scoring engine |
