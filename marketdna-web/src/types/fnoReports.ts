@@ -43,4 +43,6 @@ export interface ReportJobStatus {
   finished_at: string | null
   pdf_filename: string | null
   error: string | null
+  last_line: string | null   // most recent stdout line from the script, live
+  log_tail: string[] | null  // last ~8 stdout lines, for a small progress log
 }

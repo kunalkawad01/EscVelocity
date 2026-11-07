@@ -44,3 +44,5 @@ class ReportJobStatus(BaseModel):
     finished_at: Optional[str] = None
     pdf_filename: Optional[str] = None
     error: Optional[str] = None
+    last_line: Optional[str] = None       # most recent stdout line from the script, live
+    log_tail: Optional[List[str]] = None  # last ~8 stdout lines, for a small progress log

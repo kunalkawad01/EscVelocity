@@ -54,7 +54,7 @@ function useReportJob(job: ReportJob) {
     if (status?.state !== 'running') return
     const t = setInterval(() => {
       fnoReportsApi.getStatus(job).then(setStatus).catch(() => {})
-    }, 3000)
+    }, 2000)
     return () => clearInterval(t)
   }, [status?.state, job])
 
@@ -101,9 +101,26 @@ function ReportButtonCard({ job }: { job: ReportJob }) {
           </Button>
         )}
       </Box>
+      {running && status?.log_tail && status.log_tail.length > 0 && (
+        <Box sx={{ mt: 1.25, p: 1, borderRadius: 1, border: `1px solid ${BORDER}`, maxHeight: 108, overflowY: 'auto' }}>
+          {status.log_tail.map((line, i) => (
+            <Typography
+              key={i}
+              sx={{
+                ...MONO, fontSize: '0.62rem', lineHeight: 1.6,
+                color: i === status.log_tail!.length - 1 ? INK : INK3,
+                fontWeight: i === status.log_tail!.length - 1 ? 700 : 400,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}
+            >
+              {line}
+            </Typography>
+          ))}
+        </Box>
+      )}
       {errored && (
-        <Typography sx={{ ...MONO, fontSize: '0.64rem', color: RED, mt: 1.25, lineHeight: 1.5 }}>
-          Failed: {status?.error ? status.error.slice(0, 220) : 'unknown error'}
+        <Typography sx={{ ...MONO, fontSize: '0.64rem', color: RED, mt: 1.25, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+          Failed: {status?.error ? status.error.slice(0, 600) : 'unknown error'}
         </Typography>
       )}
       {status?.state && status.state !== 'idle' && (
