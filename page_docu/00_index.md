@@ -21,6 +21,7 @@ All pages documented with: What It Does · Optimization · Lessons Learnt · Bus
 | [pattern_dna_guide_page.md](pattern_dna_guide_page.md) | `/pattern-dna-guide` | Static user guide for the PatternDNA module |
 | [quant_strategies_page.md](quant_strategies_page.md) | `/quant-strategies` | Momentum · mean-reversion · vol rank · sector rotation |
 | [randomness_page.md](randomness_page.md) | `/randomness` | Luck vs Skill · Return Concentration · Fragility — Monte Carlo 10k shuffles |
+| [result_reaction_page.md](result_reaction_page.md) | `/result-reaction` | Price reaction (Day -1/0/+1) around each F&O stock's last 4 quarterly results, dates pulled live from NSE |
 | [short_page.md](short_page.md) | `/short` | Short candidate screener + squeeze watch |
 | [stock_eda_page.md](stock_eda_page.md) | `/stock-eda` | Chart-first EDA — distributions, seasonality, vol clustering, gaps, benchmark comparison |
 | [stock_health_page.md](stock_health_page.md) | `/stock-health` | 20-metric behavioural profile + 7-archetype scanner for NSE 500 |

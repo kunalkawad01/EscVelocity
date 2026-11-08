@@ -17,10 +17,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50, charts, trading_rules, fno_reports
+from app.routers import assistant, stock, patterns, markov_options, quant_strategies, indicators, regime, cointegration, delivery, short, dataviz, dataviz_analytics, dataviz_breadth_extra, stock_health, randomness, options, breakout, live_trading, intraday_race, druckenmiller_roc, sector_heatmap, intelligence, fno, fno_momentum, portfolios, edges, drivers, research_copilot, live_agent, stock_eda, nifty50, charts, trading_rules, fno_reports, result_reaction
 from app.services.cointegration_service import start_preload
 from app.services import validation_service
 from app.services import stock_health_service
+from app.services import result_reaction_service
 from app.services import indicators_service, indicator_edge_service
 from app.services import regime_service
 from app.services import delivery_service
@@ -83,6 +84,7 @@ app.include_router(charts.router)
 app.include_router(charts.ws_router)
 app.include_router(trading_rules.router)
 app.include_router(fno_reports.router)
+app.include_router(result_reaction.router)
 
 log = __import__("logging").getLogger(__name__)
 
@@ -108,6 +110,7 @@ def _background_prewarm() -> None:
         ("portfolios",       portfolios_service.start_prewarm),   # ~17s, user-visible; before slow tasks
         ("screener prewarm", start_screener_prewarm),    # ~3min, all 9 pattern tabs
         ("health scan",      stock_health_service.start_scan_warmup),
+        ("result reaction",  result_reaction_service.start_scan_warmup),  # NSE event-calendar fetch, ~209 symbols throttled
         ("options em-scan",  options_service.get_em_scan),   # multi-CTE full scan, ~user-visible
         ("iv-rank history",  options_service.warm_iv_history),  # build/load ATM-IV series parquet
         ("indicator edge",   indicator_edge_service.get_edge_summary),

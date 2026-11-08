@@ -407,6 +407,7 @@ Full specs at `http://localhost:8000/docs`. All routers in `marketdna-backend/ap
 | `fno.py` | `/api/fno` | Live F&O tactical dashboard. `/state` (market-state gate), `/universe` (OI positioning scatter rows + grade), `/breadth` (RISK_ON/OFF/NEUTRAL verdict), `/normalized` (9:15 rebased lines), `/optionchain/{symbol}` + `/optionchain/{symbol}/strike-chart`, POST `/invalidate`. Live Kite during market hours, DuckDB EOD fallback otherwise. Reuses `live_trading_service` (quotes, `_iday`, NFO cache, option chain). Frontend polls 5s while LIVE only. |
 | `fno_momentum.py` | `/api/fno-momentum` | F&O Momentum Radar. `/scan` — OI Gainers (futures OI up) + Short Covering (price↑ OI↓) buckets, each row must pass ≥1 momentum qualifier (±5% last session · best sector today · ±2% gap at 9:15), sorted by day change %. POST `/invalidate` (delegates to fno tactical caches). Zero extra Kite calls — piggybacks `fno_tactical_service._get_scan()`. |
 | `trading_rules.py` | `/api/trading-rules` | Personal Trading Rules rulebook. `GET` (whole doc, or `null` if unsaved/DB down) + `PUT` (replace whole doc) over a single JSONB row in Postgres table `trading_rules`. No invalidate endpoint — not day-data, nothing to go stale. |
+| `result_reaction.py` | `/api/result-reaction` | `/scan` (price reaction around each F&O symbol's last 4 quarterly results, parquet-first, 7-day freshness — poll until `ready=true`), POST `/scan/invalidate`. Result dates fetched live from NSE's event-calendar API, filtered on `bm_desc` (not the unreliable `purpose` field). |
 | `fno_reports.py` | `/api/fno-reports` | Powers `/clusters`. `GET /cluster-snapshot` (PCA+K-Means, cached per date, `force=true` to recompute) + POST `/invalidate`. `POST /{job}/generate` (`job` = `returns`\|`cluster`) launches the matching `scripts/generate_fno_*.py` as a background subprocess; `GET /{job}/status` to poll; `GET /{job}/download` streams the latest PDF for that job. |
 
 ---
@@ -887,6 +888,13 @@ Compact facts per page — enough to work on any page without reading source. Fu
 - Caret-on-focus fix: clicking mid-text to edit needs `onFocus` → `setSelectionRange(len, len)` or the caret resets to position 0 (MUI `TextField` `autoFocus` doesn't preserve the originating click position when swapping in from static `Typography`).
 - API: `GET/PUT /api/trading-rules` (`app/routers/trading_rules.py` → `app/services/trading_rules_store.py`).
 
+### `/result-reaction` — ResultReactionPage
+- **Read-only F&O-universe scanner** (~209 symbols, Live Screener's table pattern) — shows how each stock traded around its last 4 quarterly results: Day -1 (pre-result), Day 0 (announcement day), Day +1 (next trading day), averaged, plus a win rate. Click a row for the per-quarter breakdown.
+- **Result dates come live from NSE's public event-calendar API** (`nseindia.com/api/event-calendar`), no auth/cookies needed. **NSE's own `purpose` field is unreliable** — many quarters are mislabeled `"Results/Dividend"` instead of `"Financial Results"` (confirmed for TCS). Filter on the free-text `bm_desc` field (`"financial result" in bm_desc.lower()`) instead — it's consistent where `purpose` isn't.
+- **Parquet-first with a 7-day freshness window** (not daily like Stock Health) — result dates only change quarterly, so re-hitting NSE for 209 symbols every day would be wasted external load. Throttled 0.35s/symbol during the batch (~2 min total) to avoid bot-detection blocking.
+- Runs only in the background prewarm (`_background_prewarm`), never synchronously at startup — it talks to an external, rate-limited host.
+- API: `GET /api/result-reaction/scan` (poll until `ready=true`), `POST /api/result-reaction/scan/invalidate`.
+
 ### `/stock/:symbol` — StockPage (~461 lines shell + sub-components)
 - **URL param** `:symbol` — pages are linkable to specific stocks.
 - **19+ sections**, sticky 2-row nav (Row 1: symbol/price/regime/selector; Row 2: jump strip with CYAN active underline).
@@ -916,6 +924,7 @@ Compact facts per page — enough to work on any page without reading source. Fu
 | `/pattern-dna` | `page_docu/pattern_dna_page.md` |
 | `/pattern-dna-guide` | `page_docu/pattern_dna_guide_page.md` |
 | `/quant-strategies` | `page_docu/quant_strategies_page.md` |
+| `/result-reaction` | `page_docu/result_reaction_page.md` |
 | `/short` | `page_docu/short_page.md` |
 | `/stock` | `page_docu/stock_page.md` |
 | `/stock-eda` | `page_docu/stock_eda_page.md` |
