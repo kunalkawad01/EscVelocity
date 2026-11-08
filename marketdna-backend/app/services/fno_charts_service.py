@@ -53,6 +53,13 @@ _history_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}  # (symbol, 
 _HISTORY_TTL: dict[str, int] = {"1d": 15, "2d": 30, "5d": 60}
 _DEFAULT_TTL = 300  # 1mo/3mo/ytd/1y/5y are daily candles -- barely change intraday
 
+# Intraday candles for one SPECIFIC past date (not a relative "N days back" window)
+# -- used by Result Reaction to show the actual intraday shape of each reaction day
+# around a quarterly result. A closed trading day's candles never change, so this
+# is cached far longer than the relative-tf buckets above.
+_date_history_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}  # (symbol, date, interval) -> (fetched_at, response)
+_DATE_HISTORY_TTL = 24 * 3600
+
 _token_cache: dict[str, int] = {}  # NSE tradingsymbol -> instrument_token
 _token_lock = threading.Lock()
 
@@ -178,6 +185,54 @@ def get_history(symbol: str, tf: str, interval: str = "1m") -> dict:
     except Exception as exc:
         log.warning("get_history(%s, %s) failed: %s", symbol, tf, exc)
         return {"tf": tf, "symbol": symbol, "candles": [], "error": str(exc)}
+
+
+def get_history_for_date(symbol: str, date_str: str, interval: str = "5minute") -> dict:
+    """Intraday candles for one explicit past trading date (YYYY-MM-DD), 09:15-15:30.
+
+    Generalizes get_history()'s 'yesterday' branch (_prev_session_bounds) to an
+    arbitrary date instead of always-the-prior-session -- Result Reaction needs
+    the actual intraday shape of Day 0 through Day +5 around a quarterly result,
+    which are specific historical dates, not a relative lookback window.
+
+    Kite's minute-level historical_data has been verified to go back 12+ months
+    (checked empirically against RELIANCE -- see page_docu/result_reaction_page.md),
+    so this works for all 4 quarters the scan covers, not just the most recent one.
+    """
+    symbol = symbol.upper()
+    cache_key = (symbol, date_str, interval)
+    cached = _date_history_cache.get(cache_key)
+    if cached and (time.time() - cached[0]) < _DATE_HISTORY_TTL:
+        return cached[1]
+
+    token = _get_token(symbol)
+    if not token:
+        return {"symbol": symbol, "date": date_str, "candles": [], "error": f"could not resolve instrument token for '{symbol}'"}
+
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return {"symbol": symbol, "date": date_str, "candles": [], "error": f"invalid date '{date_str}'"}
+    from_dt = datetime(d.year, d.month, d.day, 9, 15)
+    to_dt = datetime(d.year, d.month, d.day, 15, 30)
+
+    try:
+        kite = get_kite()
+        raw = kite.historical_data(token, from_dt, to_dt, interval)
+        candles = [
+            {
+                "time": c["date"].isoformat(),
+                "open": c["open"], "high": c["high"], "low": c["low"], "close": c["close"],
+                "volume": c.get("volume", 0),
+            }
+            for c in raw
+        ]
+        result = {"symbol": symbol, "date": date_str, "interval": interval, "candles": candles}
+        _date_history_cache[cache_key] = (time.time(), result)
+        return result
+    except Exception as exc:
+        log.warning("get_history_for_date(%s, %s) failed: %s", symbol, date_str, exc)
+        return {"symbol": symbol, "date": date_str, "candles": [], "error": str(exc)}
 
 
 # ── Indicator snapshot (RSI / ATR% / Returns%) for the filter bar ─────────────

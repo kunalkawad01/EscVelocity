@@ -5,9 +5,19 @@ from pydantic import BaseModel
 class QuarterReaction(BaseModel):
     result_date: str              # NSE board-meeting date, as announced (YYYY-MM-DD)
     reaction_date: str            # trading day used as "Day 0" (first trading day >= result_date)
+    day_minus1_date: str | None = None
     day_minus1_pct: float | None = None
     day0_pct: float | None = None
+    day_plus1_date: str | None = None
     day_plus1_pct: float | None = None
+    day_plus2_date: str | None = None
+    day_plus2_pct: float | None = None
+    day_plus3_date: str | None = None
+    day_plus3_pct: float | None = None
+    day_plus4_date: str | None = None
+    day_plus4_pct: float | None = None
+    day_plus5_date: str | None = None
+    day_plus5_pct: float | None = None
 
 
 class SymbolResultReaction(BaseModel):

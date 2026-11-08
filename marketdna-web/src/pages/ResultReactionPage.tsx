@@ -6,6 +6,7 @@ import SearchBox from '../components/shared/SearchBox'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
 import { resultReactionApi } from '../api/resultReactionApi'
+import { ResultDayChartGrid } from '../components/charts/ResultDayChartGrid'
 import type { SymbolResultReaction } from '../types/resultReaction'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace" } as const
@@ -66,6 +67,7 @@ export default function ResultReactionPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [chartsOpen, setChartsOpen] = useState<Record<string, boolean>>({})
   const [sortKey, setSortKey] = useState<SortKey>('avgDay0')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [refreshing, setRefreshing] = useState(false)
@@ -90,6 +92,7 @@ export default function ResultReactionPage() {
   }, [])
 
   const toggleExpand = (symbol: string) => setExpanded(prev => ({ ...prev, [symbol]: !prev[symbol] }))
+  const toggleCharts = (key: string) => setChartsOpen(prev => ({ ...prev, [key]: !prev[key] }))
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortKey(k); setSortDir('desc') }
@@ -282,25 +285,69 @@ export default function ResultReactionPage() {
                                     <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day -1</TableCell>
                                     <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day 0</TableCell>
                                     <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day +1</TableCell>
+                                    <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day +2</TableCell>
+                                    <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day +3</TableCell>
+                                    <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day +4</TableCell>
+                                    <TableCell sx={{ ...TD, color: INK3, border: 'none' }} align="right">Day +5</TableCell>
+                                    <TableCell sx={{ ...TD, color: INK3, border: 'none' }} />
                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                  {r.quarters.map(q => (
-                                    <TableRow key={q.result_date}>
-                                      <TableCell sx={{ ...TD, border: 'none' }}>
-                                        <Typography sx={{ ...MONO, fontSize: '0.72rem', color: INK2 }}>{q.result_date}</Typography>
-                                      </TableCell>
-                                      <TableCell sx={{ ...TD, border: 'none' }} align="right">
-                                        <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_minus1_pct, INK2) }}>{pct(q.day_minus1_pct)}</Typography>
-                                      </TableCell>
-                                      <TableCell sx={{ ...TD, border: 'none' }} align="right">
-                                        <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day0_pct, INK2) }}>{pct(q.day0_pct)}</Typography>
-                                      </TableCell>
-                                      <TableCell sx={{ ...TD, border: 'none' }} align="right">
-                                        <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_plus1_pct, INK2) }}>{pct(q.day_plus1_pct)}</Typography>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
+                                  {r.quarters.map(q => {
+                                    const chartsKey = `${r.symbol}-${q.result_date}`
+                                    return (
+                                      <Fragment key={q.result_date}>
+                                        <TableRow>
+                                          <TableCell sx={{ ...TD, border: 'none' }}>
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', color: INK2 }}>{q.result_date}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_minus1_pct, INK2) }}>{pct(q.day_minus1_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day0_pct, INK2) }}>{pct(q.day0_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_plus1_pct, INK2) }}>{pct(q.day_plus1_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_plus2_pct, INK2) }}>{pct(q.day_plus2_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_plus3_pct, INK2) }}>{pct(q.day_plus3_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_plus4_pct, INK2) }}>{pct(q.day_plus4_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Typography sx={{ ...MONO, fontSize: '0.72rem', fontWeight: 700, color: pctColor(q.day_plus5_pct, INK2) }}>{pct(q.day_plus5_pct)}</Typography>
+                                          </TableCell>
+                                          <TableCell sx={{ ...TD, border: 'none' }} align="right">
+                                            <Box
+                                              onClick={(e) => { e.stopPropagation(); toggleCharts(chartsKey) }}
+                                              sx={{
+                                                display: 'inline-block', px: 0.9, py: 0.2, borderRadius: 1, cursor: 'pointer',
+                                                border: `1px solid ${BORDER}`,
+                                              }}
+                                            >
+                                              <Typography sx={{ ...MONO, fontSize: '0.58rem', fontWeight: 700, color: chartsOpen[chartsKey] ? CYAN : INK3 }}>
+                                                {chartsOpen[chartsKey] ? 'HIDE CHARTS' : 'VIEW CHARTS'}
+                                              </Typography>
+                                            </Box>
+                                          </TableCell>
+                                        </TableRow>
+                                        {chartsOpen[chartsKey] && (
+                                          <TableRow>
+                                            <TableCell colSpan={9} sx={{ p: 0, border: 'none' }}>
+                                              <Box sx={{ pb: 2, pt: 0.5 }}>
+                                                <ResultDayChartGrid symbol={r.symbol} quarter={q} />
+                                              </Box>
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </Fragment>
+                                    )
+                                  })}
                                 </TableBody>
                               </Table>
                             )}

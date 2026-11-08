@@ -1,4 +1,4 @@
-import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsIndicatorsResponse, ChartsReferenceOpenResponse, ChartsScreenerStatsResponse, ChartsTf, ChartsOneDInterval } from '../types/charts'
+import type { ChartsSymbolsResponse, ChartsHistoryResponse, ChartsHistoryForDateResponse, ChartsIndicatorsResponse, ChartsReferenceOpenResponse, ChartsScreenerStatsResponse, ChartsTf, ChartsOneDInterval } from '../types/charts'
 
 // Relative path so requests go through Vite's dev proxy (→ 127.0.0.1:8000) like every
 // other API. Avoids the hardcoded `localhost:8000`, which browsers may resolve to IPv6
@@ -18,6 +18,11 @@ export const chartsApi = {
   // every other timeframe, so callers for those tfs can simply omit it.
   getHistory: (symbol: string, tf: ChartsTf, interval: ChartsOneDInterval = '1m'): Promise<ChartsHistoryResponse> =>
     fetch(`${BASE}/history?symbol=${encodeURIComponent(symbol)}&tf=${tf}&interval=${interval}`).then(json<ChartsHistoryResponse>),
+
+  // Intraday candles for one exact past date (YYYY-MM-DD), not a relative tf.
+  // A closed trading day's candles are immutable -- safe to fetch once and keep.
+  getHistoryForDate: (symbol: string, date: string, interval = '5minute'): Promise<ChartsHistoryForDateResponse> =>
+    fetch(`${BASE}/history-for-date?symbol=${encodeURIComponent(symbol)}&date=${date}&interval=${interval}`).then(json<ChartsHistoryForDateResponse>),
 
   // Slow (~70s) on the first request per tf -- see ChartsIndicatorsResponse. Callers
   // should gate this behind an explicit action, not fire it on every keystroke.

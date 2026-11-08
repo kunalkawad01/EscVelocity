@@ -33,6 +33,18 @@ export interface ChartsHistoryResponse {
   error?: string
 }
 
+// GET /api/charts/history-for-date?symbol=X&date=YYYY-MM-DD -- intraday candles
+// for one explicit past trading date (not a relative timeframe). Used by Result
+// Reaction's per-quarter chart grid to show the actual intraday shape of each
+// reaction day (Day -1 through Day +5) around a stock's quarterly results.
+export interface ChartsHistoryForDateResponse {
+  symbol: string
+  date: string
+  interval?: string
+  candles: ChartsCandle[]
+  error?: string
+}
+
 // One F&O underlying's latest tick, keyed by symbol in the /ws/charts message.
 // open/high/low are TODAY's session so far (Kite MODE_FULL tick's "ohlc" block);
 // prev_close is the PREVIOUS day's close -- same quirk fno_charts_service.py relies

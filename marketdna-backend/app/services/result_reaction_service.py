@@ -112,12 +112,32 @@ def _reaction_for_symbol(symbol: str, result_dates: list[str]) -> SymbolResultRe
         idx = bisect_left(dates, rd)   # first trading day >= rd
         if idx < 2 or idx >= n:
             continue   # not enough history around this date (too old or too recent)
-        day_m1 = float(closes[idx - 1] / closes[idx - 2] - 1.0)
-        day0 = float(closes[idx] / closes[idx - 1] - 1.0)
-        day_p1 = float(closes[idx + 1] / closes[idx] - 1.0) if idx + 1 < n else None
+
+        def _day(offset: int) -> tuple[str | None, float | None]:
+            """offset=0 is Day 0 itself; positive offsets are Day +1..+5. Each
+            day's return is close[idx+offset]/close[idx+offset-1]-1 -- its own
+            one-day move, not cumulative from Day 0."""
+            i = idx + offset
+            if i >= n or i < 1:
+                return None, None
+            return dates[i], float(closes[i] / closes[i - 1] - 1.0)
+
+        day_p2_date, day_p2 = _day(2)
+        day_p3_date, day_p3 = _day(3)
+        day_p4_date, day_p4 = _day(4)
+        day_p5_date, day_p5 = _day(5)
+
         quarters.append(QuarterReaction(
             result_date=rd, reaction_date=dates[idx],
-            day_minus1_pct=day_m1, day0_pct=day0, day_plus1_pct=day_p1,
+            day_minus1_date=dates[idx - 1],
+            day_minus1_pct=float(closes[idx - 1] / closes[idx - 2] - 1.0),
+            day0_pct=float(closes[idx] / closes[idx - 1] - 1.0),
+            day_plus1_date=dates[idx + 1] if idx + 1 < n else None,
+            day_plus1_pct=float(closes[idx + 1] / closes[idx] - 1.0) if idx + 1 < n else None,
+            day_plus2_date=day_p2_date, day_plus2_pct=day_p2,
+            day_plus3_date=day_p3_date, day_plus3_pct=day_p3,
+            day_plus4_date=day_p4_date, day_plus4_pct=day_p4,
+            day_plus5_date=day_p5_date, day_plus5_pct=day_p5,
         ))
 
     if not quarters:

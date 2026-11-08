@@ -27,6 +27,17 @@ def get_history(symbol: str, tf: str = "1d", interval: str = "1m"):
     return fno_charts_service.get_history(symbol, tf, interval)
 
 
+@router.get("/history-for-date")
+def get_history_for_date(symbol: str, date: str, interval: str = "5minute"):
+    """Intraday candles for one explicit past trading date (YYYY-MM-DD).
+
+    Unlike /history's relative timeframes, this takes an exact date -- used by
+    the Result Reaction page to show the intraday shape of each reaction day
+    (Day 0 through Day +5) around a stock's quarterly results.
+    """
+    return fno_charts_service.get_history_for_date(symbol, date, interval)
+
+
 @router.get("/indicators")
 def get_indicators(tf: str = "1d"):
     """RSI(14) / ATR%(14) / period return% for every F&O symbol at one timeframe --

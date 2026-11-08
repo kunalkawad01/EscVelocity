@@ -3,9 +3,19 @@
 export interface QuarterReaction {
   result_date: string
   reaction_date: string
+  day_minus1_date: string | null
   day_minus1_pct: number | null
   day0_pct: number | null
+  day_plus1_date: string | null
   day_plus1_pct: number | null
+  day_plus2_date: string | null
+  day_plus2_pct: number | null
+  day_plus3_date: string | null
+  day_plus3_pct: number | null
+  day_plus4_date: string | null
+  day_plus4_pct: number | null
+  day_plus5_date: string | null
+  day_plus5_pct: number | null
 }
 
 export interface SymbolResultReaction {
