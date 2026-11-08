@@ -156,20 +156,54 @@ function matchesCondition(c: ScreenerCondition, v: number | null, pctileThreshol
 export function useScreenerFilters(ticks: Record<string, ChartsTick>, stats?: Record<string, ScreenerSymbolStats>) {
   const [conditions, setConditions] = useState<ScreenerCondition[]>([])
   const [combinator, setCombinator] = useState<ScreenerCombinator>('AND')
+  // Which strategy preset (screenerPresets.ts id), if any, is currently applied
+  // -- drives the STRATEGY chip's highlight in ScreenerFilterBar. Cleared by any
+  // edit that isn't togglePreset itself (addCondition/updateCondition/
+  // removeCondition/clear/toggleQuickFilter), since a hand-edited row is no
+  // longer exactly that preset -- a stale highlight would misleadingly claim a
+  // preset is still active once its conditions have drifted from it.
+  const [activePreset, setActivePreset] = useState<string | null>(null)
 
   const addCondition = useCallback(() => {
     setConditions(prev => [...prev, { id: nextId(), field: 'vsPrevClose', op: '>', value: '', value2: '', pctileMode: false }])
+    setActivePreset(null)
   }, [])
 
   const updateCondition = useCallback((id: string, patch: Partial<Omit<ScreenerCondition, 'id'>>) => {
     setConditions(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)))
+    setActivePreset(null)
   }, [])
 
   const removeCondition = useCallback((id: string) => {
     setConditions(prev => prev.filter(c => c.id !== id))
+    setActivePreset(null)
   }, [])
 
-  const clear = useCallback(() => setConditions([]), [])
+  const clear = useCallback(() => {
+    setConditions([])
+    setActivePreset(null)
+  }, [])
+
+  // Applying a strategy preset is itself a toggle, not a one-way action:
+  // clicking the currently-highlighted preset again restores the default
+  // (empty condition list, AND combinator) instead of re-applying it; clicking
+  // any other preset (or none active) overwrites the condition list with that
+  // preset's starting conditions and highlights it. Every condition gets a
+  // freshly assigned id (same nextId() as addCondition), since presets never
+  // carry their own ids. Rows stay ordinary editable ScreenerCondition rows
+  // afterward -- "preset" only means "starting point", not a locked rule --
+  // and any further hand-edit clears the highlight (see addCondition etc.).
+  const togglePreset = useCallback((id: string, presetConditions: Array<Omit<ScreenerCondition, 'id'>>, presetCombinator: ScreenerCombinator) => {
+    if (activePreset === id) {
+      setConditions([])
+      setCombinator('AND')
+      setActivePreset(null)
+    } else {
+      setConditions(presetConditions.map(c => ({ ...c, id: nextId() })))
+      setCombinator(presetCombinator)
+      setActivePreset(id)
+    }
+  }, [activePreset])
 
   // Add/remove one exact preset condition in one click -- e.g. the "Never Above
   // Open" / "Never Below Open" quick-filter buttons in ScreenerFilterBar. Acts
@@ -181,6 +215,7 @@ export function useScreenerFilters(ticks: Record<string, ChartsTick>, stats?: Re
       if (idx >= 0) return prev.filter((_, i) => i !== idx)
       return [...prev, { id: nextId(), field, op, value, value2: '', pctileMode: false }]
     })
+    setActivePreset(null)
   }, [])
 
   const hasQuickFilter = useCallback(
@@ -211,6 +246,7 @@ export function useScreenerFilters(ticks: Record<string, ChartsTick>, stats?: Re
   return {
     conditions, combinator, setCombinator,
     addCondition, updateCondition, removeCondition, clear,
+    activePreset, togglePreset,
     toggleQuickFilter, hasQuickFilter,
     active, passes,
   }

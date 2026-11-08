@@ -126,6 +126,37 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
   whichever the **Open Ref** toggle currently has selected (9:15 raw print or 9:18
   reference) — the quick filters read `highVsOpen`/`lowVsOpen`, which are already computed
   off `effectiveTicks`, so they inherit the override automatically with no extra wiring.
+- **Strategy Presets — one-click starting filters, not locked rules.** A `STRATEGY:` row
+  above `QUICK:` lists 8 named presets (`screenerPresets.ts`): **ORB — Stocks in Play**,
+  **Trend Template**, **Gap Continuation**, **Gap Fade**, **Pullback Reclaim (Long)**,
+  **Rally Fading (Short)**, **Cheap Momentum**, **Leader + Unusual Day**. Clicking one
+  replaces the entire condition list + combinator (`useScreenerFilters.togglePreset`) with
+  that strategy's starting conditions and highlights the chip (CYAN, same treatment as an
+  active QUICK filter) — every value it writes is then an ordinary editable
+  `ScreenerCondition` row, same as building one by hand (retype a threshold, flip an
+  operator, add/remove rows, toggle "vs OWN %ILE" off). **It's a toggle, not a one-way
+  apply**: clicking the already-highlighted preset again unselects it and restores the
+  default empty filter (no conditions, AND combinator) rather than re-applying it; clicking
+  a *different* preset switches straight to that one. Any hand-edit of a condition after a
+  preset is applied (change a value, flip an operator, add/remove a row, toggle a quick
+  filter) clears the highlight — the filter has drifted from that exact preset, so the chip
+  stops claiming it's still active. Hovering a chip shows a one-line `title` tooltip with
+  the strategy's rationale and evidence source. See Business Logic for each preset's exact
+  condition set and Suggestions for an honest evidence-quality note per strategy — these
+  came out of a chat research pass (web search across papers, books, practitioner blogs) and
+  range from "real published backtest" to "reasonable but unvalidated heuristic."
+- **Regime badge — breadth as a gate, not a filter.** Top-right of the Dynamic Return
+  Filter card, `RegimeBadge` shows **RISK ON** (GREEN, advancers > decliners AND the F&O
+  Equal-Weight Index > 100), **RISK OFF** (RED, the mirror), or **NEUTRAL** (AMBER,
+  anything else), plus the live ▲/▼ counts and index level. This is the one strategy from
+  the research that can't be expressed as a per-stock filter condition (the breadth
+  literature is consistent that A/D-line-style signals aren't reliable mechanical triggers
+  on their own, only useful as context on top of a real setup) — so it's guidance text next
+  to the presets ("prefer long presets when RISK ON, fade/short presets when RISK OFF"),
+  not something that narrows the table itself. Computed independently from the same two
+  inputs the hero's `EqualWeightIndexTile`/`AdvanceDeclineTile` already chart (see Business
+  Logic) — neither tile exposes its numbers upward, so this is a second small computation
+  over the same `ticks`/`refOpens`, not a shared hook.
 
 ## Optimization
 
@@ -271,6 +302,29 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
   `get_intraday_stats`). Two independently-maintained backend computations of overlapping
   math (`get_percentile_bands` bulk vs `get_intraday_stats` per-symbol) rather than one
   shared function — see Suggestions.
+- **Strategy preset condition sets** (`screenerPresets.ts` → `SCREENER_PRESETS`, all Match
+  ALL unless noted):
+  - **ORB — Stocks in Play** — `vs Today Open > own 90th %ile` AND `Give-back % < 20`. The
+    percentile condition is the "stocks in play" filter (an unusually large move *for that
+    specific stock*, à la Zarattini/Barbon/Aziz 2024's ORB paper); Give-back % < 20 confirms
+    the move is holding near the high, not fading.
+  - **Trend Template** — `vs SMA50 > 0` AND `vs SMA100 > 0` AND `vs SMA200 > 0`. A 4-SMA
+    approximation of Minervini's Stage-2 trend template (his original is 50/150/200; this
+    page only has 20/50/100/200).
+  - **Gap Continuation** — `vs Yday Close > own 90th %ile` AND `Give-back % < 20`. An
+    unusually large gap for that stock that's still holding near the session high.
+  - **Gap Fade** — `vs Yday Close > own 90th %ile` AND `Give-back % > 70`. The mirror of Gap
+    Continuation — an unusual gap that's already given back most of the move.
+  - **Pullback Reclaim (Long)** — `Recovery % > 75` AND `vs Today Open < 0`. Still net
+    negative on the day, but has clawed back most of an intraday decline.
+  - **Rally Fading (Short)** — `Give-back % > 75` AND `vs Today Open > 0`. Still net
+    positive on the day, but has given back most of an intraday rally.
+  - **Cheap Momentum** — `LTP < 500` AND `vs Yday Close > 5` AND `Low vs Open % > -0.001`
+    (same threshold as the "Never Below Open" quick filter). Low-priced, moving sharply,
+    never dipped under its own open.
+  - **Leader + Unusual Day** — Trend Template's three SMA conditions AND `vs Today Open >
+    own 90th %ile`. A structurally strong trend stock also having a statistically unusual
+    day for itself.
 - **A percentile-mode condition can't false-exclude a symbol before its band has loaded.**
   `matchesCondition` returns `true` (passes, not fails) when `pctileThreshold == null` — so a
   trader who adds a "vs OWN %ILE" condition sees the full unfiltered table for the ~4s the
@@ -352,11 +406,20 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
   '<' | '>' | 'between'`, `PercentileKey = 'min'|'p25'|'p50'|'p75'|'p90'|'max'`,
   `pctileBandFor(field)` (which of `intraday`/`closeToClose` a field maps to, or `null` if
   it has no percentile mode), `combinator`,
-  `addCondition`/`updateCondition`/`removeCondition`/`clear`, `toggleQuickFilter(field, op,
+  `addCondition`/`updateCondition`/`removeCondition`/`clear`, `activePreset` (the id of the
+  currently-highlighted strategy preset, or `null`) + `togglePreset(id, conditions,
+  combinator)` (applies a preset and highlights it, or — if that same preset is already
+  active — restores the default empty filter instead; any other mutation
+  (`addCondition`/`updateCondition`/`removeCondition`/`toggleQuickFilter`) clears
+  `activePreset` since a hand-edited filter is no longer exactly that preset — powers the
+  Strategy Presets row), `toggleQuickFilter(field, op,
   value)`/`hasQuickFilter(field, op, value)` (add/remove one exact preset condition in one
   click, toggling on a field+op+value match), `active`, `passes(symbol, stats?)`, local
   `matchesCondition`/`isConditionActive` -- deliberately not the shared
-  `chartsCommon.matchesFilter`, which only knows `'<'`/`'>'`),
+  `chartsCommon.matchesFilter`, which only knows `'<'`/`'>'`), `src/components/charts/
+  screenerPresets.ts` (`SCREENER_PRESETS` — the 8 named strategy condition sets, each a
+  `{id,name,blurb,combinator,conditions}`; `cond()` is a tiny local builder, not exported),
+  `src/components/charts/RegimeBadge.tsx` (the breadth-gate badge — see What It Does),
   `src/components/charts/ScreenerFilterBar.tsx` (the condition-row UI, including the local
   `ScreenerOpToggle` 3-way `<`/`>`/`B/W` control with an `allowBetween` prop (`false` in
   percentile mode), the second "...and..." value box shown only for `between`, the "vs OWN
@@ -390,6 +453,24 @@ at 9:18, and advance-decline breadth) built client-side off the same tick stream
 
 ## Suggestions
 
+- **Strategy preset evidence quality is uneven — worth being explicit about which is which.**
+  **ORB — Stocks in Play** is the one backed by an actual published backtest (Zarattini,
+  Barbon & Aziz 2024, SSRN/Swiss Finance Institute RP 24-98: 7,000+ US stocks, 2016-2023,
+  top-20 "stocks in play" portfolio returned 1,600%+ / Sharpe 2.81 vs. 198% buy-and-hold
+  S&P 500). **Trend Template** mirrors a widely-replicated practitioner framework
+  (Minervini, *Trade Like a Stock Market Wizard*) but this page's 4-SMA set is an
+  approximation of his 50/150/200 original. **Gap Continuation/Fade**, **Pullback
+  Reclaim/Rally Fading**, and **Cheap Momentum** are reasonable heuristics grounded in
+  common day-trading practice (VWAP/Z-score mean-reversion, gap-and-go/gap-fade concepts)
+  but the specific numeric thresholds (90th %ile, 20%/75%/70% give-back/recovery cutoffs)
+  are untested on this page's own data — none of these have gone through the Golden Rule's
+  validation pipeline (Unit → Data Quality → Forward Return → Decile → Stability → OOS).
+  Worth backtesting each preset's actual forward returns before trusting it beyond
+  "candidate watchlist" use.
+- **No volume/turnover field exists on this page**, which several of the source strategies
+  (ORB "stocks in play," Gap Continuation/Fade, Cheap Momentum) normally confirm with —
+  every preset here is a price-only proxy. Adding relative volume/turnover would let these
+  presets match their source strategies more faithfully.
 - **"vs OWN %ILE" has no nested-group/between support, and only covers 2 of 12 fields.**
   Percentile mode is `<`/`>` against one breakpoint only (no "between 25th and 75th %ile" in
   one condition — needs two stacked conditions today), and only `vsPrevClose`/`vsOpen` have a

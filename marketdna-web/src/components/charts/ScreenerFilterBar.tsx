@@ -7,6 +7,7 @@ import {
   SCREENER_FIELDS, SCREENER_FIELD_LABELS, PERCENTILE_KEYS, PERCENTILE_LABELS, pctileBandFor, isPriceField,
 } from '../../hooks/useScreenerFilters'
 import type { PercentileKey, ScreenerField, ScreenerOp, UseScreenerFilters } from '../../hooks/useScreenerFilters'
+import { SCREENER_PRESETS } from './screenerPresets'
 
 // Three-way op toggle for a screener condition -- '<' / '>' compare against one
 // value, 'between' compares against an inclusive range (two values). Local to
@@ -93,6 +94,31 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
             ))}
           </Box>
         )}
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+        <Typography sx={{ ...MONO, fontSize: '0.56rem', fontWeight: 700, color: INK2, letterSpacing: '0.06em' }}>
+          STRATEGY:
+        </Typography>
+        {SCREENER_PRESETS.map(p => {
+          const presetActive = f.activePreset === p.id
+          return (
+            <Box
+              key={p.id}
+              onClick={() => f.togglePreset(p.id, p.conditions, p.combinator)}
+              title={p.blurb}
+              sx={{
+                px: 1, py: 0.35, borderRadius: 1, cursor: 'pointer',
+                bgcolor: presetActive ? `${CYAN}20` : 'transparent',
+                border: `1px solid ${presetActive ? CYAN : BORDER}`,
+              }}
+            >
+              <Typography sx={{ ...MONO, fontSize: '0.6rem', fontWeight: 800, color: presetActive ? CYAN : INK }}>
+                {p.name}
+              </Typography>
+            </Box>
+          )
+        })}
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
@@ -254,7 +280,12 @@ export function ScreenerFilterBar({ f }: { f: UseScreenerFilters }) {
         Add any number of conditions on live return fields, or raw LTP (op can be &lt;, &gt;, or B/W for a
         between-range), then pick Match ALL (AND) or Match ANY (OR) to combine them. "vs Yday Close"/"vs Today Open"
         conditions can switch to "vs OWN %ILE" to compare against that stock's own 5-year percentile instead of a
-        fixed number. Live off the streaming tick — updates every second, no scan needed.
+        fixed number. Live off the streaming tick — updates every second, no scan needed. The STRATEGY row loads a
+        named strategy's starting conditions (replacing whatever is currently set) and highlights it — every value it
+        writes is then a normal editable row, so retype any threshold, flip an operator, or add/remove conditions
+        same as always (any such edit clears the highlight, since the filter is no longer exactly that preset).
+        Click the highlighted strategy again to unselect it and restore the default (empty) filter. Hover a strategy
+        name for a one-line explanation; see live_screener_page.md for sourcing and evidence notes.
       </Typography>
     </Box>
   )

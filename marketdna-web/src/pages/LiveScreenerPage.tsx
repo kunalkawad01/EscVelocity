@@ -10,6 +10,7 @@ import { IntradayStatsTable } from '../components/charts/IntradayStatsTable'
 import { ScreenerFilterBar } from '../components/charts/ScreenerFilterBar'
 import { EqualWeightIndexTile } from '../components/charts/EqualWeightIndexTile'
 import { AdvanceDeclineTile } from '../components/charts/AdvanceDeclineTile'
+import { RegimeBadge } from '../components/charts/RegimeBadge'
 import { MONO, SANS, GREEN, RED, AMBER, pct, pctFrom, giveBackPct, recoveryPct } from '../components/charts/chartsCommon'
 import { usePalette, useTokens } from '../hooks/usePalette'
 import { useThemeMode } from '../contexts/ThemeModeContext'
@@ -361,6 +362,9 @@ export default function LiveScreenerPage() {
       {/* Dynamic AND/OR return filter */}
       <Box sx={{ px: { xs: 2, md: 4 }, py: 2, borderBottom: `1px solid ${BORDER}` }}>
         <Box sx={{ ...CARD, p: 1.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+            <RegimeBadge ticks={ticks} refOpens={refOpens} />
+          </Box>
           <ScreenerFilterBar f={filters} />
         </Box>
       </Box>
