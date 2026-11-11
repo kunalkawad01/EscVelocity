@@ -23,7 +23,7 @@ from typing import Optional
 import numpy as np
 
 from app.services.duckdb_client import get_connection
-from app.services.fno_tactical_service import _FO_SYMBOLS
+from app.services.fno_tactical_service import _FO_SYMBOLS, _is_trading_day
 from app.services.indicators_service import _rsi, _atr
 from app.services.kite_client import get_kite
 
@@ -101,14 +101,16 @@ def _get_token(symbol: str) -> Optional[int]:
 
 
 def _session_start(now: datetime) -> datetime:
-    """09:15 of the most recently started NSE session (today if it's a weekday
-    and 09:15 has already passed, else the most recent prior weekday) -- used
-    so the 1D tile begins exactly at today's open instead of bleeding into
-    yesterday's candles via a rolling 24h lookback."""
+    """09:15 of the most recently started NSE session (today if it's a trading
+    day and 09:15 has already passed, else the most recent prior trading day) --
+    used so the 1D tile begins exactly at today's open instead of bleeding into
+    yesterday's candles via a rolling 24h lookback. Skips weekends AND NSE
+    holidays (_is_trading_day) -- a plain weekday check alone mislabels a
+    holiday as the current session and returns an empty/malformed candle set."""
     d = now.date()
-    if now.weekday() >= 5 or now.hour * 60 + now.minute < 9 * 60 + 15:
+    if not _is_trading_day(d) or now.hour * 60 + now.minute < 9 * 60 + 15:
         d -= timedelta(days=1)
-        while d.weekday() >= 5:
+        while not _is_trading_day(d):
             d -= timedelta(days=1)
     return datetime(d.year, d.month, d.day, 9, 15)
 
@@ -117,10 +119,10 @@ def _prev_session_bounds(now: datetime) -> tuple[datetime, datetime]:
     """09:15->15:30 of the trading day immediately before the current session
     (see _session_start) -- the 'Yesterday' tab's fixed lookback window. Always a
     fully-completed session (never today), so the close bound is always 15:30
-    rather than "now"."""
+    rather than "now". Skips weekends AND NSE holidays."""
     cur_session_date = _session_start(now).date()
     d = cur_session_date - timedelta(days=1)
-    while d.weekday() >= 5:
+    while not _is_trading_day(d):
         d -= timedelta(days=1)
     return datetime(d.year, d.month, d.day, 9, 15), datetime(d.year, d.month, d.day, 15, 30)
 

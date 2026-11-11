@@ -50,7 +50,6 @@ import os
 import time
 import datetime as dt
 import urllib.parse
-from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import duckdb
@@ -203,9 +202,9 @@ def fetch_tf(symbol: str, tf: str, session: requests.Session, retries: int = 3):
 
 
 def fetch_all_intraday(symbols: list[str]) -> dict:
-    """{symbol: {'1d': candles, '2d': candles, '5d': candles}}"""
+    """{symbol: {'1d': candles, 'yesterday': candles, '5d': candles}}"""
     out = {s: {} for s in symbols}
-    tasks = [(s, tf) for s in symbols for tf in ("1d", "2d", "5d")]
+    tasks = [(s, tf) for s in symbols for tf in ("1d", "yesterday", "5d")]
     session = requests.Session()
     with ThreadPoolExecutor(max_workers=3) as pool:
         futures = {pool.submit(fetch_tf, s, tf, session): (s, tf) for s, tf in tasks}
@@ -223,20 +222,6 @@ def closes_of(candles):
     if not candles:
         return None
     return np.array([c["close"] for c in candles], dtype=float)
-
-
-def yesterday_closes(candles_2d):
-    """Split the 2D (5-minute) response by date, return the earlier session's closes."""
-    if not candles_2d:
-        return None
-    groups = OrderedDict()
-    for c in candles_2d:
-        d = c["time"][:10]
-        groups.setdefault(d, []).append(c["close"])
-    dates = list(groups.keys())
-    if len(dates) < 2:
-        return None
-    return np.array(groups[dates[-2]], dtype=float)
 
 
 # -------------------------------------------------------------- charting --
@@ -589,7 +574,7 @@ def main():
     prices = load_prices(symbols)
     print(f"{len(prices)} rows fetched")
 
-    print("Fetching live intraday candles (1D/2D/5D) from backend...")
+    print("Fetching live intraday candles (1D/Yesterday/5D) from backend...")
     intraday = fetch_all_intraday(symbols)
 
     movers_lookup = {}
@@ -621,7 +606,7 @@ def main():
 
         itd = intraday.get(symbol, {})
         c_today = closes_of(itd.get("1d"))
-        c_yday = yesterday_closes(itd.get("2d"))
+        c_yday = closes_of(itd.get("yesterday"))
         c_5d = closes_of(itd.get("5d"))
         c_1m = closes[-21:] if len(closes) >= 2 else None
         c_3m = closes[-63:] if len(closes) >= 2 else None
