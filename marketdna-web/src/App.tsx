@@ -25,6 +25,7 @@ import LiveTradingPage from './pages/LiveTradingPage'
 import IntradayRacePage from './pages/IntradayRacePage'
 import DruckenmillerROCPage from './pages/DruckenmillerROCPage'
 import SectorHeatmapPage from './pages/SectorHeatmapPage'
+import HeatmapPage from './pages/HeatmapPage'
 import CompanyIntelligencePage from './pages/CompanyIntelligencePage'
 import FnoTacticalPage from './pages/FnoTacticalPage'
 import FnoMomentumPage from './pages/FnoMomentumPage'
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/intraday-race"         element={<IntradayRacePage />} />
           <Route path="/druckenmiller-roc"     element={<DruckenmillerROCPage />} />
           <Route path="/sector-heatmap"                    element={<SectorHeatmapPage />} />
+          <Route path="/heatmap"                           element={<HeatmapPage />} />
           <Route path="/company-intelligence"           element={<CompanyIntelligencePage />} />
           <Route path="/company-intelligence/:symbol"   element={<CompanyIntelligencePage />} />
           <Route path="/fno-tactical"                   element={<FnoTacticalPage />} />

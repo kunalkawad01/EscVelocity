@@ -39,6 +39,7 @@ const NAV_GROUPS = [
       { to: '/dataviz',          label: 'DataViz',       desc: 'NSE 500 return visualisation' },
       { to: '/druckenmiller-roc',label: 'ROC²',          desc: 'Druckenmiller second-derivative signal' },
       { to: '/sector-heatmap',   label: 'Sectors',       desc: 'Performance grid across 7 timeframes'   },
+      { to: '/heatmap',          label: 'Heatmap',       desc: 'F&O stocks, F&O sectors, Nifty 50 & Nifty 500 sector treemaps' },
     ],
   },
   {
